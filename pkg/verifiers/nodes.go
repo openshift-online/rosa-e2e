@@ -59,19 +59,22 @@ func (v verifyNodeCount) Name() string {
 }
 
 func (v verifyNodeCount) Verify(ctx context.Context, client kubernetes.Interface) error {
-	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	// Count only worker nodes (exclude infra/master nodes)
+	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: "node-role.kubernetes.io/worker",
+	})
 	if err != nil {
-		return fmt.Errorf("listing nodes: %w", err)
+		return fmt.Errorf("listing worker nodes: %w", err)
 	}
 
 	if len(nodes.Items) != v.expected {
-		return fmt.Errorf("expected %d nodes, found %d", v.expected, len(nodes.Items))
+		return fmt.Errorf("expected %d worker nodes, found %d", v.expected, len(nodes.Items))
 	}
 
 	return nil
 }
 
-// VerifyNodeCount returns a verifier that checks the node count matches expected.
+// VerifyNodeCount returns a verifier that checks the worker node count matches expected.
 func VerifyNodeCount(expected int) ClusterVerifier {
 	return verifyNodeCount{expected: expected}
 }

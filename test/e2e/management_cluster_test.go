@@ -30,7 +30,7 @@ var _ = Describe("Infrastructure: Management Cluster Health", labels.High, label
 		Expect(verifiers.VerifyHyperShiftOperator(ctx, tc.MCKubeClient())).To(Succeed())
 	})
 
-	It("should have CAPA controller running", func(ctx context.Context) {
+	It("should have external-dns running", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 		if !tc.HasMCAccess() {
 			Skip("MANAGEMENT_CLUSTER_ID not configured")
@@ -39,8 +39,24 @@ var _ = Describe("Infrastructure: Management Cluster Health", labels.High, label
 		By("Initializing management cluster clients")
 		Expect(tc.InitMCClients()).To(Succeed())
 
-		By("Verifying CAPA controller is available")
-		Expect(verifiers.VerifyCAPAController(ctx, tc.MCKubeClient())).To(Succeed())
+		By("Verifying external-dns is available")
+		Expect(verifiers.VerifyExternalDNS(ctx, tc.MCKubeClient())).To(Succeed())
+	})
+
+	It("should have CAPI provider running in HCP namespace", func(ctx context.Context) {
+		tc := framework.NewTestContext(cfg, conn)
+		if !tc.HasMCAccess() {
+			Skip("MANAGEMENT_CLUSTER_ID not configured")
+		}
+
+		By("Initializing management cluster clients")
+		Expect(tc.InitMCClients()).To(Succeed())
+
+		ns := tc.HCPNamespaces()
+		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+
+		By("Verifying capi-provider in " + ns.HCPNamespace)
+		Expect(verifiers.VerifyCAPIProvider(ctx, tc.MCKubeClient(), ns.HCPNamespace)).To(Succeed())
 	})
 
 	It("should have hosted control plane namespaces", func(ctx context.Context) {

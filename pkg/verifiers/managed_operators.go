@@ -73,16 +73,16 @@ func VerifyAVOVpcEndpoints(ctx context.Context, dynamicClient dynamic.Interface,
 			condType, _ := condMap["type"].(string)
 			condStatus, _ := condMap["status"].(string)
 
-			if strings.EqualFold(condType, "available") {
+			// AVO uses AWSVpcEndpointReady condition type
+			if condType == "AWSVpcEndpointReady" || strings.EqualFold(condType, "available") {
 				availableCondFound = true
 				if strings.EqualFold(condStatus, "true") {
-					// VpcEndpoint is available
 					break
 				} else {
 					reason, _ := condMap["reason"].(string)
 					message, _ := condMap["message"].(string)
-					unavailable = append(unavailable, fmt.Sprintf("- %s: available=%s (reason: %s, message: %s)",
-						name, condStatus, reason, message))
+					unavailable = append(unavailable, fmt.Sprintf("- %s: %s=%s (reason: %s, message: %s)",
+						name, condType, condStatus, reason, message))
 				}
 			}
 		}

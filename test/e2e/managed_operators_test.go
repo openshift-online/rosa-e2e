@@ -38,8 +38,11 @@ var _ = Describe("ROSA HCP Managed Operators", labels.Critical, labels.Positive,
 		By("Initializing management cluster clients")
 		Expect(tc.InitMCClients()).To(Succeed())
 
-		By("Verifying RMO RouteMonitors exist")
-		Expect(verifiers.VerifyRMORouteMonitors(ctx, tc.MCDynamicClient(), cfg.ClusterID)).To(Succeed())
+		ns := tc.HCPNamespaces()
+		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+
+		By("Verifying RMO RouteMonitors exist in " + ns.HCPNamespace)
+		Expect(verifiers.VerifyRMORouteMonitors(ctx, tc.MCDynamicClient(), ns.HCPNamespace)).To(Succeed())
 	})
 
 	It("should have AVO VpcEndpoints on management cluster", func(ctx context.Context) {
@@ -52,8 +55,11 @@ var _ = Describe("ROSA HCP Managed Operators", labels.Critical, labels.Positive,
 		By("Initializing management cluster clients")
 		Expect(tc.InitMCClients()).To(Succeed())
 
-		By("Verifying AVO VpcEndpoints are healthy")
-		Expect(verifiers.VerifyAVOVpcEndpoints(ctx, tc.MCDynamicClient(), cfg.ClusterID)).To(Succeed())
+		ns := tc.HCPNamespaces()
+		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+
+		By("Verifying AVO VpcEndpoints are healthy in " + ns.HCPNamespace)
+		Expect(verifiers.VerifyAVOVpcEndpoints(ctx, tc.MCDynamicClient(), ns.HCPNamespace)).To(Succeed())
 	})
 
 	It("should have audit-webhook running on management cluster", func(ctx context.Context) {
@@ -66,7 +72,10 @@ var _ = Describe("ROSA HCP Managed Operators", labels.Critical, labels.Positive,
 		By("Initializing management cluster clients")
 		Expect(tc.InitMCClients()).To(Succeed())
 
-		By("Verifying audit-webhook deployment is available")
-		Expect(verifiers.VerifyAuditWebhook(ctx, tc.MCKubeClient(), cfg.ClusterID)).To(Succeed())
+		ns := tc.HCPNamespaces()
+		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+
+		By("Verifying audit-webhook deployment in " + ns.HCPNamespace)
+		Expect(verifiers.VerifyAuditWebhook(ctx, tc.MCKubeClient(), ns.HCPNamespace)).To(Succeed())
 	})
 })

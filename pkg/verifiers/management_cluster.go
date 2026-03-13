@@ -15,9 +15,14 @@ func VerifyHyperShiftOperator(ctx context.Context, client kubernetes.Interface) 
 	return verifyDeploymentInNamespace(ctx, client, "hypershift", "operator")
 }
 
-// VerifyCAPAController verifies the CAPA controller manager deployment is available.
-func VerifyCAPAController(ctx context.Context, client kubernetes.Interface) error {
-	return verifyDeploymentInNamespace(ctx, client, "hypershift", "capa-controller-manager")
+// VerifyExternalDNS verifies the external-dns deployment in the hypershift namespace.
+func VerifyExternalDNS(ctx context.Context, client kubernetes.Interface) error {
+	return verifyDeploymentInNamespace(ctx, client, "hypershift", "external-dns")
+}
+
+// VerifyCAPIProvider verifies the capi-provider deployment in an HCP namespace.
+func VerifyCAPIProvider(ctx context.Context, client kubernetes.Interface, hcpNamespace string) error {
+	return verifyDeploymentInNamespace(ctx, client, hcpNamespace, "capi-provider")
 }
 
 func verifyDeploymentInNamespace(ctx context.Context, client kubernetes.Interface, namespace, name string) error {

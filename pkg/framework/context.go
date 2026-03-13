@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"os"
 
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
@@ -11,6 +12,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/openshift-online/rosa-e2e/pkg/config"
 )
@@ -35,6 +37,9 @@ type TestContext struct {
 	scRestConfig    *rest.Config
 	scKubeClient    kubernetes.Interface
 	scDynamicClient dynamic.Interface
+
+	// Resolved HCP namespaces on the MC (set after ResolveHCPNamespaces)
+	hcpNamespaces *HCPNamespaces
 
 	// AWS clients (set when AWS credentials are available)
 	ec2Client        *ec2.Client
@@ -82,8 +87,10 @@ func (tc *TestContext) InitHCClients() error {
 }
 
 // InitMCClients initializes kube and dynamic clients for the management cluster.
+// If MC_KUBECONFIG is set, uses that kubeconfig file (e.g. from backplane).
+// Otherwise falls back to OCM credentials API.
 func (tc *TestContext) InitMCClients() error {
-	restCfg, err := GetClusterCredentials(tc.conn, tc.cfg.ManagementClusterID)
+	restCfg, err := resolveKubeconfig("MC_KUBECONFIG", tc.conn, tc.cfg.ManagementClusterID)
 	if err != nil {
 		return fmt.Errorf("getting MC credentials: %w", err)
 	}
@@ -100,7 +107,33 @@ func (tc *TestContext) InitMCClients() error {
 		return fmt.Errorf("creating MC dynamic client: %w", err)
 	}
 	tc.mcDynamicClient = dynClient
+
+	// Resolve HCP namespaces if we have a cluster name or ID
+	if tc.cfg.ClusterID != "" {
+		clusterName := tc.resolveClusterName()
+		ns, err := ResolveHCPNamespaces(context.Background(), dynClient, clusterName, tc.cfg.ClusterID)
+		if err != nil {
+			// Non-fatal: some tests can still work without resolved namespaces
+			return nil
+		}
+		tc.hcpNamespaces = ns
+	}
+
 	return nil
+}
+
+// resolveClusterName gets the cluster name from OCM.
+func (tc *TestContext) resolveClusterName() string {
+	resp, err := tc.conn.ClustersMgmt().V1().Clusters().Cluster(tc.cfg.ClusterID).Get().Send()
+	if err != nil {
+		return ""
+	}
+	return resp.Body().Name()
+}
+
+// HCPNamespaces returns the resolved HCP namespace info, or nil if not resolved.
+func (tc *TestContext) HCPNamespaces() *HCPNamespaces {
+	return tc.hcpNamespaces
 }
 
 // InitAWSClients initializes EC2 and CloudTrail clients using the default credential chain.
@@ -153,8 +186,9 @@ func (tc *TestContext) CloudTrailClient() *cloudtrail.Client {
 }
 
 // InitSCClients initializes kube and dynamic clients for the service cluster.
+// If SC_KUBECONFIG is set, uses that kubeconfig file. Otherwise uses OCM credentials API.
 func (tc *TestContext) InitSCClients() error {
-	restCfg, err := GetClusterCredentials(tc.conn, tc.cfg.ServiceClusterID)
+	restCfg, err := resolveKubeconfig("SC_KUBECONFIG", tc.conn, tc.cfg.ServiceClusterID)
 	if err != nil {
 		return fmt.Errorf("getting SC credentials: %w", err)
 	}
@@ -197,4 +231,16 @@ func (tc *TestContext) HasMCAccess() bool {
 // HasAWSAccess returns true if AWS clients were successfully initialized.
 func (tc *TestContext) HasAWSAccess() bool {
 	return tc.ec2Client != nil
+}
+
+// resolveKubeconfig loads a rest.Config from a kubeconfig file env var, or falls back to OCM credentials.
+func resolveKubeconfig(envVar string, conn *sdk.Connection, clusterID string) (*rest.Config, error) {
+	if kubeconfigPath := os.Getenv(envVar); kubeconfigPath != "" {
+		cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("loading kubeconfig from %s=%s: %w", envVar, kubeconfigPath, err)
+		}
+		return cfg, nil
+	}
+	return GetClusterCredentials(conn, clusterID)
 }

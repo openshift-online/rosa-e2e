@@ -24,8 +24,11 @@ var _ = Describe("ROSA HCP HostedCluster Health", labels.Critical, labels.Positi
 		By("Initializing management cluster clients")
 		Expect(tc.InitMCClients()).To(Succeed())
 
-		By("Verifying all deployments in HCP namespace are healthy")
-		Expect(verifiers.VerifyHCPNamespaceHealthy(ctx, tc.MCKubeClient(), cfg.ClusterID)).To(Succeed())
+		ns := tc.HCPNamespaces()
+		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+
+		By("Verifying all deployments in " + ns.HCPNamespace + " are healthy")
+		Expect(verifiers.VerifyHCPNamespaceHealthy(ctx, tc.MCKubeClient(), ns.HCPNamespace)).To(Succeed())
 	})
 
 	It("should have healthy HostedCluster CR", func(ctx context.Context) {
@@ -38,8 +41,11 @@ var _ = Describe("ROSA HCP HostedCluster Health", labels.Critical, labels.Positi
 		By("Initializing management cluster clients")
 		Expect(tc.InitMCClients()).To(Succeed())
 
-		By("Verifying HostedCluster CR is healthy")
-		Expect(verifiers.VerifyHostedClusterHealthy(ctx, tc.MCDynamicClient(), cfg.ClusterID, cfg.ClusterID)).To(Succeed())
+		ns := tc.HCPNamespaces()
+		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+
+		By("Verifying HostedCluster CR in " + ns.HCNamespace)
+		Expect(verifiers.VerifyHostedClusterHealthy(ctx, tc.MCDynamicClient(), ns.HCNamespace, ns.ClusterName)).To(Succeed())
 	})
 
 	It("should have healthy NodePool CRs", func(ctx context.Context) {
@@ -52,7 +58,10 @@ var _ = Describe("ROSA HCP HostedCluster Health", labels.Critical, labels.Positi
 		By("Initializing management cluster clients")
 		Expect(tc.InitMCClients()).To(Succeed())
 
-		By("Verifying NodePool CRs are healthy")
-		Expect(verifiers.VerifyNodePoolHealthy(ctx, tc.MCDynamicClient(), cfg.ClusterID, cfg.ClusterID)).To(Succeed())
+		ns := tc.HCPNamespaces()
+		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+
+		By("Verifying NodePool CRs in " + ns.HCNamespace)
+		Expect(verifiers.VerifyNodePoolHealthy(ctx, tc.MCDynamicClient(), ns.HCNamespace, ns.ClusterName)).To(Succeed())
 	})
 })
