@@ -2,7 +2,7 @@
 
 Unified end-to-end test suite for ROSA (Red Hat OpenShift Service on AWS). Validates cluster lifecycle, data plane health, managed service components, customer features, infrastructure tiers, and upgrade operations.
 
-Modeled after the [ARO-HCP e2e methodology](https://github.com/Azure/ARO-HCP/tree/main/test): framework/test/verifier separation, label-based test selection, Ginkgo v2, and composable health checks.
+Uses framework/test/verifier separation, label-based test selection, Ginkgo v2, and composable health checks.
 
 ## Overview
 
@@ -16,14 +16,15 @@ This test suite validates all three tiers and the interactions between them.
 
 ## Test Areas
 
-The suite is organized into six test areas (use `Area:*` labels to filter):
+The suite is organized into seven test areas (use `Area:*` labels to filter):
 
 1. **Cluster Lifecycle** (`Area:ClusterLifecycle`) - Cluster create/delete via OCM API, cluster state transitions
 2. **Data Plane** (`Area:DataPlane`) - Workload deployments, storage, PVC, snapshots, node readiness
 3. **Managed Service Health** (`Area:ManagedService`) - ClusterOperators, RMO/AVO on MC, CloudTrail IAM validation, infrastructure tags, HostedCluster CRs
 4. **Customer Features** (`Area:CustomerFeatures`) - Log forwarding, external OIDC, PrivateLink, KMS, machine pools
 5. **Infrastructure Tiers** (`Area:Infrastructure`) - SC health, MC health, cross-tier connectivity
-6. **Upgrade Validation** (`Area:Upgrade`) - Control plane upgrades, nodepool upgrades
+6. **Control Plane** (`Area:ControlPlane`) - OCM API health, OSDFM fleet management, cluster-service responsiveness
+7. **Upgrade Validation** (`Area:Upgrade`) - Control plane upgrades, nodepool upgrades
 
 ## Prerequisites
 
@@ -166,6 +167,7 @@ Tests are labeled using Ginkgo v2 labels. Use `--label-filter` to run subsets of
 - `Area:ManagedService`
 - `Area:CustomerFeatures`
 - `Area:Infrastructure`
+- `Area:ControlPlane`
 - `Area:Upgrade`
 
 **Importance** (criticality):
@@ -262,8 +264,6 @@ rosa-e2e/
 - **OCM SDK Direct**: Uses OCM Go SDK directly (not rosa CLI) for cluster lifecycle operations
 - **Composable Verifiers**: Reusable health check functions that can be mixed and matched
 - **Per-Test Isolation**: Each test cleans up via `DeferCleanup` to prevent state leakage
-
-Modeled after [ARO-HCP e2e test suite](https://github.com/Azure/ARO-HCP/tree/main/test).
 
 ## CI Integration
 

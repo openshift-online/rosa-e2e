@@ -38,5 +38,6 @@ var (
 	ManagedService   = ginkgo.Label("Area:ManagedService")
 	CustomerFeatures = ginkgo.Label("Area:CustomerFeatures")
 	Infrastructure   = ginkgo.Label("Area:Infrastructure")
+	ControlPlane     = ginkgo.Label("Area:ControlPlane")
 	Upgrade          = ginkgo.Label("Area:Upgrade")
 )
