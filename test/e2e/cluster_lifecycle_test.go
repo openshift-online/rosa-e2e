@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -14,35 +15,29 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("ROSA HCP Cluster Lifecycle", labels.Critical, labels.Positive, labels.Slow, labels.HCP, labels.ClusterLifecycle, func() {
-	It("should create and delete a ROSA HCP cluster", func(ctx context.Context) {
+var _ = Describe("ROSA HCP Cluster Lifecycle: Full", labels.Critical, labels.Positive, labels.Slow, labels.HCP, labels.ClusterLifecycle, func() {
+	It("should create, verify, and delete a ROSA HCP cluster", func(ctx context.Context) {
+		if cfg.ClusterID != "" {
+			Skip("CLUSTER_ID is set, skipping full lifecycle test (use existing cluster tests instead)")
+		}
+
 		tc := framework.NewTestContext(cfg, conn)
 
-		var clusterID string
+		By("Creating a ROSA HCP cluster")
+		clusterID, err := framework.CreateRosaHCPCluster(tc.Connection(), tc.Config())
+		Expect(err).NotTo(HaveOccurred())
+		GinkgoWriter.Printf("Created cluster: %s\n", clusterID)
 
-		if tc.Config().ClusterID != "" {
-			// Use existing cluster — skip creation and deletion
-			clusterID = tc.Config().ClusterID
-			GinkgoWriter.Printf("Using existing cluster: %s\n", clusterID)
-		} else {
-			By("Creating a ROSA HCP cluster")
-			var err error
-			clusterID, err = framework.CreateRosaHCPCluster(tc.Connection(), tc.Config())
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Printf("Created cluster: %s\n", clusterID)
+		DeferCleanup(func() {
+			By("Cleaning up: deleting cluster")
+			err := framework.DeleteCluster(tc.Connection(), clusterID)
+			if err != nil {
+				GinkgoWriter.Printf("Warning: failed to delete cluster %s during cleanup: %v\n", clusterID, err)
+			}
+		})
 
-			// Register cleanup — runs even if test fails
-			DeferCleanup(func() {
-				By("Cleaning up: deleting cluster")
-				err := framework.DeleteCluster(tc.Connection(), clusterID)
-				if err != nil {
-					GinkgoWriter.Printf("Warning: failed to delete cluster %s during cleanup: %v\n", clusterID, err)
-				}
-			})
-
-			By("Waiting for cluster to be ready")
-			Expect(framework.WaitForClusterReady(tc.Connection(), clusterID, 45*time.Minute)).To(Succeed())
-		}
+		By("Waiting for cluster to be ready (up to 45 minutes)")
+		Expect(framework.WaitForClusterReady(tc.Connection(), clusterID, 45*time.Minute)).To(Succeed())
 
 		By("Verifying cluster is ready in OCM")
 		Expect(verifiers.VerifyClusterReady(tc.Connection(), clusterID)).To(Succeed())
@@ -59,12 +54,43 @@ var _ = Describe("ROSA HCP Cluster Lifecycle", labels.Critical, labels.Positive,
 			verifiers.VerifyNodeCount(tc.Config().ComputeNodes),
 		)).To(Succeed())
 
-		if tc.Config().ClusterID == "" {
-			By("Deleting the cluster")
-			Expect(framework.DeleteCluster(tc.Connection(), clusterID)).To(Succeed())
+		By("Deleting the cluster")
+		Expect(framework.DeleteCluster(tc.Connection(), clusterID)).To(Succeed())
 
-			By("Verifying cluster is uninstalling")
-			Expect(verifiers.VerifyClusterDeleting(tc.Connection(), clusterID)).To(Succeed())
+		By("Verifying cluster is uninstalling")
+		Expect(verifiers.VerifyClusterDeleting(tc.Connection(), clusterID)).To(Succeed())
+	})
+})
+
+var _ = Describe("ROSA HCP Cluster Lifecycle: Existing Cluster", labels.Critical, labels.Positive, labels.HCP, labels.ClusterLifecycle, func() {
+	It("should verify an existing cluster is healthy", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set, skipping existing cluster verification")
 		}
+
+		tc := framework.NewTestContext(cfg, conn)
+
+		By("Verifying cluster is ready in OCM")
+		Expect(verifiers.VerifyClusterReady(tc.Connection(), cfg.ClusterID)).To(Succeed())
+
+		By("Getting actual node count from OCM")
+		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.Status()).To(Equal(http.StatusOK))
+
+		expectedNodes := resp.Body().Nodes().Compute()
+		GinkgoWriter.Printf("Cluster has %d compute nodes configured\n", expectedNodes)
+
+		By("Verifying cluster health via Kubernetes API")
+		kubeConfig, err := framework.GetClusterCredentials(tc.Connection(), cfg.ClusterID)
+		Expect(err).NotTo(HaveOccurred())
+
+		kubeClient, err := framework.NewKubeClient(kubeConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(verifiers.RunVerifiers(ctx, kubeClient,
+			verifiers.VerifyAllNodesReady(),
+			verifiers.VerifyNodeCount(expectedNodes),
+		)).To(Succeed())
 	})
 })
