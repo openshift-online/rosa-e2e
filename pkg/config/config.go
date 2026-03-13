@@ -38,8 +38,14 @@ type Config struct {
 	// Management cluster access (for HCP namespace checks)
 	ManagementClusterID string `yaml:"management_cluster_id"`
 
+	// Service cluster access (for SC health checks)
+	ServiceClusterID string `yaml:"service_cluster_id"`
+
 	// Persistent sector mode
 	SectorName string `yaml:"sector_name"`
+
+	// Upgrade testing
+	UpgradeTargetVersion string `yaml:"upgrade_target_version"`
 }
 
 // OCMBaseURL returns the OCM API URL for the configured environment.
@@ -135,8 +141,14 @@ func Load() (*Config, error) {
 	if v := os.Getenv("MANAGEMENT_CLUSTER_ID"); v != "" {
 		cfg.ManagementClusterID = v
 	}
+	if v := os.Getenv("SERVICE_CLUSTER_ID"); v != "" {
+		cfg.ServiceClusterID = v
+	}
 	if v := os.Getenv("SECTOR_NAME"); v != "" {
 		cfg.SectorName = v
+	}
+	if v := os.Getenv("UPGRADE_TARGET_VERSION"); v != "" {
+		cfg.UpgradeTargetVersion = v
 	}
 
 	if cfg.OCMToken == "" {

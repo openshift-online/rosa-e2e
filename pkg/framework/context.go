@@ -31,6 +31,11 @@ type TestContext struct {
 	mcKubeClient    kubernetes.Interface
 	mcDynamicClient dynamic.Interface
 
+	// Service cluster client (set when SERVICE_CLUSTER_ID is configured)
+	scRestConfig    *rest.Config
+	scKubeClient    kubernetes.Interface
+	scDynamicClient dynamic.Interface
+
 	// AWS clients (set when AWS credentials are available)
 	ec2Client        *ec2.Client
 	cloudtrailClient *cloudtrail.Client
@@ -145,6 +150,43 @@ func (tc *TestContext) EC2Client() *ec2.Client {
 // CloudTrailClient returns the CloudTrail client, or nil if not initialized.
 func (tc *TestContext) CloudTrailClient() *cloudtrail.Client {
 	return tc.cloudtrailClient
+}
+
+// InitSCClients initializes kube and dynamic clients for the service cluster.
+func (tc *TestContext) InitSCClients() error {
+	restCfg, err := GetClusterCredentials(tc.conn, tc.cfg.ServiceClusterID)
+	if err != nil {
+		return fmt.Errorf("getting SC credentials: %w", err)
+	}
+	tc.scRestConfig = restCfg
+
+	kubeClient, err := NewKubeClient(restCfg)
+	if err != nil {
+		return fmt.Errorf("creating SC kube client: %w", err)
+	}
+	tc.scKubeClient = kubeClient
+
+	dynClient, err := dynamic.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("creating SC dynamic client: %w", err)
+	}
+	tc.scDynamicClient = dynClient
+	return nil
+}
+
+// SCKubeClient returns the service cluster kube client, or nil if not initialized.
+func (tc *TestContext) SCKubeClient() kubernetes.Interface {
+	return tc.scKubeClient
+}
+
+// SCDynamicClient returns the service cluster dynamic client, or nil if not initialized.
+func (tc *TestContext) SCDynamicClient() dynamic.Interface {
+	return tc.scDynamicClient
+}
+
+// HasSCAccess returns true if the service cluster ID is configured.
+func (tc *TestContext) HasSCAccess() bool {
+	return tc.cfg.ServiceClusterID != ""
 }
 
 // HasMCAccess returns true if the management cluster ID is configured.
