@@ -1,0 +1,6 @@
+ocm_env: integration
+aws_region: us-east-1
+cluster_name_prefix: e2e
+compute_machine_type: m5.xlarge
+compute_nodes: 2
+channel_group: stable

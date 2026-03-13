@@ -1,0 +1,26 @@
+# ci-operator configuration for openshift-online/rosa-e2e
+# This file will be submitted to openshift/release repository
+
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.24
+
+images:
+- dockerfile_path: Containerfile
+  to: rosa-e2e
+
+tests:
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+
+- as: lint
+  commands: make lint
+  container:
+    from: src
+
+# Periodic E2E job will be added once tests are stable
+# See docs/ci-setup.md for the complete periodic job configuration

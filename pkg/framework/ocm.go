@@ -1,0 +1,218 @@
+package framework
+
+import (
+	"context"
+	"fmt"
+	"math/rand/v2"
+	"time"
+
+	"github.com/onsi/ginkgo/v2"
+	sdk "github.com/openshift-online/ocm-sdk-go"
+	cmv1 "github.com/openshift-online/ocm-sdk-go/clustersmgmt/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/openshift-online/rosa-e2e/pkg/config"
+)
+
+const (
+	tokenURL     = "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+	clientID     = "cloud-services"
+	clientSecret = ""
+
+	pollInterval       = 30 * time.Second
+	defaultReadyTimout = 45 * time.Minute
+)
+
+// NewOCMConnection creates a new OCM SDK connection using the provided configuration.
+func NewOCMConnection(cfg *config.Config) (*sdk.Connection, error) {
+	builder := sdk.NewConnectionBuilder().
+		URL(cfg.OCMBaseURL()).
+		TokenURL(tokenURL).
+		Client(clientID, clientSecret).
+		Tokens(cfg.OCMToken)
+
+	conn, err := builder.Build()
+	if err != nil {
+		return nil, fmt.Errorf("building OCM connection: %w", err)
+	}
+	return conn, nil
+}
+
+// CreateRosaHCPCluster creates a ROSA HCP cluster via the OCM API and returns its ID.
+func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, error) {
+	name := generateClusterName(cfg.ClusterNamePrefix)
+
+	versionID, err := resolveVersion(conn, cfg)
+	if err != nil {
+		return "", fmt.Errorf("resolving version: %w", err)
+	}
+
+	stsBuilder := cmv1.NewSTS().
+		RoleARN(fmt.Sprintf("arn:aws:iam::%s:role/%s-Installer-Role", cfg.AWSAccountID, cfg.AccountRolePrefix)).
+		SupportRoleARN(fmt.Sprintf("arn:aws:iam::%s:role/%s-Support-Role", cfg.AWSAccountID, cfg.AccountRolePrefix)).
+		OperatorRolePrefix(cfg.OperatorRolePrefix).
+		OidcConfig(cmv1.NewOidcConfig().ID(cfg.OIDCConfigID))
+
+	awsBuilder := cmv1.NewAWS().
+		SubnetIDs(cfg.SubnetIDs...).
+		STS(stsBuilder)
+
+	if cfg.BillingAccountID != "" {
+		awsBuilder = awsBuilder.BillingAccountID(cfg.BillingAccountID)
+	}
+
+	clusterBuilder := cmv1.NewCluster().
+		Name(name).
+		Product(cmv1.NewProduct().ID("rosa")).
+		CloudProvider(cmv1.NewCloudProvider().ID("aws")).
+		Region(cmv1.NewCloudRegion().ID(cfg.AWSRegion)).
+		Hypershift(cmv1.NewHypershift().Enabled(true)).
+		MultiAZ(false).
+		CCS(cmv1.NewCCS().Enabled(true)).
+		AWS(awsBuilder).
+		Nodes(cmv1.NewClusterNodes().
+			ComputeMachineType(cmv1.NewMachineType().ID(cfg.ComputeMachineType)).
+			Compute(cfg.ComputeNodes)).
+		Version(cmv1.NewVersion().
+			ID(versionID).
+			ChannelGroup(cfg.ChannelGroup)).
+		Properties(map[string]string{
+			"rosa_creator_arn": cfg.CreatorARN,
+		})
+
+	cluster, err := clusterBuilder.Build()
+	if err != nil {
+		return "", fmt.Errorf("building cluster object: %w", err)
+	}
+
+	resp, err := conn.ClustersMgmt().V1().Clusters().Add().Body(cluster).Send()
+	if err != nil {
+		return "", fmt.Errorf("creating cluster: %w", err)
+	}
+
+	clusterID := resp.Body().ID()
+	ginkgo.GinkgoWriter.Printf("Cluster %q created with ID %s\n", name, clusterID)
+	return clusterID, nil
+}
+
+// WaitForClusterReady polls the cluster status until it reaches "ready" or the timeout expires.
+func WaitForClusterReady(conn *sdk.Connection, clusterID string, timeout time.Duration) error {
+	if timeout == 0 {
+		timeout = defaultReadyTimout
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for cluster %s to be ready after %v", clusterID, timeout)
+		case <-ticker.C:
+			resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().Send()
+			if err != nil {
+				ginkgo.GinkgoWriter.Printf("Error polling cluster %s status: %v\n", clusterID, err)
+				continue
+			}
+			state := resp.Body().State()
+			ginkgo.GinkgoWriter.Printf("Cluster %s state: %s\n", clusterID, state)
+
+			switch state {
+			case cmv1.ClusterStateReady:
+				return nil
+			case cmv1.ClusterStateError:
+				return fmt.Errorf("cluster %s entered error state", clusterID)
+			case cmv1.ClusterStateUninstalling:
+				return fmt.Errorf("cluster %s is uninstalling unexpectedly", clusterID)
+			}
+		}
+	}
+}
+
+// DeleteCluster deletes a cluster via the OCM API.
+func DeleteCluster(conn *sdk.Connection, clusterID string) error {
+	_, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Delete().Send()
+	if err != nil {
+		return fmt.Errorf("deleting cluster %s: %w", clusterID, err)
+	}
+	ginkgo.GinkgoWriter.Printf("Cluster %s deletion initiated\n", clusterID)
+	return nil
+}
+
+// GetClusterCredentials retrieves kubeconfig credentials from the OCM API for the given cluster.
+func GetClusterCredentials(conn *sdk.Connection, clusterID string) (*rest.Config, error) {
+	resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Credentials().Get().Send()
+	if err != nil {
+		return nil, fmt.Errorf("getting credentials for cluster %s: %w", clusterID, err)
+	}
+
+	kubeconfig := resp.Body().Kubeconfig()
+	if kubeconfig == "" {
+		return nil, fmt.Errorf("no kubeconfig available for cluster %s", clusterID)
+	}
+
+	restConfig, err := clientConfigFromKubeconfig([]byte(kubeconfig))
+	if err != nil {
+		return nil, fmt.Errorf("parsing kubeconfig for cluster %s: %w", clusterID, err)
+	}
+
+	return restConfig, nil
+}
+
+// GetClusterState returns the current state of a cluster.
+func GetClusterState(conn *sdk.Connection, clusterID string) (cmv1.ClusterState, error) {
+	resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().Send()
+	if err != nil {
+		return "", fmt.Errorf("getting cluster %s state: %w", clusterID, err)
+	}
+	return resp.Body().State(), nil
+}
+
+// resolveVersion finds the latest available HCP-enabled version matching the config.
+func resolveVersion(conn *sdk.Connection, cfg *config.Config) (string, error) {
+	if cfg.OpenShiftVersion != "" {
+		return "openshift-v" + cfg.OpenShiftVersion, nil
+	}
+
+	// Find the latest version in the channel group that supports HCP
+	query := fmt.Sprintf("channel_group = '%s' AND rosa_enabled = 'true' AND hosted_control_plane_enabled = 'true' AND enabled = 'true'", cfg.ChannelGroup)
+	resp, err := conn.ClustersMgmt().V1().Versions().List().
+		Search(query).
+		Order("raw_id desc").
+		Size(1).
+		Send()
+	if err != nil {
+		return "", fmt.Errorf("listing versions: %w", err)
+	}
+
+	items := resp.Items().Slice()
+	if len(items) == 0 {
+		return "", fmt.Errorf("no HCP-enabled versions found for channel group %q", cfg.ChannelGroup)
+	}
+
+	version := items[0]
+	ginkgo.GinkgoWriter.Printf("Resolved version: %s\n", version.ID())
+	return version.ID(), nil
+}
+
+func generateClusterName(prefix string) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	suffix := make([]byte, 5)
+	for i := range suffix {
+		suffix[i] = charset[rand.IntN(len(charset))]
+	}
+	return fmt.Sprintf("%s-%s", prefix, string(suffix))
+}
+
+// clientConfigFromKubeconfig parses raw kubeconfig YAML into a rest.Config.
+func clientConfigFromKubeconfig(kubeconfig []byte) (*rest.Config, error) {
+	clientConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	return clientConfig, nil
+}
