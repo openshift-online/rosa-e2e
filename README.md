@@ -28,7 +28,7 @@ The suite is organized into seven test areas (use `Area:*` labels to filter):
 
 ## Prerequisites
 
-- Go 1.23+
+- Go 1.24+
 - An OCM offline token (get from https://console.redhat.com/openshift/token)
 - For full lifecycle tests: Pre-provisioned AWS infrastructure (VPC, subnets, OIDC config, IAM roles)
 - For existing cluster tests: Just the cluster ID
@@ -96,6 +96,8 @@ Configuration loads from environment variables with optional YAML file overlay. 
 |----------|-------------|---------|
 | `CLUSTER_ID` | Existing cluster ID (skips create/delete when set) | - |
 | `MANAGEMENT_CLUSTER_ID` | Management cluster ID for HCP namespace checks | - |
+| `MC_KUBECONFIG` | Path to MC kubeconfig file (from backplane) | - |
+| `SC_KUBECONFIG` | Path to SC kubeconfig file (from backplane) | - |
 | `SECTOR_NAME` | Sector name for persistent sector tests | - |
 
 ### AWS Infrastructure (for cluster provisioning)

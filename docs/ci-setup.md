@@ -67,6 +67,18 @@ CLUSTER_ID: "abc123def456"  # Hosted Cluster ID in rosa-e2e sector
 MANAGEMENT_CLUSTER_ID: "xyz789uvw012"  # Management Cluster ID for HCP namespace checks
 ```
 
+### Management Cluster Access
+
+```yaml
+# Secret: rosa-e2e-mc-kubeconfig
+# Key: kubeconfig
+MC_KUBECONFIG: |
+  # Base64-encoded kubeconfig from backplane login
+  # Obtained via: ocm backplane login <cluster-id> --manager
+```
+
+Backplane integration provides MC access in CI, allowing tests to validate HCP namespace health, HostedCluster CRs, NodePool CRs, and managed operators (RMO, AVO, audit-webhook) running on the management cluster.
+
 ## ci-operator Configuration
 
 The rosa-e2e ci-operator config lives in `openshift/release` at:

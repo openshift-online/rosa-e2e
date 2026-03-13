@@ -146,7 +146,22 @@ var _ = Describe("Customer Features: Ingress", labels.High, labels.Positive, lab
 })
 
 var _ = Describe("Customer Features: Log Forwarding", labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
-	PIt("should forward logs to CloudWatch when configured")
+	It("should have ClusterLogForwarder CRD available", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+		tc := framework.NewTestContext(cfg, conn)
+		Expect(tc.InitHCClients()).To(Succeed())
+
+		By("Checking if ClusterLogForwarder CRD exists")
+		gvr := schema.GroupVersionResource{
+			Group:    "observability.openshift.io",
+			Version:  "v1",
+			Resource: "clusterlogforwarders",
+		}
+		_, err := tc.HCDynamicClient().Resource(gvr).List(ctx, metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred(), "ClusterLogForwarder CRD should be available on ROSA HCP clusters")
+	})
 })
 
 var _ = Describe("Customer Features: External OIDC", labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
@@ -154,9 +169,40 @@ var _ = Describe("Customer Features: External OIDC", labels.Medium, labels.Posit
 })
 
 var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
-	PIt("should use KMS key for etcd encryption")
+	It("should report KMS configuration via OCM API", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+		tc := framework.NewTestContext(cfg, conn)
+
+		By("Querying cluster KMS configuration")
+		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
+		Expect(err).NotTo(HaveOccurred())
+
+		kmsKeyARN := resp.Body().AWS().KMSKeyArn()
+		if kmsKeyARN == "" {
+			Skip("Cluster does not have KMS encryption configured")
+		}
+		GinkgoWriter.Printf("KMS Key ARN: %s\n", kmsKeyARN)
+		Expect(kmsKeyARN).To(HavePrefix("arn:aws:kms:"), "KMS key ARN should be a valid AWS KMS ARN")
+	})
 })
 
 var _ = Describe("Customer Features: PrivateLink", labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
-	PIt("should create cluster with PrivateLink enabled")
+	It("should report PrivateLink status via OCM API", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+		tc := framework.NewTestContext(cfg, conn)
+
+		By("Querying cluster PrivateLink status")
+		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
+		Expect(err).NotTo(HaveOccurred())
+
+		isPrivateLink := resp.Body().AWS().PrivateLink()
+		GinkgoWriter.Printf("PrivateLink enabled: %v\n", isPrivateLink)
+		if !isPrivateLink {
+			Skip("Cluster does not have PrivateLink enabled")
+		}
+	})
 })

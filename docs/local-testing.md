@@ -55,39 +55,28 @@ ocm get /api/osd_fleet_mgmt/v1/management_clusters \
   | jq -r '.items[] | .name + "\t" + .cluster_management_reference.cluster_id'
 ```
 
-### Step 2: Login via backplane
+### Step 2: Login via backplane and save kubeconfig
 
 ```bash
 # Login to the HC's MC (--manager flag)
 ocm backplane login <cluster-id> --manager
 
-# This prints the HCP namespace info:
-#   export HC_NAMESPACE=ocm-staging-<cluster-id>
-#   export HCP_NAMESPACE=ocm-staging-<cluster-id>-<cluster-name>
+# Copy the kubeconfig to a temporary location
+cp ~/.kube/config /tmp/mc-kubeconfig.yaml
 ```
 
-### Step 3: Note the namespace format
-
-On staging, HCP namespaces follow this pattern:
-- HostedCluster CR namespace: `ocm-staging-<cluster-id>`
-- HCP deployments namespace: `ocm-staging-<cluster-id>-<cluster-name>`
-
-The tests currently use `CLUSTER_ID` as the HCP namespace, which is correct for production but not staging. This is a known issue being addressed.
-
-### Step 4: Run MC tests manually
-
-Until the namespace resolution is automated, you can verify MC health directly:
+### Step 3: Run tests with MC access
 
 ```bash
-# Check HCP deployments
-oc get deployments -n ocm-staging-<cluster-id>-<cluster-name> --no-headers | wc -l
+# Export the MC kubeconfig path
+export MC_KUBECONFIG=/tmp/mc-kubeconfig.yaml
+export MANAGEMENT_CLUSTER_ID=<mc-cluster-id>
 
-# Check HostedCluster CR
-oc get hostedclusters -n ocm-staging-<cluster-id> -o wide
-
-# Check NodePool CRs
-oc get nodepools -n ocm-staging-<cluster-id> -o wide
+# Run with MC access (tests will now access MC)
+OCM_TOKEN=$(ocm token) OCM_ENV=staging CLUSTER_ID=<cluster-id> make test
 ```
+
+The tests will automatically discover the HCP namespace by querying the HostedCluster CR on the MC. No manual namespace configuration is needed.
 
 ## Adding AWS Access
 
@@ -166,16 +155,14 @@ make build
 | ClusterOperators | CLUSTER_ID, OCM_TOKEN | CLUSTER_ID |
 | IAM Validation | AWS creds | AWS creds |
 | Infrastructure Tags | AWS creds | AWS creds |
-| HCP Namespace Health | MANAGEMENT_CLUSTER_ID | MC access |
-| HostedCluster CR | MANAGEMENT_CLUSTER_ID | MC access |
-| NodePool CR | MANAGEMENT_CLUSTER_ID | MC access |
-| RMO RouteMonitors | MANAGEMENT_CLUSTER_ID | MC access |
-| AVO VpcEndpoints | MANAGEMENT_CLUSTER_ID | MC access |
-| Audit Webhook | MANAGEMENT_CLUSTER_ID | MC access |
+| HCP Namespace Health | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
+| HostedCluster CR | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
+| NodePool CR | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
+| RMO RouteMonitors | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
+| AVO VpcEndpoints | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
+| Audit Webhook | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
 | Cluster Lifecycle | Full AWS infra | CLUSTER_ID (uses existing) |
 
 ## Known Issues
 
-- **HCP namespace format**: Staging uses `ocm-staging-<cluster-id>-<cluster-name>` for the HCP namespace, not just the cluster ID. The tests need to be updated to resolve this dynamically.
-- **MC credentials**: OCM's credentials API doesn't work for management clusters. Tests need backplane integration or a pre-created kubeconfig.
 - **AWS credential validation**: The AWS SDK loads credentials lazily. If `InitAWSClients` succeeds but creds are invalid, the test fails at the API call rather than skipping. Fixed by eagerly validating credentials with `Retrieve()`.

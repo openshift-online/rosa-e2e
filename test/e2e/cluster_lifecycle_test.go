@@ -4,7 +4,6 @@ package e2e
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -73,13 +72,16 @@ var _ = Describe("ROSA HCP Cluster Lifecycle: Existing Cluster", labels.Critical
 		By("Verifying cluster is ready in OCM")
 		Expect(verifiers.VerifyClusterReady(tc.Connection(), cfg.ClusterID)).To(Succeed())
 
-		By("Getting actual node count from OCM")
-		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
+		By("Getting expected node count from node pools")
+		npResp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).
+			NodePools().List().SendContext(ctx)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.Status()).To(Equal(http.StatusOK))
 
-		expectedNodes := resp.Body().Nodes().Compute()
-		GinkgoWriter.Printf("Cluster has %d compute nodes configured\n", expectedNodes)
+		expectedNodes := 0
+		for _, np := range npResp.Items().Slice() {
+			expectedNodes += np.Replicas()
+		}
+		GinkgoWriter.Printf("Cluster has %d total worker nodes across %d node pools\n", expectedNodes, npResp.Total())
 
 		By("Verifying cluster health via Kubernetes API")
 		kubeConfig, err := framework.GetClusterCredentials(tc.Connection(), cfg.ClusterID)

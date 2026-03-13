@@ -45,6 +45,8 @@ configs/          YAML config files per environment
 - **Graceful skips**: Tests skip when required access (MC, AWS) isn't configured
 - **DeferCleanup**: Used for test resource cleanup (namespaces, deployments)
 - **Dynamic client for CRDs**: ClusterOperator, HostedCluster, NodePool, RouteMonitor, VpcEndpoint -- parsed from unstructured, no heavy API type imports
+- **MC/SC access**: Use MC_KUBECONFIG and SC_KUBECONFIG env vars for backplane-based kubeconfig files, or MANAGEMENT_CLUSTER_ID for OCM credentials API
+- **HCP namespace resolution**: Automatically discovered via HostedCluster CR lookup (no manual namespace calculation needed)
 
 ## Test Areas and Labels
 
@@ -75,8 +77,6 @@ configs/          YAML config files per environment
 
 ## Known Issues
 
-- HCP namespace on staging is `ocm-staging-<cluster-id>-<cluster-name>`, not just cluster ID
-- MC access requires backplane (OCM credentials API doesn't work for MCs)
 - AWS SDK validates credentials lazily -- `InitAWSClients` uses eager `Retrieve()` to fail fast
 
 ## Jira
