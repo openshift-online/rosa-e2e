@@ -6,8 +6,41 @@ How to run rosa-e2e tests from your laptop against staging clusters.
 
 - Go 1.24+
 - `ocm` CLI logged into staging: `ocm login --use-auth-code --url stage`
+- `rosa` CLI (for cluster provisioning)
+- `osdctl` CLI (for AWS credentials)
 - `ocm-backplane` CLI (for management cluster access)
-- AWS credentials (for CloudTrail/EBS tag tests, optional)
+
+## Provision Your Own Cluster
+
+Don't use someone else's cluster. Provision a dedicated one with known configuration:
+
+```bash
+# Step 1: Get AWS credentials for your dev account
+# List your accounts:
+osdctl account mgmt list -u <your-username> -p osd-staging-2
+
+# Get credentials (exports AWS env vars):
+eval $(echo "y" | osdctl account cli -i <ACCOUNT_ID> -p osd-staging-2 -r us-east-2 -oenv 2>/dev/null | tr '\n' ' ' | sed 's/.*AWS_ACCESS/AWS_ACCESS/')
+
+# Step 2: Provision (creates VPC, account roles, OIDC, and cluster)
+./scripts/provision-e2e-cluster.sh
+
+# Step 3: Wait for cluster to be ready (~15 min)
+rosa logs install -c rosa-e2e-$(date +%m%d) --watch
+
+# Step 4: Run tests
+source /tmp/rosa-e2e-cluster.env
+OCM_TOKEN=$(ocm token) make test
+
+# Step 5: Clean up when done
+source /tmp/rosa-e2e-cluster.env
+./scripts/deprovision-e2e-cluster.sh
+```
+
+Customize with environment variables:
+```bash
+CLUSTER_NAME=my-test REGION=us-west-2 COMPUTE_NODES=3 ./scripts/provision-e2e-cluster.sh
+```
 
 ## Quick Start: Hosted Cluster Tests Only
 
@@ -163,6 +196,15 @@ make build
 | Audit Webhook | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
 | Cluster Lifecycle | Full AWS infra | CLUSTER_ID (uses existing) |
 
+## Scripts Reference
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/provision-e2e-cluster.sh` | Create VPC, account roles, OIDC config, and ROSA HCP cluster |
+| `scripts/deprovision-e2e-cluster.sh` | Delete cluster, operator roles, OIDC provider, and VPC |
+| `scripts/run-e2e.sh` | Run tests (works both locally and in Prow CI) |
+
 ## Known Issues
 
-- **AWS credential validation**: The AWS SDK loads credentials lazily. If `InitAWSClients` succeeds but creds are invalid, the test fails at the API call rather than skipping. Fixed by eagerly validating credentials with `Retrieve()`.
+- **AWS credential validation**: The AWS SDK loads credentials lazily. `InitAWSClients` uses eager `Retrieve()` to fail fast and skip when creds are unavailable.
+- **HCP regions**: Not all regions support HCP in staging. us-east-2 and us-west-2 are reliable choices.
