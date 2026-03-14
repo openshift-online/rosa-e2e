@@ -46,6 +46,9 @@ type Config struct {
 
 	// Upgrade testing
 	UpgradeTargetVersion string `yaml:"upgrade_target_version"`
+
+	// ClusterOperator exclusion list (for known staging issues)
+	ExcludeClusterOperators []string `yaml:"exclude_cluster_operators"`
 }
 
 // OCMBaseURL returns the OCM API URL for the configured environment.
@@ -149,6 +152,9 @@ func Load() (*Config, error) {
 	}
 	if v := os.Getenv("UPGRADE_TARGET_VERSION"); v != "" {
 		cfg.UpgradeTargetVersion = v
+	}
+	if v := os.Getenv("EXCLUDE_CLUSTER_OPERATORS"); v != "" {
+		cfg.ExcludeClusterOperators = strings.Split(v, ",")
 	}
 
 	if cfg.OCMToken == "" {

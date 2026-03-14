@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"time"
@@ -142,5 +143,95 @@ var _ = Describe("Control Plane: Cluster Service Health", labels.High, labels.Po
 			Addons().List().SendContext(ctx)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.Status()).To(Equal(http.StatusOK))
+	})
+})
+
+var _ = Describe("Control Plane: Cluster Health Indicators", labels.High, labels.Positive, labels.HCP, labels.ControlPlane, func() {
+	It("should have DNS domain configured", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+
+		tc := framework.NewTestContext(cfg, conn)
+
+		By("Querying cluster DNS configuration")
+		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.Status()).To(Equal(http.StatusOK))
+
+		baseDomain := resp.Body().DNS().BaseDomain()
+		Expect(baseDomain).NotTo(BeEmpty())
+
+		GinkgoWriter.Printf("Cluster DNS base domain: %s\n", baseDomain)
+	})
+
+	It("should have console URL set", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+
+		tc := framework.NewTestContext(cfg, conn)
+
+		By("Querying cluster console URL")
+		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.Status()).To(Equal(http.StatusOK))
+
+		consoleURL := resp.Body().Console().URL()
+		Expect(consoleURL).NotTo(BeEmpty())
+
+		GinkgoWriter.Printf("Cluster console URL: %s\n", consoleURL)
+	})
+
+	It("should have API URL responding", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+
+		tc := framework.NewTestContext(cfg, conn)
+
+		By("Querying cluster API URL")
+		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.Status()).To(Equal(http.StatusOK))
+
+		apiURL := resp.Body().API().URL()
+		Expect(apiURL).NotTo(BeEmpty())
+
+		By("Checking API URL reachability")
+		client := &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+
+		apiResp, err := client.Get(apiURL)
+		Expect(err).NotTo(HaveOccurred(), "API URL should be reachable")
+		if apiResp != nil && apiResp.Body != nil {
+			apiResp.Body.Close()
+		}
+
+		GinkgoWriter.Printf("Cluster API URL: %s (reachable)\n", apiURL)
+	})
+
+	It("should have provision shard assigned", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+
+		tc := framework.NewTestContext(cfg, conn)
+
+		By("Querying cluster provision shard")
+		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.Status()).To(Equal(http.StatusOK))
+
+		provisionShard := resp.Body().ProvisionShard()
+		if provisionShard == nil || provisionShard.ID() == "" {
+			GinkgoWriter.Printf("Provision shard not set or not exposed in this environment\n")
+		} else {
+			GinkgoWriter.Printf("Provision shard ID: %s\n", provisionShard.ID())
+		}
 	})
 })

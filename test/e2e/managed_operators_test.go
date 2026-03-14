@@ -25,7 +25,7 @@ var _ = Describe("ROSA HCP Managed Operators", labels.Critical, labels.Positive,
 		Expect(tc.InitHCClients()).To(Succeed())
 
 		By("Verifying all ClusterOperators are healthy")
-		Expect(verifiers.VerifyClusterOperatorsHealthy(ctx, tc.HCDynamicClient())).To(Succeed())
+		Expect(verifiers.VerifyClusterOperatorsHealthy(ctx, tc.HCDynamicClient(), cfg.ExcludeClusterOperators...)).To(Succeed())
 	})
 
 	It("should have RMO RouteMonitors on management cluster", func(ctx context.Context) {

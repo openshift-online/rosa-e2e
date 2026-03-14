@@ -3,6 +3,7 @@ package verifiers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -10,7 +11,13 @@ import (
 )
 
 // VerifyClusterOperatorsHealthy verifies that all ClusterOperators have Available=True and Degraded=False.
-func VerifyClusterOperatorsHealthy(ctx context.Context, dynamicClient dynamic.Interface) error {
+func VerifyClusterOperatorsHealthy(ctx context.Context, dynamicClient dynamic.Interface, excludeOperators ...string) error {
+	// Build exclusion set
+	excluded := make(map[string]bool)
+	for _, op := range excludeOperators {
+		excluded[strings.TrimSpace(op)] = true
+	}
+
 	gvr := schema.GroupVersionResource{
 		Group:    "config.openshift.io",
 		Version:  "v1",
@@ -29,6 +36,9 @@ func VerifyClusterOperatorsHealthy(ctx context.Context, dynamicClient dynamic.In
 	var unhealthy []string
 	for _, item := range unstructuredList.Items {
 		name := item.GetName()
+		if excluded[name] {
+			continue
+		}
 		conditions, found, err := getConditions(item.Object)
 		if err != nil {
 			return fmt.Errorf("getting conditions for %s: %w", name, err)

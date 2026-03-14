@@ -72,17 +72,6 @@ var _ = Describe("ROSA HCP Cluster Lifecycle: Existing Cluster", labels.Critical
 		By("Verifying cluster is ready in OCM")
 		Expect(verifiers.VerifyClusterReady(tc.Connection(), cfg.ClusterID)).To(Succeed())
 
-		By("Getting expected node count from node pools")
-		npResp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).
-			NodePools().List().SendContext(ctx)
-		Expect(err).NotTo(HaveOccurred())
-
-		expectedNodes := 0
-		for _, np := range npResp.Items().Slice() {
-			expectedNodes += np.Replicas()
-		}
-		GinkgoWriter.Printf("Cluster has %d total worker nodes across %d node pools\n", expectedNodes, npResp.Total())
-
 		By("Verifying cluster health via Kubernetes API")
 		kubeConfig, err := framework.GetClusterCredentials(tc.Connection(), cfg.ClusterID)
 		Expect(err).NotTo(HaveOccurred())
@@ -90,9 +79,10 @@ var _ = Describe("ROSA HCP Cluster Lifecycle: Existing Cluster", labels.Critical
 		kubeClient, err := framework.NewKubeClient(kubeConfig)
 		Expect(err).NotTo(HaveOccurred())
 
+		// For existing clusters, just verify all nodes are ready (don't assert count
+		// since autoscaler may have changed it)
 		Expect(verifiers.RunVerifiers(ctx, kubeClient,
 			verifiers.VerifyAllNodesReady(),
-			verifiers.VerifyNodeCount(expectedNodes),
 		)).To(Succeed())
 	})
 })
