@@ -71,8 +71,8 @@ func (c *Config) OCMBaseURL() string {
 // Environment variables take precedence over YAML values.
 func Load() (*Config, error) {
 	cfg := &Config{
-		OCMEnv:             "integration",
-		AWSRegion:          "us-east-1",
+		OCMEnv:             "staging",
+		AWSRegion:          "us-east-2",
 		ClusterNamePrefix:  "e2e",
 		ComputeMachineType: "m5.xlarge",
 		ComputeNodes:       2,

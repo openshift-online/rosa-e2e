@@ -19,13 +19,20 @@
 set -euo pipefail
 
 CLUSTER_NAME="${CLUSTER_NAME:-rosa-e2e-$(date +%m%d)}"
-REGION="${REGION:-us-east-2}"
+OCM_ENV="${OCM_ENV:-staging}"
+REGION="${REGION:-${AWS_REGION:-us-east-2}}"
 COMPUTE_NODES="${COMPUTE_NODES:-2}"
 COMPUTE_MACHINE_TYPE="${COMPUTE_MACHINE_TYPE:-m5.xlarge}"
 OIDC_CONFIG_ID="${OIDC_CONFIG_ID:-}"
 CLUSTER_SECTOR="${CLUSTER_SECTOR:-}"
-# For staging, billing account is osd-staging-2 payer account
-BILLING_ACCOUNT="${BILLING_ACCOUNT:-811685182089}"
+
+# AWS payer/billing account per OCM environment
+# integration/staging: 277304166082 (osd-staging-1) or 811685182089 (osd-staging-2)
+# production: 922711891673 (rhcontrol)
+case "${OCM_ENV}" in
+  production|prod) BILLING_ACCOUNT="${BILLING_ACCOUNT:-922711891673}" ;;
+  *)               BILLING_ACCOUNT="${BILLING_ACCOUNT:-811685182089}" ;;
+esac
 
 echo "=== ROSA E2E Cluster Provisioning ==="
 echo "Cluster name: ${CLUSTER_NAME}"
@@ -45,10 +52,11 @@ AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 echo "AWS Account: ${AWS_ACCOUNT_ID}"
 
 if ! ocm whoami &>/dev/null; then
-  echo "ERROR: OCM not logged in. Run: ocm login --use-auth-code --url stage"
+  echo "ERROR: OCM not logged in. Run: ocm login --use-auth-code --url ${OCM_ENV}"
   exit 1
 fi
-echo "OCM: $(ocm config get url)"
+CURRENT_OCM=$(ocm config get url)
+echo "OCM: ${CURRENT_OCM}"
 
 # Step 1: Create account roles if needed
 echo ""
@@ -154,7 +162,7 @@ CLUSTER_ID=$(rosa describe cluster -c "${CLUSTER_NAME}" -o json | jq -r '.id')
 cat > "${SHARED_DIR:-/tmp}/rosa-e2e-cluster.env" << EOF
 export CLUSTER_ID=${CLUSTER_ID}
 export CLUSTER_NAME=${CLUSTER_NAME}
-export OCM_ENV=staging
+export OCM_ENV=${OCM_ENV}
 export AWS_REGION=${REGION}
 export VPC_ID=${VPC_ID}
 export OIDC_CONFIG_ID=${OIDC_CONFIG_ID}

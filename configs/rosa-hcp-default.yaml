@@ -1,5 +1,5 @@
-ocm_env: integration
-aws_region: us-east-1
+ocm_env: staging
+aws_region: us-east-2
 cluster_name_prefix: e2e
 compute_machine_type: m5.xlarge
 compute_nodes: 2

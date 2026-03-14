@@ -15,7 +15,7 @@ fi
 CLUSTER_NAME="${CLUSTER_NAME:-}"
 CLUSTER_ID="${CLUSTER_ID:-}"
 VPC_ID="${VPC_ID:-}"
-REGION="${AWS_REGION:-us-east-1}"
+REGION="${AWS_REGION:-us-east-2}"
 OIDC_CONFIG_ID="${OIDC_CONFIG_ID:-}"
 
 if [[ -z "${CLUSTER_NAME}" && -z "${CLUSTER_ID}" ]]; then
