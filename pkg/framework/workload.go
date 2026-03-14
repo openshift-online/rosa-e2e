@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 )
@@ -82,8 +83,9 @@ func DeployTestWorkload(ctx context.Context, client kubernetes.Interface, namesp
 			},
 			Ports: []corev1.ServicePort{
 				{
-					Port:     80,
-					Protocol: corev1.ProtocolTCP,
+					Port:       80,
+					TargetPort: intstr.FromInt32(8080),
+					Protocol:   corev1.ProtocolTCP,
 				},
 			},
 		},

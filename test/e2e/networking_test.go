@@ -121,10 +121,10 @@ var _ = Describe("Data Plane: Networking", labels.High, labels.Positive, labels.
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
-						Name:  "wget-test",
+						Name:  "connectivity-test",
 						Image: "registry.access.redhat.com/ubi9/ubi-minimal:latest",
-						Command: []string{"sh", "-c",
-							"wget -q -O /dev/null -T 10 http://test-nginx-svc:80 && echo CONNECTIVITY_OK || echo CONNECTIVITY_FAILED"},
+						Command: []string{"bash", "-c",
+							"echo -e 'GET / HTTP/1.0\\r\\nHost: test-nginx-svc\\r\\n\\r\\n' > /dev/tcp/test-nginx-svc/80 && echo CONNECTIVITY_OK || echo CONNECTIVITY_FAILED"},
 						SecurityContext: restrictedSecurityContext(),
 					},
 				},
