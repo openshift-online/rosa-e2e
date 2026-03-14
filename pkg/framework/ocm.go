@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
 	"time"
@@ -62,6 +63,23 @@ func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, err
 		awsBuilder = awsBuilder.BillingAccountID(cfg.BillingAccountID)
 	}
 
+	properties := map[string]string{
+		"rosa_creator_arn": cfg.CreatorARN,
+	}
+
+	// Resolve provision shard from sector if not explicitly set
+	if cfg.ProvisionShardID == "" && cfg.SectorName != "" {
+		shardID, err := resolveProvisionShard(conn, cfg.SectorName, cfg.AWSRegion)
+		if err != nil {
+			return "", fmt.Errorf("resolving provision shard for sector %s: %w", cfg.SectorName, err)
+		}
+		cfg.ProvisionShardID = shardID
+	}
+	if cfg.ProvisionShardID != "" {
+		properties["provision_shard_id"] = cfg.ProvisionShardID
+		ginkgo.GinkgoWriter.Printf("Using provision shard: %s\n", cfg.ProvisionShardID)
+	}
+
 	clusterBuilder := cmv1.NewCluster().
 		Name(name).
 		Product(cmv1.NewProduct().ID("rosa")).
@@ -77,9 +95,7 @@ func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, err
 		Version(cmv1.NewVersion().
 			ID(versionID).
 			ChannelGroup(cfg.ChannelGroup)).
-		Properties(map[string]string{
-			"rosa_creator_arn": cfg.CreatorARN,
-		})
+		Properties(properties)
 
 	cluster, err := clusterBuilder.Build()
 	if err != nil {
@@ -197,6 +213,72 @@ func resolveVersion(conn *sdk.Connection, cfg *config.Config) (string, error) {
 	version := items[0]
 	ginkgo.GinkgoWriter.Printf("Resolved version: %s\n", version.ID())
 	return version.ID(), nil
+}
+
+// resolveProvisionShard finds a ready provision shard for the given sector and region.
+// This matches the logic in openshift/release rosa-cluster-provision-commands.sh.
+func resolveProvisionShard(conn *sdk.Connection, sector, region string) (string, error) {
+	shardID, err := findShardForSector(conn, sector, region, "ready")
+	if err != nil || shardID == "" {
+		// Try maintenance status
+		shardID, err = findShardForSector(conn, sector, region, "maintenance")
+		if err != nil || shardID == "" {
+			return "", fmt.Errorf("no provision shard found for sector %s in region %s", sector, region)
+		}
+	}
+	return shardID, nil
+}
+
+func findShardForSector(conn *sdk.Connection, sector, region, status string) (string, error) {
+	type scItem struct {
+		ProvisionShardRef struct {
+			ID string `json:"id"`
+		} `json:"provision_shard_reference"`
+	}
+	type scResponse struct {
+		Items []scItem `json:"items"`
+	}
+
+	query := fmt.Sprintf("sector is '%s' and region is '%s' and status in ('%s')", sector, region, status)
+	resp, err := conn.Get().
+		Path("/api/osd_fleet_mgmt/v1/service_clusters").
+		Parameter("search", query).
+		Send()
+	if err != nil {
+		return "", fmt.Errorf("querying service clusters: %w", err)
+	}
+
+	body := resp.Bytes()
+	var scResp scResponse
+	if err := json.Unmarshal(body, &scResp); err != nil {
+		return "", fmt.Errorf("parsing OSDFM response: %w", err)
+	}
+
+	// Find a dedicated topology provision shard
+	for _, sc := range scResp.Items {
+		shardID := sc.ProvisionShardRef.ID
+		if shardID == "" {
+			continue
+		}
+
+		shardResp, err := conn.ClustersMgmt().V1().ProvisionShards().ProvisionShard(shardID).Get().Send()
+		if err != nil {
+			return shardID, nil // Can't check topology, use it anyway
+		}
+
+		topology := shardResp.Body().HypershiftConfig().Topology()
+		if topology == "dedicated" || topology == "dedicated-v2" {
+			ginkgo.GinkgoWriter.Printf("Found dedicated shard %s for sector %s\n", shardID, sector)
+			return shardID, nil
+		}
+	}
+
+	// Fall back to first available
+	if len(scResp.Items) > 0 && scResp.Items[0].ProvisionShardRef.ID != "" {
+		return scResp.Items[0].ProvisionShardRef.ID, nil
+	}
+
+	return "", nil
 }
 
 func generateClusterName(prefix string) string {

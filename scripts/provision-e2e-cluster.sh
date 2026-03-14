@@ -23,6 +23,7 @@ REGION="${REGION:-us-east-2}"
 COMPUTE_NODES="${COMPUTE_NODES:-2}"
 COMPUTE_MACHINE_TYPE="${COMPUTE_MACHINE_TYPE:-m5.xlarge}"
 OIDC_CONFIG_ID="${OIDC_CONFIG_ID:-}"
+CLUSTER_SECTOR="${CLUSTER_SECTOR:-}"
 # For staging, billing account is osd-staging-2 payer account
 BILLING_ACCOUNT="${BILLING_ACCOUNT:-811685182089}"
 
@@ -114,7 +115,23 @@ aws ec2 associate-route-table --route-table-id ${PRIV_RT} --subnet-id ${PRIV2} -
 echo "VPC: ${VPC_ID}"
 SUBNET_IDS="${PUB1},${PUB2},${PRIV1},${PRIV2}"
 
-# Step 4: Create cluster
+# Step 4: Resolve sector if specified
+SECTOR_ARGS=""
+if [[ -n "${CLUSTER_SECTOR}" ]]; then
+  echo ""
+  echo "--- Resolving provision shard for sector: ${CLUSTER_SECTOR} ---"
+  PS_ID=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters \
+    --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status in ('ready')" \
+    | jq -r '.items[].provision_shard_reference.id' | head -1)
+  if [[ -z "${PS_ID}" ]]; then
+    echo "ERROR: No provision shard found for sector ${CLUSTER_SECTOR} in ${REGION}"
+    exit 1
+  fi
+  echo "Provision shard: ${PS_ID}"
+  SECTOR_ARGS="--properties provision_shard_id:${PS_ID}"
+fi
+
+# Step 5: Create cluster
 echo ""
 echo "--- Creating ROSA HCP cluster ---"
 rosa create cluster \
@@ -128,6 +145,7 @@ rosa create cluster \
   --billing-account "${BILLING_ACCOUNT}" \
   --oidc-config-id "${OIDC_CONFIG_ID}" \
   --subnet-ids "${SUBNET_IDS}" \
+  ${SECTOR_ARGS} \
   --yes
 
 CLUSTER_ID=$(rosa describe cluster -c "${CLUSTER_NAME}" -o json | jq -r '.id')
@@ -142,6 +160,7 @@ export VPC_ID=${VPC_ID}
 export OIDC_CONFIG_ID=${OIDC_CONFIG_ID}
 export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
 export BILLING_ACCOUNT=${BILLING_ACCOUNT}
+export CLUSTER_SECTOR=${CLUSTER_SECTOR}
 EOF
 
 echo ""

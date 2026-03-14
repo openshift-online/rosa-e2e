@@ -41,8 +41,9 @@ type Config struct {
 	// Service cluster access (for SC health checks)
 	ServiceClusterID string `yaml:"service_cluster_id"`
 
-	// Persistent sector mode
-	SectorName string `yaml:"sector_name"`
+	// Sector targeting
+	SectorName       string `yaml:"sector_name"`
+	ProvisionShardID string `yaml:"provision_shard_id"`
 
 	// Upgrade testing
 	UpgradeTargetVersion string `yaml:"upgrade_target_version"`
@@ -146,6 +147,9 @@ func Load() (*Config, error) {
 	}
 	if v := os.Getenv("SERVICE_CLUSTER_ID"); v != "" {
 		cfg.ServiceClusterID = v
+	}
+	if v := os.Getenv("PROVISION_SHARD_ID"); v != "" {
+		cfg.ProvisionShardID = v
 	}
 	if v := os.Getenv("SECTOR_NAME"); v != "" {
 		cfg.SectorName = v
