@@ -1,6 +1,7 @@
 FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22 AS builder
 
 WORKDIR /build
+ENV GOFLAGS=""
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
