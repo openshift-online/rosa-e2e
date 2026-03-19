@@ -23,7 +23,7 @@ The suite is organized into seven test areas (use `Area:*` labels to filter):
 3. **Managed Service Health** (`Area:ManagedService`) - ClusterOperators, RMO/AVO on MC, CloudTrail IAM validation, infrastructure tags, HostedCluster CRs
 4. **Customer Features** (`Area:CustomerFeatures`) - Log forwarding, external OIDC, PrivateLink, KMS, machine pools
 5. **Infrastructure Tiers** (`Area:Infrastructure`) - SC health, MC health, cross-tier connectivity
-6. **Control Plane** (`Area:ControlPlane`) - OCM API health, OSDFM fleet management, cluster-service responsiveness
+6. **Management Plane** (`Area:ManagementPlane`) - OCM API health, OSDFM fleet management, cluster-service responsiveness
 7. **Upgrade Validation** (`Area:Upgrade`) - Control plane upgrades, nodepool upgrades
 
 ## Prerequisites
@@ -169,7 +169,7 @@ Tests are labeled using Ginkgo v2 labels. Use `--label-filter` to run subsets of
 - `Area:ManagedService`
 - `Area:CustomerFeatures`
 - `Area:Infrastructure`
-- `Area:ControlPlane`
+- `Area:ManagementPlane`
 - `Area:Upgrade`
 
 **Importance** (criticality):

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Unified ROSA E2E test suite. Go/Ginkgo v2 binary using OCM SDK directly for cluster lifecycle, with composable verifiers for health checks across all four ROSA HCP infrastructure tiers (app-SRE/control plane, SC, MC, HC).
+Unified ROSA E2E test suite. Go/Ginkgo v2 binary using OCM SDK directly for cluster lifecycle, with composable verifiers for health checks across all four ROSA HCP infrastructure tiers (app-SRE/management plane, SC, MC, HC).
 
 ## Build and Test Commands
 
@@ -55,7 +55,7 @@ configs/          YAML config files per environment
 | Cluster Lifecycle | `Area:ClusterLifecycle` | Create/delete via OCM API |
 | Data Plane | `Area:DataPlane` | Workload deployment, storage PVC |
 | Managed Service | `Area:ManagedService` | ClusterOperators, CloudTrail IAM, EBS tags, HCP namespace, HostedCluster/NodePool CRs, RMO/AVO/audit-webhook |
-| Control Plane | `Area:ControlPlane` | OCM API health, OSDFM fleet management, cluster-service latency, add-on listing |
+| Management Plane | `Area:ManagementPlane` | OCM API health, OSDFM fleet management, cluster-service latency, add-on listing |
 | Customer Features | `Area:CustomerFeatures` | Not yet implemented |
 | Infrastructure | `Area:Infrastructure` | Not yet implemented |
 | Upgrade | `Area:Upgrade` | Not yet implemented |

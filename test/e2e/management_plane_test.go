@@ -16,7 +16,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/labels"
 )
 
-var _ = Describe("Control Plane: OCM API Health", labels.Critical, labels.Positive, labels.HCP, labels.ControlPlane, func() {
+var _ = Describe("Management Plane: OCM API Health", labels.Critical, labels.Positive, labels.HCP, labels.ManagementPlane, func() {
 	It("should respond to cluster list requests", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 
@@ -72,7 +72,7 @@ var _ = Describe("Control Plane: OCM API Health", labels.Critical, labels.Positi
 	})
 })
 
-var _ = Describe("Control Plane: OSDFM Health", labels.Critical, labels.Positive, labels.HCP, labels.ControlPlane, func() {
+var _ = Describe("Management Plane: OSDFM Health", labels.Critical, labels.Positive, labels.HCP, labels.ManagementPlane, func() {
 	It("should list service clusters", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 
@@ -111,7 +111,7 @@ var _ = Describe("Control Plane: OSDFM Health", labels.Critical, labels.Positive
 	})
 })
 
-var _ = Describe("Control Plane: Cluster Service Health", labels.High, labels.Positive, labels.HCP, labels.ControlPlane, func() {
+var _ = Describe("Management Plane: Cluster Service Health", labels.High, labels.Positive, labels.HCP, labels.ManagementPlane, func() {
 	It("should process cluster status requests within SLA", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -146,7 +146,7 @@ var _ = Describe("Control Plane: Cluster Service Health", labels.High, labels.Po
 	})
 })
 
-var _ = Describe("Control Plane: Cluster Health Indicators", labels.High, labels.Positive, labels.HCP, labels.ControlPlane, func() {
+var _ = Describe("Management Plane: Cluster Health Indicators", labels.High, labels.Positive, labels.HCP, labels.ManagementPlane, func() {
 	It("should have DNS domain configured", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
