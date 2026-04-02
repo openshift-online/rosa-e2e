@@ -114,7 +114,7 @@ func DeployTestWorkload(ctx context.Context, client kubernetes.Interface, namesp
 	}
 
 	cleanup = func() {
-		client.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+		_ = client.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 	}
 
 	return cleanup, nil

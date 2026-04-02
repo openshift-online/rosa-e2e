@@ -101,7 +101,7 @@ var _ = Describe("Customer Features: Network Policies", labels.High, labels.Posi
 		_, err := tc.HCKubeClient().CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		if err == nil {
 			DeferCleanup(func() {
-				tc.HCKubeClient().CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+				_ = tc.HCKubeClient().CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 			})
 		}
 

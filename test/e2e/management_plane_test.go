@@ -218,7 +218,7 @@ var _ = Describe("Management Plane: Cluster Health Indicators", labels.High, lab
 		apiResp, err := client.Get(apiURL)
 		Expect(err).NotTo(HaveOccurred(), "API URL should be reachable")
 		if apiResp != nil && apiResp.Body != nil {
-			apiResp.Body.Close()
+			_ = apiResp.Body.Close()
 		}
 
 		GinkgoWriter.Printf("Cluster API URL: %s (reachable)\n", apiURL)
