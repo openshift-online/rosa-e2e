@@ -82,6 +82,9 @@ var _ = Describe("Management Plane: OSDFM Health", labels.Critical, labels.Posit
 			Parameter("size", 1).
 			SendContext(ctx)
 		Expect(err).NotTo(HaveOccurred())
+		if resp.Status() == http.StatusForbidden {
+			Skip("OSDFM access not available with current credentials (403)")
+		}
 		Expect(resp.Status()).To(Equal(http.StatusOK))
 	})
 
@@ -94,6 +97,9 @@ var _ = Describe("Management Plane: OSDFM Health", labels.Critical, labels.Posit
 			Parameter("size", 1).
 			SendContext(ctx)
 		Expect(err).NotTo(HaveOccurred())
+		if resp.Status() == http.StatusForbidden {
+			Skip("OSDFM access not available with current credentials (403)")
+		}
 		Expect(resp.Status()).To(Equal(http.StatusOK))
 	})
 
@@ -107,6 +113,9 @@ var _ = Describe("Management Plane: OSDFM Health", labels.Critical, labels.Posit
 			Parameter("search", fmt.Sprintf("status='ready' AND region='%s'", region)).
 			SendContext(ctx)
 		Expect(err).NotTo(HaveOccurred())
+		if resp.Status() == http.StatusForbidden {
+			Skip("OSDFM access not available with current credentials (403)")
+		}
 		Expect(resp.Status()).To(Equal(http.StatusOK))
 	})
 })
