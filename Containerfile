@@ -7,7 +7,7 @@ RUN go mod download
 COPY . .
 RUN go run github.com/onsi/ginkgo/v2/ginkgo build --tags E2Etests ./test/e2e/
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM registry.ci.openshift.org/ci/rosa-aws-cli:latest
 
 COPY --from=builder /build/test/e2e/e2e.test /usr/local/bin/e2e.test
 
