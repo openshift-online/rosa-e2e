@@ -81,47 +81,49 @@ if [[ -z "${OIDC_CONFIG_ID}" ]]; then
 fi
 echo "OIDC Config: ${OIDC_CONFIG_ID}"
 
-# Step 3: Create VPC with HCP-compatible CIDR (10.0.0.0/16)
+# Step 3: Create VPC using ROSA network template
 echo ""
 echo "--- Creating VPC ---"
-VPC_ID=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 --query 'Vpc.VpcId' --output text --region ${REGION})
-aws ec2 create-tags --resources ${VPC_ID} --tags Key=Name,Value=${CLUSTER_NAME}-vpc --region ${REGION}
-aws ec2 modify-vpc-attribute --vpc-id ${VPC_ID} --enable-dns-hostnames --region ${REGION}
-aws ec2 modify-vpc-attribute --vpc-id ${VPC_ID} --enable-dns-support --region ${REGION}
+STACK_NAME="${CLUSTER_NAME}-vpc"
 
-# Internet gateway
-IGW_ID=$(aws ec2 create-internet-gateway --query 'InternetGateway.InternetGatewayId' --output text --region ${REGION})
-aws ec2 attach-internet-gateway --internet-gateway-id ${IGW_ID} --vpc-id ${VPC_ID} --region ${REGION}
+rosa create network rosa-quickstart-default-vpc \
+  --mode auto \
+  --param Region="${REGION}" \
+  --param Name="${STACK_NAME}" \
+  --param AvailabilityZoneCount=2 \
+  --param VpcCidr=10.0.0.0/16 \
+  --yes
 
-# AZs
-AZ1=$(aws ec2 describe-availability-zones --region ${REGION} --query 'AvailabilityZones[0].ZoneName' --output text)
-AZ2=$(aws ec2 describe-availability-zones --region ${REGION} --query 'AvailabilityZones[1].ZoneName' --output text)
+# Wait for stack creation
+echo "Waiting for VPC stack creation..."
+aws cloudformation wait stack-create-complete \
+  --stack-name "${STACK_NAME}" \
+  --region "${REGION}"
 
-# Subnets
-PUB1=$(aws ec2 create-subnet --vpc-id ${VPC_ID} --cidr-block 10.0.0.0/24 --availability-zone ${AZ1} --query 'Subnet.SubnetId' --output text --region ${REGION})
-PUB2=$(aws ec2 create-subnet --vpc-id ${VPC_ID} --cidr-block 10.0.1.0/24 --availability-zone ${AZ2} --query 'Subnet.SubnetId' --output text --region ${REGION})
-PRIV1=$(aws ec2 create-subnet --vpc-id ${VPC_ID} --cidr-block 10.0.2.0/24 --availability-zone ${AZ1} --query 'Subnet.SubnetId' --output text --region ${REGION})
-PRIV2=$(aws ec2 create-subnet --vpc-id ${VPC_ID} --cidr-block 10.0.3.0/24 --availability-zone ${AZ2} --query 'Subnet.SubnetId' --output text --region ${REGION})
+# Get VPC ID and subnet IDs from stack outputs
+VPC_ID=$(aws cloudformation describe-stacks \
+  --stack-name "${STACK_NAME}" \
+  --region "${REGION}" \
+  --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue' \
+  --output text)
 
-# NAT gateway
-EIP=$(aws ec2 allocate-address --domain vpc --query 'AllocationId' --output text --region ${REGION})
-NAT=$(aws ec2 create-nat-gateway --subnet-id ${PUB1} --allocation-id ${EIP} --query 'NatGateway.NatGatewayId' --output text --region ${REGION})
-echo "Waiting for NAT gateway..."
-aws ec2 wait nat-gateway-available --nat-gateway-ids ${NAT} --region ${REGION}
+# Get subnet IDs (public and private)
+PUBLIC_SUBNET_IDS=$(aws cloudformation describe-stacks \
+  --stack-name "${STACK_NAME}" \
+  --region "${REGION}" \
+  --query 'Stacks[0].Outputs[?OutputKey==`PublicSubnetIds`].OutputValue' \
+  --output text)
 
-# Route tables
-PUB_RT=$(aws ec2 create-route-table --vpc-id ${VPC_ID} --query 'RouteTable.RouteTableId' --output text --region ${REGION})
-aws ec2 create-route --route-table-id ${PUB_RT} --destination-cidr-block 0.0.0.0/0 --gateway-id ${IGW_ID} --region ${REGION} > /dev/null
-aws ec2 associate-route-table --route-table-id ${PUB_RT} --subnet-id ${PUB1} --region ${REGION} > /dev/null
-aws ec2 associate-route-table --route-table-id ${PUB_RT} --subnet-id ${PUB2} --region ${REGION} > /dev/null
+PRIVATE_SUBNET_IDS=$(aws cloudformation describe-stacks \
+  --stack-name "${STACK_NAME}" \
+  --region "${REGION}" \
+  --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnetIds`].OutputValue' \
+  --output text)
 
-PRIV_RT=$(aws ec2 create-route-table --vpc-id ${VPC_ID} --query 'RouteTable.RouteTableId' --output text --region ${REGION})
-aws ec2 create-route --route-table-id ${PRIV_RT} --destination-cidr-block 0.0.0.0/0 --nat-gateway-id ${NAT} --region ${REGION} > /dev/null
-aws ec2 associate-route-table --route-table-id ${PRIV_RT} --subnet-id ${PRIV1} --region ${REGION} > /dev/null
-aws ec2 associate-route-table --route-table-id ${PRIV_RT} --subnet-id ${PRIV2} --region ${REGION} > /dev/null
+SUBNET_IDS="${PUBLIC_SUBNET_IDS},${PRIVATE_SUBNET_IDS}"
 
 echo "VPC: ${VPC_ID}"
-SUBNET_IDS="${PUB1},${PUB2},${PRIV1},${PRIV2}"
+echo "Stack: ${STACK_NAME}"
 
 # Step 4: Resolve sector if specified
 SECTOR_ARGS=""
@@ -165,6 +167,7 @@ export CLUSTER_NAME=${CLUSTER_NAME}
 export OCM_ENV=${OCM_ENV}
 export AWS_REGION=${REGION}
 export VPC_ID=${VPC_ID}
+export VPC_STACK_NAME=${STACK_NAME}
 export OIDC_CONFIG_ID=${OIDC_CONFIG_ID}
 export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
 export BILLING_ACCOUNT=${BILLING_ACCOUNT}

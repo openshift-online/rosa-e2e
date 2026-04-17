@@ -36,7 +36,7 @@ var _ = Describe("Data Plane: Storage", labels.High, labels.Positive, labels.HCP
 		_, err := tc.HCKubeClient().CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(func() {
-			tc.HCKubeClient().CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+			_ = tc.HCKubeClient().CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 		})
 
 		By("Creating a PVC with gp3-csi storage class")

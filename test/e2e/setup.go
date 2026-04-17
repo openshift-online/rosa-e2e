@@ -3,7 +3,7 @@
 package e2e
 
 import (
-	. "github.com/onsi/ginkgo/v2"
+	g "github.com/onsi/ginkgo/v2"
 	sdk "github.com/openshift-online/ocm-sdk-go"
 
 	"github.com/openshift-online/rosa-e2e/pkg/config"
@@ -15,7 +15,7 @@ var (
 	conn *sdk.Connection
 )
 
-var _ = BeforeSuite(func() {
+var _ = g.BeforeSuite(func() {
 	var err error
 	cfg, err = config.Load()
 	if err != nil {
@@ -27,11 +27,11 @@ var _ = BeforeSuite(func() {
 		panic("failed to create OCM connection: " + err.Error())
 	}
 
-	GinkgoWriter.Printf("Connected to OCM at %s (env: %s)\n", cfg.OCMBaseURL(), cfg.OCMEnv)
+	g.GinkgoWriter.Printf("Connected to OCM at %s (env: %s)\n", cfg.OCMBaseURL(), cfg.OCMEnv)
 })
 
-var _ = AfterSuite(func() {
+var _ = g.AfterSuite(func() {
 	if conn != nil {
-		conn.Close()
+		_ = conn.Close()
 	}
 })

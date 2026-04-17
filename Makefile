@@ -2,6 +2,7 @@
 
 GINKGO = go run github.com/onsi/ginkgo/v2/ginkgo
 LABEL_FILTER ?=
+GOLANGCI_LINT = $(shell go env GOPATH)/bin/golangci-lint
 
 build:
 	$(GINKGO) build --tags E2Etests ./test/e2e/
@@ -21,11 +22,12 @@ else
 endif
 
 unit-test:
-	go test ./pkg/...
+	go test -mod=mod ./pkg/...
 
 lint:
+	@which golangci-lint > /dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go vet --tags E2Etests ./...
-	golangci-lint run --build-tags E2Etests ./...
+	GOLANGCI_LINT_CACHE=/tmp/.golangci-lint-cache $(GOLANGCI_LINT) run --build-tags E2Etests --concurrency=1 --timeout=10m ./...
 
 image:
 	podman build -t rosa-e2e:latest -f Containerfile .

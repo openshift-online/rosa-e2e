@@ -15,6 +15,7 @@ fi
 CLUSTER_NAME="${CLUSTER_NAME:-}"
 CLUSTER_ID="${CLUSTER_ID:-}"
 VPC_ID="${VPC_ID:-}"
+VPC_STACK_NAME="${VPC_STACK_NAME:-}"
 REGION="${AWS_REGION:-us-east-2}"
 OIDC_CONFIG_ID="${OIDC_CONFIG_ID:-}"
 
@@ -42,10 +43,38 @@ if [[ -n "${CLUSTER_ID}" ]]; then
   rosa delete oidc-provider -c "${CLUSTER_ID}" --mode auto --yes 2>/dev/null || true
 fi
 
-# Step 3: Clean up VPC
-if [[ -n "${VPC_ID}" ]]; then
+# Step 3: Clean up VPC CloudFormation stack
+if [[ -n "${VPC_STACK_NAME}" ]]; then
   echo ""
-  echo "--- Cleaning up VPC ${VPC_ID} ---"
+  echo "--- Deleting VPC CloudFormation stack ${VPC_STACK_NAME} ---"
+
+  # Workaround for OCPBUGS-74960: Delete leftover vpce-private-router security groups
+  # before deleting the stack to prevent stack deletion failure
+  VPC_ID_FROM_STACK=$(aws cloudformation describe-stacks \
+    --stack-name "${VPC_STACK_NAME}" \
+    --region "${REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue' \
+    --output text 2>/dev/null || echo "")
+
+  if [[ -n "${VPC_ID_FROM_STACK}" ]]; then
+    echo "Cleaning up vpce-private-router security groups in VPC ${VPC_ID_FROM_STACK}..."
+    for sg in $(aws ec2 describe-security-groups \
+      --filters "Name=vpc-id,Values=${VPC_ID_FROM_STACK}" "Name=group-name,Values=*vpce-private-router*" \
+      --query 'SecurityGroups[].GroupId' \
+      --output text \
+      --region ${REGION} 2>/dev/null); do
+      echo "Deleting security group: ${sg}"
+      aws ec2 delete-security-group --group-id ${sg} --region ${REGION} 2>/dev/null || true
+    done
+  fi
+
+  aws cloudformation delete-stack --stack-name "${VPC_STACK_NAME}" --region ${REGION} 2>/dev/null || true
+
+  echo "Waiting for VPC stack deletion..."
+  aws cloudformation wait stack-delete-complete --stack-name "${VPC_STACK_NAME}" --region ${REGION} 2>/dev/null || true
+elif [[ -n "${VPC_ID}" ]]; then
+  echo ""
+  echo "--- Cleaning up VPC ${VPC_ID} (legacy manual cleanup) ---"
 
   # Delete NAT gateways
   for nat in $(aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=${VPC_ID} --query 'NatGateways[].NatGatewayId' --output text --region ${REGION} 2>/dev/null); do
