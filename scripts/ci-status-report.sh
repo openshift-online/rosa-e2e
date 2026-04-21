@@ -115,7 +115,7 @@ main() {
         SUCCESS)  icon="PASS"; pass_count=$((pass_count + 1)) ;;
         FAILURE)  icon="FAIL"; fail_count=$((fail_count + 1)) ;;
         ABORTED)  icon="ABORTED"; fail_count=$((fail_count + 1)) ;;
-        NO_DATA)  icon="NO DATA"; other_count=$((other_count + 1)) ;;
+        NO_DATA)  icon="NO DATA"; fail_count=$((fail_count + 1)) ;;
         RUNNING)  icon="RUNNING"; other_count=$((other_count + 1)) ;;
         *)        icon="${result}"; other_count=$((other_count + 1)) ;;
       esac
@@ -129,6 +129,16 @@ main() {
   done
 
   local total=$((pass_count + fail_count + other_count))
+
+  # Guard against false green: if fewer than half the jobs returned a
+  # definitive result, something is wrong with GCS connectivity.
+  local definitive=$((pass_count + fail_count))
+  if [[ "${definitive}" -lt $((total / 2)) ]]; then
+    echo ""
+    echo "ERROR: Only ${definitive}/${total} jobs returned results. Possible GCS connectivity issue."
+    exit 1
+  fi
+
   echo ""
   echo "--- Summary ---"
   echo ""
