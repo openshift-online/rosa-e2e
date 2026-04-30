@@ -26,7 +26,10 @@ JOBS=(
   "rosa-e2e|rosa-e2e 4.20|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-20"
   "rosa-e2e|rosa-e2e 4.21|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-21"
   "rosa-e2e|rosa-e2e 4.22|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-22"
-  "ocm-fvt|OCM FVT (CS)|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main"
+  "ocm-fvt|FVT HCP AD|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main"
+  "ocm-fvt|FVT STS AD (stg)|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main"
+  "ocm-fvt|FVT STS AD (int)|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main"
+  "ocm-fvt|FVT ROSA AD|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-ad-staging-main"
   "hcp|HCP 4.19|periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-hcp-ovn"
   "hcp|HCP 4.20|periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-hcp-ovn"
   "hcp|HCP 4.21|periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-hcp-ovn"
@@ -202,7 +205,7 @@ main() {
           pass_count=$((pass_count + 1))
           cat_pass[${category}]=$(( ${cat_pass[${category}]} + 1 ))
           ;;
-        FAILURE|ABORTED|NO_DATA)
+        FAILURE|ABORTED)
           fail_count=$((fail_count + 1))
           cat_fail[${category}]=$(( ${cat_fail[${category}]} + 1 ))
           cat_fail_names[${category}]+="${name}, "
