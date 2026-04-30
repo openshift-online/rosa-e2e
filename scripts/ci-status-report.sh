@@ -390,7 +390,7 @@ main() {
   # --- Post to Slack ---
   local webhook_url="${SLACK_WEBHOOK_URL:-}"
   if [[ -z "${webhook_url}" ]] && [[ -f "/usr/local/rosa-ci-secrets/slack-webhook-url" ]]; then
-    webhook_url=$(cat /usr/local/rosa-ci-secrets/slack-webhook-url)
+    webhook_url=$(tr -d '\r\n' < /usr/local/rosa-ci-secrets/slack-webhook-url)
   fi
 
   if [[ -n "${webhook_url}" ]]; then
