@@ -23,9 +23,12 @@ readonly PROW_STS_CONFORMANCE="https://prow.ci.openshift.org/?type=periodic&job=
 # Each entry: "category|short_name|full_prow_job_name"
 # ---------------------------------------------------------------------------
 JOBS=(
+  "rosa-e2e|rosa-e2e 4.19|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-19"
   "rosa-e2e|rosa-e2e 4.20|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-20"
   "rosa-e2e|rosa-e2e 4.21|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-21"
   "rosa-e2e|rosa-e2e 4.22|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-22"
+  "rosa-e2e|rosa-e2e 4.23|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-23"
+  "rosa-e2e|rosa-e2e 5.0|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-5-0"
   "ocm-fvt|FVT HCP AD|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main"
   "ocm-fvt|FVT STS AD (stg)|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main"
   "ocm-fvt|FVT STS AD (int)|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main"
@@ -34,10 +37,14 @@ JOBS=(
   "hcp|HCP 4.20|periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-hcp-ovn"
   "hcp|HCP 4.21|periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-hcp-ovn"
   "hcp|HCP 4.22|periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-hcp-ovn"
+  "hcp|HCP 4.23|periodic-ci-openshift-release-main-nightly-4.23-e2e-rosa-hcp-ovn"
+  "hcp|HCP 5.0|periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn"
   "classic|STS 4.19|periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-sts-ovn"
   "classic|STS 4.20|periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-sts-ovn"
   "classic|STS 4.21|periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-sts-ovn"
   "classic|STS 4.22|periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-sts-ovn"
+  "classic|STS 4.23|periodic-ci-openshift-release-main-nightly-4.23-e2e-rosa-sts-ovn"
+  "classic|STS 5.0|periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-sts-ovn"
 )
 
 CATEGORY_ORDER=(rosa-e2e ocm-fvt hcp classic)
