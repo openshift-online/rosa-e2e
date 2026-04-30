@@ -303,10 +303,10 @@ main() {
 
   # --- Slack message ---
   local overall_emoji
-  overall_emoji=$(slack_emoji "${pass_count}" "${definitive}")
+  overall_emoji=$(slack_emoji "${pass_count}" "${total}")
   local overall_pct
-  if [[ "${definitive}" -gt 0 ]]; then
-    overall_pct="$(( (pass_count * 100) / definitive ))%"
+  if [[ "${total}" -gt 0 ]]; then
+    overall_pct="$(( (pass_count * 100) / total ))%"
   else
     overall_pct="N/A"
   fi
@@ -320,13 +320,11 @@ main() {
     local co=${cat_other[${cat}]}
     local ct=$((cp + cf + co))
     local emoji
-    emoji=$(slack_emoji "${cp}" "$((cp + cf))")
+    emoji=$(slack_emoji "${cp}" "${ct}")
 
     local pct_str
-    if [[ $((cp + cf)) -gt 0 ]]; then
-      pct_str="$(( (cp * 100) / (cp + cf) ))%"
-    elif [[ "${co}" -gt 0 ]]; then
-      pct_str="running"
+    if [[ "${ct}" -gt 0 ]]; then
+      pct_str="$(( (cp * 100) / ct ))%"
     else
       pct_str="N/A"
     fi
@@ -351,13 +349,11 @@ main() {
     local co=${cat_other[${cat}]}
     local ct=$((cp + cf + co))
     local indicator
-    indicator=$(log_indicator "${cp}" "$((cp + cf))")
+    indicator=$(log_indicator "${cp}" "${ct}")
 
     local pct_str
-    if [[ $((cp + cf)) -gt 0 ]]; then
-      pct_str="$(( (cp * 100) / (cp + cf) ))%"
-    elif [[ "${co}" -gt 0 ]]; then
-      pct_str="running"
+    if [[ "${ct}" -gt 0 ]]; then
+      pct_str="$(( (cp * 100) / ct ))%"
     else
       pct_str="N/A"
     fi
