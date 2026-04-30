@@ -1,65 +1,96 @@
 #!/bin/bash
 # ci-status-report.sh -- Check ROSA CI job health and post summary to Slack.
 #
-# Queries Prow GCS artifacts for the latest run of each tracked job.
-# Posts a formatted message directly to Slack with per-category pass rates.
-# Also prints a detailed report to stdout (captured as the Prow build log).
+# Reads job definitions from configs/ci-status-jobs.yaml, queries Prow GCS
+# for the latest result of each job, and posts a formatted Slack message
+# with per-category pass rates. Also prints a detailed build log to stdout.
 #
 # Requirements: curl, python3
 # Environment: SLACK_WEBHOOK_URL (from mounted secret, optional for local testing)
 
 set -euo pipefail
 
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+readonly JOBS_CONFIG="${REPO_ROOT}/configs/ci-status-jobs.yaml"
 readonly GCS_BASE="https://storage.googleapis.com/test-platform-results"
 readonly PROW_BASE="https://prow.ci.openshift.org/view/gs/test-platform-results"
-readonly SIPPY_URL="https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage"
-readonly PROW_ROSA_E2E="https://prow.ci.openshift.org/?type=periodic&job=*rosa-hcp-e2e-nightly*"
-readonly PROW_OCM_FVT="https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*rosa*"
-readonly PROW_HCP_CONFORMANCE="https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-hcp-ovn"
-readonly PROW_STS_CONFORMANCE="https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-sts-ovn"
 
-# ---------------------------------------------------------------------------
-# Job definitions
-# Each entry: "category|short_name|full_prow_job_name"
-# ---------------------------------------------------------------------------
-JOBS=(
-  "rosa-e2e|rosa-e2e 4.19|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-19"
-  "rosa-e2e|rosa-e2e 4.20|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-20"
-  "rosa-e2e|rosa-e2e 4.21|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-21"
-  "rosa-e2e|rosa-e2e 4.22|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-22"
-  "rosa-e2e|rosa-e2e 4.23|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-23"
-  "rosa-e2e|rosa-e2e 5.0|periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-5-0"
-  "ocm-fvt|FVT HCP AD|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main"
-  "ocm-fvt|FVT STS AD (stg)|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main"
-  "ocm-fvt|FVT STS AD (int)|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main"
-  "ocm-fvt|FVT ROSA AD|periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-ad-staging-main"
-  "hcp|HCP 4.19|periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-hcp-ovn"
-  "hcp|HCP 4.20|periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-hcp-ovn"
-  "hcp|HCP 4.21|periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-hcp-ovn"
-  "hcp|HCP 4.22|periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-hcp-ovn"
-  "hcp|HCP 4.23|periodic-ci-openshift-release-main-nightly-4.23-e2e-rosa-hcp-ovn"
-  "hcp|HCP 5.0|periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn"
-  "classic|STS 4.19|periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-sts-ovn"
-  "classic|STS 4.20|periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-sts-ovn"
-  "classic|STS 4.21|periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-sts-ovn"
-  "classic|STS 4.22|periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-sts-ovn"
-  "classic|STS 4.23|periodic-ci-openshift-release-main-nightly-4.23-e2e-rosa-sts-ovn"
-  "classic|STS 5.0|periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-sts-ovn"
-)
+if [[ ! -f "${JOBS_CONFIG}" ]]; then
+  echo "ERROR: Job config not found: ${JOBS_CONFIG}"
+  exit 1
+fi
 
-CATEGORY_ORDER=(rosa-e2e ocm-fvt hcp classic)
-declare -A CATEGORY_NAMES=(
-  [rosa-e2e]="ROSA E2E"
-  [ocm-fvt]="OCM FVT"
-  [hcp]="HCP Conformance"
-  [classic]="Classic STS Conformance"
-)
-declare -A CATEGORY_PROW_LINKS=(
-  [rosa-e2e]="${PROW_ROSA_E2E}"
-  [ocm-fvt]="${PROW_OCM_FVT}"
-  [hcp]="${PROW_HCP_CONFORMANCE}"
-  [classic]="${PROW_STS_CONFORMANCE}"
-)
+# Parse the YAML config into shell-friendly format using python3.
+# Outputs lines: category_id|category_name|prow_filter|job_display_name|prow_job_name
+# followed by a metadata line: META|sippy_url|<url>
+parse_config() {
+  python3 -c "
+import sys, re
+
+config_text = sys.stdin.read()
+
+# Minimal YAML parser for our specific flat structure
+sippy_url = ''
+categories = []
+current_cat = None
+current_job = None
+
+for line in config_text.split('\n'):
+    stripped = line.strip()
+    if not stripped or stripped.startswith('#'):
+        continue
+
+    m = re.match(r'sippy_url:\s*(.+)', stripped)
+    if m:
+        sippy_url = m.group(1).strip()
+        continue
+
+    if stripped == 'categories:':
+        continue
+
+    # Category-level fields (indented under categories list)
+    m = re.match(r'-\s+id:\s*(.+)', stripped)
+    if m:
+        current_cat = {'id': m.group(1).strip(), 'name': '', 'prow_filter': '', 'jobs': []}
+        categories.append(current_cat)
+        current_job = None
+        continue
+
+    if current_cat is not None:
+        m = re.match(r'name:\s*(.+)', stripped)
+        if m and current_job is None:
+            current_cat['name'] = m.group(1).strip()
+            continue
+
+        m = re.match(r'prow_filter:\s*[\"\\']?(.+?)[\"\\']?\s*$', stripped)
+        if m:
+            current_cat['prow_filter'] = m.group(1).strip()
+            continue
+
+        if stripped == 'jobs:':
+            continue
+
+        # Job-level fields
+        m = re.match(r'-\s+name:\s*(.+)', stripped)
+        if m:
+            current_job = {'name': m.group(1).strip(), 'prow_job': ''}
+            current_cat['jobs'].append(current_job)
+            continue
+
+        if current_job is not None:
+            m = re.match(r'prow_job:\s*(.+)', stripped)
+            if m:
+                current_job['prow_job'] = m.group(1).strip()
+                continue
+
+for cat in categories:
+    for job in cat['jobs']:
+        print(f\"{cat['id']}|{cat['name']}|{cat['prow_filter']}|{job['name']}|{job['prow_job']}\")
+
+print(f'META|sippy_url|{sippy_url}')
+" < "${JOBS_CONFIG}"
+}
 
 get_latest_build() {
   curl -sf --max-time 10 "${GCS_BASE}/logs/${1}/latest-build.txt" 2>/dev/null || true
@@ -73,7 +104,6 @@ get_build_result() {
   fi
 }
 
-# When latest build is still running, find the most recent completed build
 get_last_completed() {
   local job_name="$1"
   python3 -c "
@@ -109,7 +139,6 @@ check_job() {
 
   result=$(get_build_result "${job_name}" "${build_id}")
 
-  # If latest build is still running, fall back to most recent completed build
   if [[ -z "${result}" ]]; then
     local fallback
     fallback=$(get_last_completed "${job_name}")
@@ -123,8 +152,6 @@ check_job() {
   echo "${category}|${display_name}|${result:-RUNNING}|${PROW_BASE}/logs/${job_name}/${build_id}|${job_name}"
 }
 
-# Slack emoji based on pass percentage
-# 100% = green, >= 50% = orange, < 50% = red
 slack_emoji() {
   local pass="$1" total="$2"
   if [[ "${total}" -eq 0 ]]; then echo ":white_circle:"; return; fi
@@ -138,7 +165,6 @@ slack_emoji() {
   fi
 }
 
-# Plain text indicator for build log
 log_indicator() {
   local pass="$1" total="$2"
   if [[ "${total}" -eq 0 ]]; then echo "[----]"; return; fi
@@ -172,23 +198,41 @@ main() {
   echo "========================================="
   echo ""
 
+  # Parse config
+  local config_lines sippy_url
+  config_lines=$(parse_config)
+  sippy_url=$(echo "${config_lines}" | grep "^META|sippy_url|" | cut -d'|' -f3)
+
+  # Build category order and metadata from config (preserves YAML ordering)
+  local -a category_order=()
+  local -A category_names=()
+  local -A category_prow_links=()
+  while IFS='|' read -r cat_id cat_name prow_filter _ _; do
+    if [[ "${cat_id}" == "META" ]]; then continue; fi
+    if [[ -z "${category_names[${cat_id}]+x}" ]]; then
+      category_order+=("${cat_id}")
+      category_names[${cat_id}]="${cat_name}"
+      category_prow_links[${cat_id}]="${prow_filter}"
+    fi
+  done <<< "${config_lines}"
+
   # Check all Prow jobs in parallel
   local tmpdir
   tmpdir=$(mktemp -d)
   trap "rm -rf '${tmpdir}'" EXIT
 
   local idx=0
-  for entry in "${JOBS[@]}"; do
-    IFS='|' read -r category display_name job_name <<< "${entry}"
-    (check_job "${category}" "${display_name}" "${job_name}" > "${tmpdir}/${idx}.txt" 2>"${tmpdir}/${idx}.err") &
+  while IFS='|' read -r cat_id _ _ display_name prow_job; do
+    if [[ "${cat_id}" == "META" ]]; then continue; fi
+    (check_job "${cat_id}" "${display_name}" "${prow_job}" > "${tmpdir}/${idx}.txt" 2>"${tmpdir}/${idx}.err") &
     idx=$((idx + 1))
-  done
+  done <<< "${config_lines}"
   wait
 
   # Collect results and per-category stats
   local fail_count=0 pass_count=0 other_count=0
-  declare -A cat_pass cat_fail cat_other cat_fail_names cat_fail_urls
-  for cat in "${CATEGORY_ORDER[@]}"; do
+  local -A cat_pass cat_fail cat_other cat_fail_names cat_fail_urls
+  for cat in "${category_order[@]}"; do
     cat_pass[${cat}]=0
     cat_fail[${cat}]=0
     cat_other[${cat}]=0
@@ -196,11 +240,11 @@ main() {
     cat_fail_urls[${cat}]=""
   done
 
-  declare -a result_lines=()
+  local -a result_lines=()
 
   for i in $(seq 0 $((idx - 1))); do
     if [[ -f "${tmpdir}/${i}.txt" ]]; then
-      local line category name result url job_name
+      local line category name result url
       line=$(cat "${tmpdir}/${i}.txt")
       category=$(echo "${line}" | cut -d'|' -f1)
       name=$(echo "${line}" | cut -d'|' -f2)
@@ -251,14 +295,13 @@ main() {
   local total=$((pass_count + fail_count + other_count))
   local definitive=$((pass_count + fail_count))
 
-  # Guard against GCS connectivity issues
   if [[ "${definitive}" -lt $((total / 2)) ]]; then
     echo ""
     echo "ERROR: Only ${definitive}/${total} jobs returned results. Possible GCS connectivity issue."
     exit 1
   fi
 
-  # --- Build the Slack message ---
+  # --- Slack message ---
   local overall_emoji
   overall_emoji=$(slack_emoji "${pass_count}" "${definitive}")
   local overall_pct
@@ -271,7 +314,7 @@ main() {
   local slack_lines="${overall_emoji} *ROSA CI Daily Status:* ${pass_count}/${total} (${overall_pct})"
   slack_lines+="\n"
 
-  for cat in "${CATEGORY_ORDER[@]}"; do
+  for cat in "${category_order[@]}"; do
     local cp=${cat_pass[${cat}]}
     local cf=${cat_fail[${cat}]}
     local co=${cat_other[${cat}]}
@@ -288,7 +331,7 @@ main() {
       pct_str="N/A"
     fi
 
-    local cat_line="${emoji} *<${CATEGORY_PROW_LINKS[${cat}]}|${CATEGORY_NAMES[${cat}]}>:* ${cp}/${ct} (${pct_str})"
+    local cat_line="${emoji} *<${category_prow_links[${cat}]}|${category_names[${cat}]}>:* ${cp}/${ct} (${pct_str})"
 
     if [[ -n "${cat_fail_urls[${cat}]}" ]]; then
       cat_line+="  -  ${cat_fail_urls[${cat}]%, }"
@@ -297,12 +340,12 @@ main() {
     slack_lines+="\n${cat_line}"
   done
 
-  slack_lines+="\n\n:bar_chart: <${SIPPY_URL}|Sippy>"
+  slack_lines+="\n\n:bar_chart: <${sippy_url}|Sippy>"
 
-  # --- Print build log (stdout) ---
+  # --- Build log ---
   echo "--- Category Summary ---"
   echo ""
-  for cat in "${CATEGORY_ORDER[@]}"; do
+  for cat in "${category_order[@]}"; do
     local cp=${cat_pass[${cat}]}
     local cf=${cat_fail[${cat}]}
     local co=${cat_other[${cat}]}
@@ -325,7 +368,7 @@ main() {
     fi
 
     printf "  %s %-22s %d/%d (%s)%s\n" \
-      "${indicator}" "${CATEGORY_NAMES[${cat}]}:" "${cp}" "${ct}" "${pct_str}" "${fail_detail}"
+      "${indicator}" "${category_names[${cat}]}:" "${cp}" "${ct}" "${pct_str}" "${fail_detail}"
   done
 
   echo ""

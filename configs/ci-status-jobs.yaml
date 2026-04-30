@@ -1,0 +1,74 @@
+# ci-status-jobs.yaml -- Single source of truth for ROSA CI daily status tracking.
+#
+# The ci-status-report.sh script reads this file to determine which Prow jobs
+# to check and how to group them in the Slack summary.
+#
+# To add a new job: add an entry under the appropriate category.
+# To add a new category: add a new top-level entry to the categories list.
+
+sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
+
+categories:
+  - id: rosa-e2e
+    name: ROSA E2E
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-hcp-e2e-nightly*"
+    jobs:
+      - name: rosa-e2e 4.19
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-19
+      - name: rosa-e2e 4.20
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-20
+      - name: rosa-e2e 4.21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-21
+      - name: rosa-e2e 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-22
+      - name: rosa-e2e 4.23
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-23
+      - name: rosa-e2e 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-5-0
+
+  - id: ocm-fvt
+    name: OCM FVT
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*rosa*"
+    jobs:
+      - name: FVT HCP AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
+      - name: FVT STS AD (stg)
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main
+      - name: FVT STS AD (int)
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main
+      - name: FVT ROSA AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-ad-staging-main
+
+  - id: hcp
+    name: HCP Conformance
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-hcp-ovn"
+    jobs:
+      - name: HCP 4.19
+        prow_job: periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-hcp-ovn
+      - name: HCP 4.20
+        prow_job: periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-hcp-ovn
+      - name: HCP 4.21
+        prow_job: periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-hcp-ovn
+      - name: HCP 4.22
+        prow_job: periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-hcp-ovn
+      - name: HCP 4.23
+        prow_job: periodic-ci-openshift-release-main-nightly-4.23-e2e-rosa-hcp-ovn
+      - name: HCP 5.0
+        prow_job: periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn
+
+  - id: classic
+    name: Classic STS Conformance
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-sts-ovn"
+    jobs:
+      - name: STS 4.19
+        prow_job: periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-sts-ovn
+      - name: STS 4.20
+        prow_job: periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-sts-ovn
+      - name: STS 4.21
+        prow_job: periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-sts-ovn
+      - name: STS 4.22
+        prow_job: periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-sts-ovn
+      - name: STS 4.23
+        prow_job: periodic-ci-openshift-release-main-nightly-4.23-e2e-rosa-sts-ovn
+      - name: STS 5.0
+        prow_job: periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-sts-ovn
