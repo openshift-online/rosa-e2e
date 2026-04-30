@@ -1,12 +1,13 @@
 #!/bin/bash
-# ci-status-report.sh -- Check ROSA CI job health and post summary to Slack.
+# ci-status-report.sh -- Check ROSA CI job health and output a summary.
 #
 # Reads job definitions from configs/ci-status-jobs.yaml, queries Prow GCS
-# for the latest result of each job, and posts a formatted Slack message
-# with per-category pass rates. Also prints a detailed build log to stdout.
+# for the latest result of each job, and prints a report with per-category
+# pass rates to stdout (captured as the Prow build log). Prow's
+# slack_reporter posts to Slack based on exit code; the "Full report"
+# link in Slack points to this build log.
 #
 # Requirements: curl, python3
-# Environment: SLACK_WEBHOOK_URL (from mounted secret, optional for local testing)
 
 set -euo pipefail
 
@@ -152,19 +153,6 @@ check_job() {
   echo "${category}|${display_name}|${result:-RUNNING}|${PROW_BASE}/logs/${job_name}/${build_id}|${job_name}"
 }
 
-slack_emoji() {
-  local pass="$1" total="$2"
-  if [[ "${total}" -eq 0 ]]; then echo ":white_circle:"; return; fi
-  local pct=$(( (pass * 100) / total ))
-  if [[ "${pct}" -eq 100 ]]; then
-    echo ":large_green_circle:"
-  elif [[ "${pct}" -ge 50 ]]; then
-    echo ":large_orange_circle:"
-  else
-    echo ":red_circle:"
-  fi
-}
-
 log_indicator() {
   local pass="$1" total="$2"
   if [[ "${total}" -eq 0 ]]; then echo "[----]"; return; fi
@@ -175,17 +163,6 @@ log_indicator() {
     echo "[WARN]"
   else
     echo "[FAIL]"
-  fi
-}
-
-post_to_slack() {
-  local webhook_url="$1" payload="$2"
-  local http_code
-  http_code=$(curl -sf --max-time 10 -o /dev/null -w "%{http_code}" \
-    -X POST -H "Content-Type: application/json" \
-    -d "${payload}" "${webhook_url}" 2>/dev/null) || true
-  if [[ "${http_code}" != "200" ]]; then
-    echo >&2 "WARN: Slack post returned HTTP ${http_code}"
   fi
 }
 
@@ -231,13 +208,12 @@ main() {
 
   # Collect results and per-category stats
   local fail_count=0 pass_count=0 other_count=0
-  local -A cat_pass cat_fail cat_other cat_fail_names cat_fail_urls
+  local -A cat_pass cat_fail cat_other cat_fail_names
   for cat in "${category_order[@]}"; do
     cat_pass[${cat}]=0
     cat_fail[${cat}]=0
     cat_other[${cat}]=0
     cat_fail_names[${cat}]=""
-    cat_fail_urls[${cat}]=""
   done
 
   local -a result_lines=()
@@ -260,9 +236,6 @@ main() {
           fail_count=$((fail_count + 1))
           cat_fail[${category}]=$(( ${cat_fail[${category}]} + 1 ))
           cat_fail_names[${category}]+="${name}, "
-          if [[ -n "${url}" ]]; then
-            cat_fail_urls[${category}]+="<${url}|${name}>, "
-          fi
           ;;
         *)
           other_count=$((other_count + 1))
@@ -302,45 +275,7 @@ main() {
   fi
 
   # --- Slack message ---
-  local overall_emoji
-  overall_emoji=$(slack_emoji "${pass_count}" "${total}")
-  local overall_pct
-  if [[ "${total}" -gt 0 ]]; then
-    overall_pct="$(( (pass_count * 100) / total ))%"
-  else
-    overall_pct="N/A"
-  fi
-
-  local slack_lines="${overall_emoji} *ROSA CI Daily Status:* ${pass_count}/${total} (${overall_pct})"
-  slack_lines+="\n"
-
-  for cat in "${category_order[@]}"; do
-    local cp=${cat_pass[${cat}]}
-    local cf=${cat_fail[${cat}]}
-    local co=${cat_other[${cat}]}
-    local ct=$((cp + cf + co))
-    local emoji
-    emoji=$(slack_emoji "${cp}" "${ct}")
-
-    local pct_str
-    if [[ "${ct}" -gt 0 ]]; then
-      pct_str="$(( (cp * 100) / ct ))%"
-    else
-      pct_str="N/A"
-    fi
-
-    local cat_line="${emoji} *<${category_prow_links[${cat}]}|${category_names[${cat}]}>:* ${cp}/${ct} (${pct_str})"
-
-    if [[ -n "${cat_fail_urls[${cat}]}" ]]; then
-      cat_line+="  -  ${cat_fail_urls[${cat}]%, }"
-    fi
-
-    slack_lines+="\n${cat_line}"
-  done
-
-  slack_lines+="\n\n:bar_chart: <${sippy_url}|Sippy>"
-
-  # --- Build log ---
+  # --- Build log (linked from Prow slack reporter as "Full report") ---
   echo "--- Category Summary ---"
   echo ""
   for cat in "${category_order[@]}"; do
@@ -381,34 +316,6 @@ main() {
   echo "  Failing: ${fail_count}/${total}"
   if [[ "${other_count}" -gt 0 ]]; then
     echo "  Other:   ${other_count}/${total} (running/no data)"
-  fi
-
-  # --- Post to Slack ---
-  local webhook_url="${SLACK_WEBHOOK_URL:-}"
-  if [[ -z "${webhook_url}" ]] && [[ -f "/usr/local/rosa-ci-secrets/slack-webhook-url" ]]; then
-    webhook_url=$(tr -d '\r\n' < /usr/local/rosa-ci-secrets/slack-webhook-url)
-  fi
-
-  if [[ -n "${webhook_url}" ]]; then
-    local escaped_text
-    escaped_text=$(echo -ne "${slack_lines}")
-    local payload
-    payload=$(python3 -c "
-import json, sys
-print(json.dumps({'text': sys.stdin.read()}))
-" <<< "${escaped_text}")
-    echo ""
-    echo "--- Slack Message ---"
-    echo ""
-    echo -e "${slack_lines}"
-    echo ""
-    post_to_slack "${webhook_url}" "${payload}"
-    echo "Slack message posted."
-  else
-    echo ""
-    echo "--- Slack Message (not posted, no SLACK_WEBHOOK_URL) ---"
-    echo ""
-    echo -e "${slack_lines}"
   fi
 
   echo ""
