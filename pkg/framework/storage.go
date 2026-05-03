@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 )
 
 // CreateTestPVC creates a PersistentVolumeClaim with the given storage class and returns its name.
@@ -64,6 +65,16 @@ func CreateTestPodWithPVC(ctx context.Context, client kubernetes.Interface, name
 						{
 							Name:      "data",
 							MountPath: "/data",
+						},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: ptr.To(false),
+						RunAsNonRoot:             ptr.To(true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+						Capabilities: &corev1.Capabilities{
+							Drop: []corev1.Capability{"ALL"},
 						},
 					},
 				},
