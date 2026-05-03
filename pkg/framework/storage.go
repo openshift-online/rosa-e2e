@@ -52,6 +52,14 @@ func CreateTestPodWithPVC(ctx context.Context, client kubernetes.Interface, name
 			Namespace: namespace,
 		},
 		Spec: corev1.PodSpec{
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsNonRoot: ptr.To(true),
+				RunAsUser:    ptr.To(int64(1000)),
+				FSGroup:      ptr.To(int64(1000)),
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
+			},
 			Containers: []corev1.Container{
 				{
 					Name:    "busybox",
@@ -69,10 +77,6 @@ func CreateTestPodWithPVC(ctx context.Context, client kubernetes.Interface, name
 					},
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: ptr.To(false),
-						RunAsNonRoot:             ptr.To(true),
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
