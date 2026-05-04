@@ -4,6 +4,14 @@ Unified end-to-end test suite for ROSA (Red Hat OpenShift Service on AWS). Valid
 
 Uses framework/test/verifier separation, label-based test selection, Ginkgo v2, and composable health checks.
 
+## Quick Start
+
+```bash
+make build       # Build the test binary
+make test        # Run unit tests
+make lint        # Run linters
+```
+
 ## Overview
 
 ROSA HCP has three infrastructure tiers that need validation:
