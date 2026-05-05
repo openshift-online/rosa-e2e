@@ -70,6 +70,7 @@ func InitiateClusterUpgrade(conn *sdk.Connection, clusterID, targetVersion strin
 	policy, err := cmv1.NewUpgradePolicy().
 		Version(targetVersion).
 		ScheduleType("manual").
+		UpgradeType("OSD").
 		NextRun(nextRun).
 		Build()
 	if err != nil {

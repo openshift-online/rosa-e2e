@@ -104,7 +104,7 @@ func Load() (*Config, error) {
 		cfg.OCMToken = v
 	}
 	if v := os.Getenv("CLUSTER_TOPOLOGY"); v != "" {
-		cfg.ClusterTopology = v
+		cfg.ClusterTopology = strings.ToLower(strings.TrimSpace(v))
 	}
 	if v := os.Getenv("CLUSTER_ID"); v != "" {
 		cfg.ClusterID = v
