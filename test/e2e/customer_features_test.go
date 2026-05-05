@@ -17,6 +17,7 @@ import (
 
 	"github.com/openshift-online/rosa-e2e/pkg/framework"
 	"github.com/openshift-online/rosa-e2e/pkg/labels"
+	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
 var _ = Describe("Customer Features: Machine Pools", labels.High, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
@@ -58,7 +59,7 @@ var _ = Describe("Customer Features: Machine Pools", labels.High, labels.Positiv
 	})
 })
 
-var _ = Describe("Customer Features: Cluster Admin RBAC", labels.High, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: Cluster Admin RBAC", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
 	It("should have cluster-admin ClusterRoleBinding", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -84,7 +85,7 @@ var _ = Describe("Customer Features: Cluster Admin RBAC", labels.High, labels.Po
 	})
 })
 
-var _ = Describe("Customer Features: Network Policies", labels.High, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: Network Policies", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
 	It("should support NetworkPolicy creation", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -124,7 +125,7 @@ var _ = Describe("Customer Features: Network Policies", labels.High, labels.Posi
 	})
 })
 
-var _ = Describe("Customer Features: Ingress", labels.High, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: Ingress", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
 	It("should have default IngressController", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -146,7 +147,7 @@ var _ = Describe("Customer Features: Ingress", labels.High, labels.Positive, lab
 	})
 })
 
-var _ = Describe("Customer Features: Log Forwarding", labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: Log Forwarding", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
 	It("should have ClusterLogForwarder CRD available", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -193,11 +194,11 @@ var _ = Describe("Customer Features: Log Forwarding", labels.Medium, labels.Posi
 	})
 })
 
-var _ = Describe("Customer Features: External OIDC", labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: External OIDC", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
 	PIt("should authenticate via external OIDC provider")
 })
 
-var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
 	It("should report KMS configuration via OCM API", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -217,7 +218,7 @@ var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Posi
 	})
 })
 
-var _ = Describe("Customer Features: PrivateLink", labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: PrivateLink", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
 	It("should report PrivateLink status via OCM API", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -233,5 +234,44 @@ var _ = Describe("Customer Features: PrivateLink", labels.Medium, labels.Positiv
 		if !isPrivateLink {
 			Skip("Cluster does not have PrivateLink enabled")
 		}
+	})
+})
+
+var _ = Describe("Customer Features: Machine Pools (Classic)", labels.High, labels.Positive, labels.Classic, labels.CustomerFeatures, func() {
+	It("should list machine pools for the cluster", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+
+		tc := framework.NewTestContext(cfg, conn)
+		if !tc.IsClassic() {
+			Skip("Machine pool tests only apply to Classic clusters")
+		}
+
+		By("Verifying machine pools exist via OCM API")
+		Expect(verifiers.VerifyMachinePoolsExist(tc.Connection(), cfg.ClusterID)).To(Succeed())
+	})
+
+	It("should have machine pool with expected instance type", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+
+		tc := framework.NewTestContext(cfg, conn)
+		if !tc.IsClassic() {
+			Skip("Machine pool tests only apply to Classic clusters")
+		}
+
+		By("Getting machine pool details")
+		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).
+			MachinePools().List().SendContext(ctx)
+		Expect(err).NotTo(HaveOccurred())
+
+		items := resp.Items().Slice()
+		Expect(items).NotTo(BeEmpty())
+
+		instanceType := items[0].InstanceType()
+		GinkgoWriter.Printf("First machine pool instance type: %s\n", instanceType)
+		Expect(instanceType).NotTo(BeEmpty())
 	})
 })

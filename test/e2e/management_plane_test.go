@@ -16,7 +16,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/labels"
 )
 
-var _ = Describe("Management Plane: OCM API Health", labels.Critical, labels.Positive, labels.HCP, labels.ManagementPlane, func() {
+var _ = Describe("Management Plane: OCM API Health", labels.Critical, labels.Positive, labels.HCP, labels.Classic, labels.ManagementPlane, func() {
 	It("should respond to cluster list requests", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 
@@ -59,16 +59,21 @@ var _ = Describe("Management Plane: OCM API Health", labels.Critical, labels.Pos
 	It("should list available versions", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 
-		By("Querying available ROSA HCP versions")
+		query := "rosa_enabled='true' AND enabled='true'"
+		if tc.IsHCP() || tc.Topology() == "" {
+			query += " AND hosted_control_plane_enabled='true'"
+		}
+
+		By("Querying available ROSA versions")
 		resp, err := tc.Connection().ClustersMgmt().V1().Versions().List().
-			Search("rosa_enabled='true' AND hosted_control_plane_enabled='true' AND enabled='true'").
+			Search(query).
 			Size(5).
 			SendContext(ctx)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.Status()).To(Equal(http.StatusOK))
 		Expect(resp.Total()).To(BeNumerically(">", 0))
 
-		GinkgoWriter.Printf("Found %d available ROSA HCP versions\n", resp.Total())
+		GinkgoWriter.Printf("Found %d available ROSA versions\n", resp.Total())
 	})
 })
 
@@ -120,7 +125,7 @@ var _ = Describe("Management Plane: OSDFM Health", labels.Critical, labels.Posit
 	})
 })
 
-var _ = Describe("Management Plane: Cluster Service Health", labels.High, labels.Positive, labels.HCP, labels.ManagementPlane, func() {
+var _ = Describe("Management Plane: Cluster Service Health", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.ManagementPlane, func() {
 	It("should process cluster status requests within SLA", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -155,7 +160,7 @@ var _ = Describe("Management Plane: Cluster Service Health", labels.High, labels
 	})
 })
 
-var _ = Describe("Management Plane: Cluster Health Indicators", labels.High, labels.Positive, labels.HCP, labels.ManagementPlane, func() {
+var _ = Describe("Management Plane: Cluster Health Indicators", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.ManagementPlane, func() {
 	It("should have DNS domain configured", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")

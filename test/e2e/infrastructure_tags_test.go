@@ -14,7 +14,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("ROSA HCP Infrastructure Tags", labels.High, labels.Positive, labels.HCP, labels.ManagedService, func() {
+var _ = Describe("ROSA Infrastructure Tags", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.ManagedService, func() {
 	It("should have correct tags on EBS volumes", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not configured, skipping infrastructure tags test")

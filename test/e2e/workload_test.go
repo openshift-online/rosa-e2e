@@ -13,7 +13,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("Data Plane: Workload Deployment", labels.High, labels.Positive, labels.HCP, labels.DataPlane, func() {
+var _ = Describe("Data Plane: Workload Deployment", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.DataPlane, func() {
 	It("should deploy a workload and verify it is available", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set, skipping data plane test")

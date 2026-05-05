@@ -15,6 +15,9 @@ type Config struct {
 	OCMEnv   string `yaml:"ocm_env"`
 	OCMToken string `yaml:"-"` // never serialize tokens
 
+	// Cluster topology: "hcp" or "classic" (auto-detected from OCM if empty)
+	ClusterTopology string `yaml:"cluster_topology"`
+
 	// Existing cluster (skip provisioning when set)
 	ClusterID string `yaml:"cluster_id"`
 
@@ -27,6 +30,10 @@ type Config struct {
 	OperatorRolePrefix string   `yaml:"operator_role_prefix"`
 	BillingAccountID   string   `yaml:"billing_account_id"`
 	CreatorARN         string   `yaml:"creator_arn"`
+
+	// GCP infrastructure (for OSD GCP clusters)
+	GCPProjectID string `yaml:"gcp_project_id"`
+	GCPRegion    string `yaml:"gcp_region"`
 
 	// Cluster parameters
 	ClusterNamePrefix  string `yaml:"cluster_name_prefix"`
@@ -96,6 +103,9 @@ func Load() (*Config, error) {
 	if v := os.Getenv("OCM_TOKEN"); v != "" {
 		cfg.OCMToken = v
 	}
+	if v := os.Getenv("CLUSTER_TOPOLOGY"); v != "" {
+		cfg.ClusterTopology = v
+	}
 	if v := os.Getenv("CLUSTER_ID"); v != "" {
 		cfg.ClusterID = v
 	}
@@ -122,6 +132,12 @@ func Load() (*Config, error) {
 	}
 	if v := os.Getenv("CREATOR_ARN"); v != "" {
 		cfg.CreatorARN = v
+	}
+	if v := os.Getenv("GCP_PROJECT_ID"); v != "" {
+		cfg.GCPProjectID = v
+	}
+	if v := os.Getenv("GCP_REGION"); v != "" {
+		cfg.GCPRegion = v
 	}
 	if v := os.Getenv("CLUSTER_NAME_PREFIX"); v != "" {
 		cfg.ClusterNamePrefix = v

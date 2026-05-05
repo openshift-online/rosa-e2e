@@ -13,7 +13,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("ROSA HCP Managed Operators", labels.Critical, labels.Positive, labels.HCP, labels.ManagedService, func() {
+var _ = Describe("ROSA Managed Operators: ClusterOperators", labels.Critical, labels.Positive, labels.HCP, labels.Classic, labels.ManagedService, func() {
 	It("should have all ClusterOperators healthy", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not configured, skipping ClusterOperators test")
@@ -21,13 +21,15 @@ var _ = Describe("ROSA HCP Managed Operators", labels.Critical, labels.Positive,
 
 		tc := framework.NewTestContext(cfg, conn)
 
-		By("Initializing hosted cluster clients")
+		By("Initializing cluster clients")
 		Expect(tc.InitHCClients()).To(Succeed())
 
 		By("Verifying all ClusterOperators are healthy")
 		Expect(verifiers.VerifyClusterOperatorsHealthy(ctx, tc.HCDynamicClient(), cfg.ExcludeClusterOperators...)).To(Succeed())
 	})
+})
 
+var _ = Describe("ROSA HCP Managed Operators: MC Components", labels.Critical, labels.Positive, labels.HCP, labels.ManagedService, func() {
 	It("should have RMO RouteMonitors on management cluster", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 

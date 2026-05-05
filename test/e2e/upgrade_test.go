@@ -80,7 +80,32 @@ var _ = Describe("Upgrade: NodePool", labels.Critical, labels.Positive, labels.S
 	})
 })
 
-var _ = Describe("Upgrade: Post-Upgrade Verification", labels.High, labels.Positive, labels.HCP, labels.Upgrade, func() {
+var _ = Describe("Upgrade: Classic Cluster", labels.Critical, labels.Positive, labels.Slow, labels.Classic, labels.Upgrade, func() {
+	It("should upgrade a Classic cluster to target version", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+		if cfg.UpgradeTargetVersion == "" {
+			Skip("UPGRADE_TARGET_VERSION not set, skipping upgrade test")
+		}
+
+		tc := framework.NewTestContext(cfg, conn)
+		if !tc.IsClassic() {
+			Skip("Not a Classic cluster, skipping Classic upgrade test")
+		}
+
+		By("Initiating cluster upgrade to " + cfg.UpgradeTargetVersion)
+		Expect(framework.InitiateClusterUpgrade(tc.Connection(), cfg.ClusterID, cfg.UpgradeTargetVersion)).To(Succeed())
+
+		By("Waiting for upgrade to complete (up to 90 minutes)")
+		Expect(framework.WaitForUpgradeComplete(tc.Connection(), cfg.ClusterID, cfg.UpgradeTargetVersion, 90*time.Minute)).To(Succeed())
+
+		By("Verifying cluster is ready after upgrade")
+		Expect(verifiers.VerifyClusterReady(tc.Connection(), cfg.ClusterID)).To(Succeed())
+	})
+})
+
+var _ = Describe("Upgrade: Post-Upgrade Verification", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.Upgrade, func() {
 	It("should have all ClusterOperators healthy after upgrade", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")

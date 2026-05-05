@@ -16,7 +16,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("Data Plane: Storage", labels.High, labels.Positive, labels.HCP, labels.DataPlane, func() {
+var _ = Describe("Data Plane: Storage", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.DataPlane, func() {
 	It("should create a PVC and verify it is bound", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set, skipping storage test")

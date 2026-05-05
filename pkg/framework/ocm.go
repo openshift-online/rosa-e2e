@@ -40,11 +40,31 @@ func NewOCMConnection(cfg *config.Config) (*sdk.Connection, error) {
 	return conn, nil
 }
 
+// DetectClusterTopology queries the OCM API and returns "hcp", "classic", or "osd-gcp"
+// based on the cluster's product and hypershift configuration.
+func DetectClusterTopology(conn *sdk.Connection, clusterID string) (string, error) {
+	resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().Send()
+	if err != nil {
+		return "", fmt.Errorf("getting cluster %s for topology detection: %w", clusterID, err)
+	}
+
+	cluster := resp.Body()
+	cloudProvider := cluster.CloudProvider().ID()
+
+	if cloudProvider == "gcp" {
+		return "osd-gcp", nil
+	}
+	if cluster.Hypershift().Enabled() {
+		return "hcp", nil
+	}
+	return "classic", nil
+}
+
 // CreateRosaHCPCluster creates a ROSA HCP cluster via the OCM API and returns its ID.
 func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, error) {
 	name := generateClusterName(cfg.ClusterNamePrefix)
 
-	versionID, err := resolveVersion(conn, cfg)
+	versionID, err := resolveVersionForTopology(conn, cfg, "hcp")
 	if err != nil {
 		return "", fmt.Errorf("resolving version: %w", err)
 	}
@@ -109,6 +129,63 @@ func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, err
 
 	clusterID := resp.Body().ID()
 	ginkgo.GinkgoWriter.Printf("Cluster %q created with ID %s\n", name, clusterID)
+	return clusterID, nil
+}
+
+// CreateRosaClassicCluster creates a ROSA Classic STS cluster via the OCM API and returns its ID.
+func CreateRosaClassicCluster(conn *sdk.Connection, cfg *config.Config) (string, error) {
+	name := generateClusterName(cfg.ClusterNamePrefix)
+
+	versionID, err := resolveVersionForTopology(conn, cfg, "classic")
+	if err != nil {
+		return "", fmt.Errorf("resolving version: %w", err)
+	}
+
+	stsBuilder := cmv1.NewSTS().
+		RoleARN(fmt.Sprintf("arn:aws:iam::%s:role/%s-Installer-Role", cfg.AWSAccountID, cfg.AccountRolePrefix)).
+		SupportRoleARN(fmt.Sprintf("arn:aws:iam::%s:role/%s-Support-Role", cfg.AWSAccountID, cfg.AccountRolePrefix)).
+		OperatorRolePrefix(cfg.OperatorRolePrefix)
+
+	awsBuilder := cmv1.NewAWS().
+		SubnetIDs(cfg.SubnetIDs...).
+		STS(stsBuilder)
+
+	if cfg.BillingAccountID != "" {
+		awsBuilder = awsBuilder.BillingAccountID(cfg.BillingAccountID)
+	}
+
+	properties := map[string]string{
+		"rosa_creator_arn": cfg.CreatorARN,
+	}
+
+	clusterBuilder := cmv1.NewCluster().
+		Name(name).
+		Product(cmv1.NewProduct().ID("rosa")).
+		CloudProvider(cmv1.NewCloudProvider().ID("aws")).
+		Region(cmv1.NewCloudRegion().ID(cfg.AWSRegion)).
+		MultiAZ(false).
+		CCS(cmv1.NewCCS().Enabled(true)).
+		AWS(awsBuilder).
+		Nodes(cmv1.NewClusterNodes().
+			ComputeMachineType(cmv1.NewMachineType().ID(cfg.ComputeMachineType)).
+			Compute(cfg.ComputeNodes)).
+		Version(cmv1.NewVersion().
+			ID(versionID).
+			ChannelGroup(cfg.ChannelGroup)).
+		Properties(properties)
+
+	cluster, err := clusterBuilder.Build()
+	if err != nil {
+		return "", fmt.Errorf("building cluster object: %w", err)
+	}
+
+	resp, err := conn.ClustersMgmt().V1().Clusters().Add().Body(cluster).Send()
+	if err != nil {
+		return "", fmt.Errorf("creating cluster: %w", err)
+	}
+
+	clusterID := resp.Body().ID()
+	ginkgo.GinkgoWriter.Printf("Classic STS cluster %q created with ID %s\n", name, clusterID)
 	return clusterID, nil
 }
 
@@ -188,14 +265,17 @@ func GetClusterState(conn *sdk.Connection, clusterID string) (cmv1.ClusterState,
 	return resp.Body().State(), nil
 }
 
-// resolveVersion finds the latest available HCP-enabled version matching the config.
-func resolveVersion(conn *sdk.Connection, cfg *config.Config) (string, error) {
+// resolveVersionForTopology finds the latest available version for the given topology.
+func resolveVersionForTopology(conn *sdk.Connection, cfg *config.Config, topology string) (string, error) {
 	if cfg.OpenShiftVersion != "" {
 		return "openshift-v" + cfg.OpenShiftVersion, nil
 	}
 
-	// Find the latest version in the channel group that supports HCP
-	query := fmt.Sprintf("channel_group = '%s' AND rosa_enabled = 'true' AND hosted_control_plane_enabled = 'true' AND enabled = 'true'", cfg.ChannelGroup)
+	query := fmt.Sprintf("channel_group = '%s' AND rosa_enabled = 'true' AND enabled = 'true'", cfg.ChannelGroup)
+	if topology == "hcp" {
+		query += " AND hosted_control_plane_enabled = 'true'"
+	}
+
 	resp, err := conn.ClustersMgmt().V1().Versions().List().
 		Search(query).
 		Order("raw_id desc").
@@ -207,11 +287,11 @@ func resolveVersion(conn *sdk.Connection, cfg *config.Config) (string, error) {
 
 	items := resp.Items().Slice()
 	if len(items) == 0 {
-		return "", fmt.Errorf("no HCP-enabled versions found for channel group %q", cfg.ChannelGroup)
+		return "", fmt.Errorf("no %s-compatible versions found for channel group %q", topology, cfg.ChannelGroup)
 	}
 
 	version := items[0]
-	ginkgo.GinkgoWriter.Printf("Resolved version: %s\n", version.ID())
+	ginkgo.GinkgoWriter.Printf("Resolved %s version: %s\n", topology, version.ID())
 	return version.ID(), nil
 }
 
