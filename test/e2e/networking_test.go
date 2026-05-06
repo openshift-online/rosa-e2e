@@ -33,7 +33,7 @@ func restrictedSecurityContext() *corev1.SecurityContext {
 	}
 }
 
-var _ = Describe("Data Plane: Networking", labels.High, labels.Positive, labels.HCP, labels.DataPlane, func() {
+var _ = Describe("Data Plane: Networking", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.DataPlane, func() {
 	It("should resolve cluster DNS", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set, skipping data plane test")

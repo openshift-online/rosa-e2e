@@ -14,7 +14,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("ROSA HCP IAM Validation", labels.Critical, labels.Positive, labels.HCP, labels.ManagedService, func() {
+var _ = Describe("ROSA IAM Validation", labels.Critical, labels.Positive, labels.HCP, labels.Classic, labels.ManagedService, func() {
 	It("should have zero AccessDenied events in CloudTrail", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not configured, skipping IAM validation test")

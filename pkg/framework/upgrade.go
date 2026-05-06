@@ -62,6 +62,31 @@ func WaitForUpgradeComplete(conn *sdk.Connection, clusterID, targetVersion strin
 	}
 }
 
+// InitiateClusterUpgrade starts a cluster upgrade for Classic clusters via the OCM API.
+// Classic clusters use the top-level UpgradePolicies endpoint (not ControlPlane).
+func InitiateClusterUpgrade(conn *sdk.Connection, clusterID, targetVersion string) error {
+	nextRun := time.Now().Add(5 * time.Minute).UTC()
+
+	policy, err := cmv1.NewUpgradePolicy().
+		Version(targetVersion).
+		ScheduleType("manual").
+		UpgradeType("OSD").
+		NextRun(nextRun).
+		Build()
+	if err != nil {
+		return fmt.Errorf("building upgrade policy: %w", err)
+	}
+
+	_, err = conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).
+		UpgradePolicies().Add().Body(policy).Send()
+	if err != nil {
+		return fmt.Errorf("creating cluster upgrade policy: %w", err)
+	}
+
+	ginkgo.GinkgoWriter.Printf("Classic cluster upgrade to %s scheduled for cluster %s\n", targetVersion, clusterID)
+	return nil
+}
+
 // InitiateNodePoolUpgrade starts a node pool upgrade via the OCM API.
 func InitiateNodePoolUpgrade(conn *sdk.Connection, clusterID, nodePoolID, targetVersion string) error {
 	nextRun := time.Now().Add(5 * time.Minute).UTC()

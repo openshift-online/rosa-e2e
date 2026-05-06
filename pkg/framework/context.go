@@ -41,6 +41,9 @@ type TestContext struct {
 	// Resolved HCP namespaces on the MC (set after ResolveHCPNamespaces)
 	hcpNamespaces *HCPNamespaces
 
+	// Detected cluster topology (lazy-initialized)
+	topology string
+
 	// AWS clients (set when AWS credentials are available)
 	ec2Client        *ec2.Client
 	cloudtrailClient *cloudtrail.Client
@@ -108,8 +111,8 @@ func (tc *TestContext) InitMCClients() error {
 	}
 	tc.mcDynamicClient = dynClient
 
-	// Resolve HCP namespaces if we have a cluster name or ID
-	if tc.cfg.ClusterID != "" {
+	// Resolve HCP namespaces if we have a cluster name or ID (HCP topology only)
+	if tc.cfg.ClusterID != "" && tc.Topology() == "hcp" {
 		clusterName := tc.resolveClusterName()
 		ns, err := ResolveHCPNamespaces(context.Background(), dynClient, clusterName, tc.cfg.ClusterID)
 		if err != nil {
@@ -216,6 +219,44 @@ func (tc *TestContext) SCKubeClient() kubernetes.Interface {
 // SCDynamicClient returns the service cluster dynamic client, or nil if not initialized.
 func (tc *TestContext) SCDynamicClient() dynamic.Interface {
 	return tc.scDynamicClient
+}
+
+// Topology returns the cluster topology, detecting it from OCM if needed.
+// Returns "hcp", "classic", or "osd-gcp".
+func (tc *TestContext) Topology() string {
+	if tc.topology != "" {
+		return tc.topology
+	}
+
+	if tc.cfg.ClusterTopology != "" {
+		tc.topology = tc.cfg.ClusterTopology
+		return tc.topology
+	}
+
+	if tc.cfg.ClusterID != "" {
+		topo, err := DetectClusterTopology(tc.conn, tc.cfg.ClusterID)
+		if err == nil {
+			tc.topology = topo
+			return tc.topology
+		}
+	}
+
+	return ""
+}
+
+// IsHCP returns true if the cluster topology is ROSA HCP.
+func (tc *TestContext) IsHCP() bool {
+	return tc.Topology() == "hcp"
+}
+
+// IsClassic returns true if the cluster topology is ROSA Classic STS.
+func (tc *TestContext) IsClassic() bool {
+	return tc.Topology() == "classic"
+}
+
+// IsOSDGCP returns true if the cluster topology is OSD on GCP.
+func (tc *TestContext) IsOSDGCP() bool {
+	return tc.Topology() == "osd-gcp"
 }
 
 // HasSCAccess returns true if the service cluster ID is configured.
