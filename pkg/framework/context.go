@@ -134,6 +134,19 @@ func (tc *TestContext) resolveClusterName() string {
 	return resp.Body().Name()
 }
 
+// ResolveInfraID gets the cluster infrastructure ID from OCM.
+func (tc *TestContext) ResolveInfraID() (string, error) {
+	resp, err := tc.conn.ClustersMgmt().V1().Clusters().Cluster(tc.cfg.ClusterID).Get().Send()
+	if err != nil {
+		return "", fmt.Errorf("getting cluster from OCM: %w", err)
+	}
+	infraID := resp.Body().InfraID()
+	if infraID == "" {
+		return "", fmt.Errorf("cluster %s has no infra ID", tc.cfg.ClusterID)
+	}
+	return infraID, nil
+}
+
 // HCPNamespaces returns the resolved HCP namespace info, or nil if not resolved.
 func (tc *TestContext) HCPNamespaces() *HCPNamespaces {
 	return tc.hcpNamespaces
