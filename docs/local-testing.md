@@ -1,6 +1,6 @@
 # Local Testing Guide
 
-How to run rosa-e2e tests from your laptop against staging clusters.
+How to run rosa-e2e tests from your laptop against staging clusters. The test suite supports ROSA HCP, ROSA Classic STS, and (planned) OSD GCP topologies.
 
 ## Prerequisites
 
@@ -42,22 +42,44 @@ Customize with environment variables:
 CLUSTER_NAME=my-test REGION=us-west-2 COMPUTE_NODES=3 ./scripts/provision-e2e-cluster.sh
 ```
 
-## Quick Start: Hosted Cluster Tests Only
+## Quick Start: Test Against Any Existing Cluster
 
-The simplest path -- tests against the hosted cluster data plane.
+The simplest path. The framework auto-detects whether the cluster is HCP or Classic.
 
 ```bash
-# Find a ready HCP cluster in staging
-ocm list clusters --parameter search="product.id='rosa' AND hypershift.enabled='true' AND state='ready'" --columns id,name,region.id
+# Find a ready cluster in staging
+ocm list clusters --parameter search="product.id='rosa' AND state='ready'" --columns id,name,region.id
 
-# Run tests
+# Run tests (topology auto-detected)
 export OCM_TOKEN=$(ocm token)
 export OCM_ENV=staging
 export CLUSTER_ID=<cluster-id>
 make test
 ```
 
-This runs all tests. Tests requiring MC or AWS access will skip gracefully.
+This runs all tests applicable to the detected topology. Tests requiring MC, SC, or AWS access skip gracefully.
+
+### Classic STS clusters
+
+```bash
+# Find a Classic STS cluster
+ocm list clusters --parameter search="product.id='rosa' AND hypershift.enabled='false' AND state='ready'" --columns id,name,region.id
+
+# Run Classic-only tests
+export CLUSTER_ID=<classic-cluster-id>
+LABEL_FILTER="Platform:Classic" make test
+```
+
+### HCP clusters
+
+```bash
+# Find an HCP cluster
+ocm list clusters --parameter search="product.id='rosa' AND hypershift.enabled='true' AND state='ready'" --columns id,name,region.id
+
+# Run HCP-only tests
+export CLUSTER_ID=<hcp-cluster-id>
+LABEL_FILTER="Platform:HCP" make test
+```
 
 ## Filtering by Test Area
 
@@ -181,20 +203,43 @@ make build
 
 ## What to Expect
 
+### Tests that run on all topologies (HCP + Classic)
+
 | Test | Requires | Skips Without |
 |------|----------|---------------|
 | Workload Deployment | CLUSTER_ID, OCM_TOKEN | CLUSTER_ID |
 | Storage PVC | CLUSTER_ID, OCM_TOKEN | CLUSTER_ID |
 | ClusterOperators | CLUSTER_ID, OCM_TOKEN | CLUSTER_ID |
-| IAM Validation | AWS creds | AWS creds |
-| Infrastructure Tags | AWS creds | AWS creds |
+| Networking (DNS, connectivity) | CLUSTER_ID, OCM_TOKEN | CLUSTER_ID |
+| RBAC, Ingress, Log Forwarding | CLUSTER_ID, OCM_TOKEN | CLUSTER_ID |
+| KMS, PrivateLink | CLUSTER_ID, OCM_TOKEN | Skips if not configured |
+| IAM Validation (CloudTrail) | AWS creds | AWS creds |
+| Infrastructure Tags (EBS) | AWS creds | AWS creds |
+| OCM API Health | OCM_TOKEN | - |
+| Cluster Service Health | CLUSTER_ID, OCM_TOKEN | CLUSTER_ID |
+
+### HCP-only tests
+
+| Test | Requires | Skips Without |
+|------|----------|---------------|
 | HCP Namespace Health | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
 | HostedCluster CR | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
 | NodePool CR | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
 | RMO RouteMonitors | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
 | AVO VpcEndpoints | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
 | Audit Webhook | MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID | MC access |
-| Cluster Lifecycle | Full AWS infra | CLUSTER_ID (uses existing) |
+| SC Health (ACM, Hive, MCE) | SERVICE_CLUSTER_ID | SC access |
+| OSDFM Health | OCM_TOKEN with OSDFM access | 403 Forbidden |
+| NodePool Upgrade | CLUSTER_ID, UPGRADE_TARGET_VERSION | Version not set |
+| HCP Lifecycle (Full) | Full AWS infra + OIDC config | CLUSTER_ID (uses existing) |
+
+### Classic-only tests
+
+| Test | Requires | Skips Without |
+|------|----------|---------------|
+| MachinePool List/Verify | CLUSTER_ID (Classic topology) | Non-Classic cluster |
+| Classic Upgrade | CLUSTER_ID, UPGRADE_TARGET_VERSION | Version not set |
+| Classic Lifecycle (Full) | Full AWS infra (no OIDC needed) | CLUSTER_ID (uses existing) |
 
 ## Scripts Reference
 
@@ -208,3 +253,5 @@ make build
 
 - **AWS credential validation**: The AWS SDK loads credentials lazily. `InitAWSClients` uses eager `Retrieve()` to fail fast and skip when creds are unavailable.
 - **HCP regions**: Not all regions support HCP in staging. us-east-2 and us-west-2 are reliable choices.
+- **Classic provisioning time**: Classic STS clusters take longer to provision (~30-45 min) compared to HCP (~15 min). The lifecycle test uses a 60-minute timeout.
+- **Topology detection**: If `CLUSTER_TOPOLOGY` is not set, the framework queries the OCM API to detect topology. This adds one API call per test context creation. Set `CLUSTER_TOPOLOGY` explicitly to avoid this overhead.

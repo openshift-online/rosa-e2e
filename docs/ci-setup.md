@@ -117,11 +117,12 @@ This provides:
 - **Lint checks** - Run on every PR
 - **Container image build** - Validate Containerfile builds
 
-### Periodic E2E Job (to be added)
+### Periodic E2E Jobs (to be added)
 
-Once the test suite is stable (>95% pass rate), add a periodic job:
+Once the test suite is stable (>95% pass rate), add periodic jobs for each topology:
 
 ```yaml
+# HCP periodic job
 - as: e2e-rosa-hcp-staging
   cron: "0 */6 * * *"  # Every 6 hours
   steps:
@@ -130,7 +131,8 @@ Once the test suite is stable (>95% pass rate), add a periodic job:
       commands: |
         export OCM_ENV=staging
         export AWS_REGION=us-east-1
-        make test
+        export CLUSTER_TOPOLOGY=hcp
+        LABEL_FILTER="Platform:HCP" make test
       credentials:
       - mount_path: /secrets/ocm
         name: rosa-e2e-ocm-token
@@ -140,6 +142,33 @@ Once the test suite is stable (>95% pass rate), add a periodic job:
         namespace: test-credentials
       - mount_path: /secrets/cluster
         name: rosa-e2e-cluster-config
+        namespace: test-credentials
+      from: rosa-e2e
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+
+# Classic STS periodic job
+- as: e2e-rosa-classic-staging
+  cron: "0 */6 * * *"
+  steps:
+    test:
+    - as: e2e
+      commands: |
+        export OCM_ENV=staging
+        export AWS_REGION=us-east-1
+        export CLUSTER_TOPOLOGY=classic
+        LABEL_FILTER="Platform:Classic" make test
+      credentials:
+      - mount_path: /secrets/ocm
+        name: rosa-e2e-ocm-token
+        namespace: test-credentials
+      - mount_path: /secrets/aws
+        name: rosa-e2e-aws-credentials
+        namespace: test-credentials
+      - mount_path: /secrets/cluster
+        name: rosa-e2e-classic-cluster-config
         namespace: test-credentials
       from: rosa-e2e
       resources:
@@ -263,6 +292,14 @@ Common causes:
 
 ## Future Work
 
+### OSD GCP Support
+
+Config fields (`GCP_PROJECT_ID`, `GCP_REGION`) are in place. Remaining work:
+- `CreateOSDGCPCluster()` with WIF and non-WIF variants
+- GCP-specific verifiers (GCE tags, service accounts)
+- `Platform:OSD-GCP` labeled tests
+- CI job with GCP credentials
+
 ### Pre-submit Testing (RRP)
 
 The ROSA Regional Platform (RRP) team is building pre-submit testing on the new EKS-based architecture. This will allow ephemeral cluster provisioning for PR validation. See [LANDSCAPE-AND-ALIGNMENT.md](../../hcm-design/rosa-e2e/LANDSCAPE-AND-ALIGNMENT.md) for details.
@@ -273,6 +310,10 @@ Expand periodic jobs to test multiple regions:
 - US (us-east-1, us-west-2)
 - EU (eu-west-1, eu-central-1)
 - APAC (ap-southeast-1, ap-northeast-1)
+
+### Critical Alert Verification
+
+Add `VerifyNoCriticalAlerts` verifier to lifecycle tests (both HCP and Classic) to catch pre-GA alert bugs after cluster creation.
 
 ### OCP-Blocking Promotion
 
