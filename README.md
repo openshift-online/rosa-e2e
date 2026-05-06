@@ -1,6 +1,6 @@
 # rosa-e2e
 
-Unified end-to-end test suite for ROSA (Red Hat OpenShift Service on AWS). Validates cluster lifecycle, data plane health, managed service components, customer features, infrastructure tiers, and upgrade operations.
+Unified end-to-end test suite for ROSA (Red Hat OpenShift Service on AWS) and OSD (OpenShift Dedicated). Validates cluster lifecycle, data plane health, managed service components, customer features, infrastructure tiers, and upgrade operations across multiple cluster topologies.
 
 Uses framework/test/verifier separation, label-based test selection, Ginkgo v2, and composable health checks.
 
@@ -12,47 +12,79 @@ make test        # Run unit tests
 make lint        # Run linters
 ```
 
-## Overview
+## Supported Topologies
 
-ROSA HCP has three infrastructure tiers that need validation:
+### ROSA HCP (Hosted Control Plane)
+
+Three infrastructure tiers:
 
 - **Service Clusters (SC)**: OSD Classic clusters running ACM hub, cert-manager, Hive
 - **Management Clusters (MC)**: OSD Classic clusters running HyperShift operator, hosted control planes, RMO, AVO
 - **Hosted Clusters (HC)**: Customer data plane with workers and managed operators
 
-This test suite validates all three tiers and the interactions between them.
+### ROSA Classic STS
+
+Single-cluster topology where the control plane runs on the cluster itself. Uses STS (Security Token Service) for IAM authentication, MachinePool for worker scaling, and standard OSD upgrade policies.
+
+### OSD GCP (planned)
+
+OSD on Google Cloud Platform, both WIF (Workload Identity Federation) and non-WIF variants. Config fields are in place but cluster creation and GCP-specific tests are not yet implemented.
+
+## Topology Detection
+
+The framework auto-detects cluster topology from the OCM API by checking `Hypershift().Enabled()` and the cloud provider. You can override with `CLUSTER_TOPOLOGY`:
+
+```bash
+# Auto-detect (default)
+export CLUSTER_ID=<id>
+
+# Explicit override
+export CLUSTER_TOPOLOGY=hcp      # or classic, osd-gcp
+```
+
+The `IsHCP()`, `IsClassic()`, and `IsOSDGCP()` helpers on `TestContext` allow tests to branch behavior or skip based on topology.
 
 ## Test Areas
 
 The suite is organized into seven test areas (use `Area:*` labels to filter):
 
-1. **Cluster Lifecycle** (`Area:ClusterLifecycle`) - Cluster create/delete via OCM API, cluster state transitions
-2. **Data Plane** (`Area:DataPlane`) - Workload deployments, storage, PVC, snapshots, node readiness
-3. **Managed Service Health** (`Area:ManagedService`) - ClusterOperators, RMO/AVO on MC, CloudTrail IAM validation, infrastructure tags, HostedCluster CRs
-4. **Customer Features** (`Area:CustomerFeatures`) - Log forwarding, external OIDC, PrivateLink, KMS, machine pools
-5. **Infrastructure Tiers** (`Area:Infrastructure`) - SC health, MC health, cross-tier connectivity
-6. **Management Plane** (`Area:ManagementPlane`) - OCM API health, OSDFM fleet management, cluster-service responsiveness
-7. **Upgrade Validation** (`Area:Upgrade`) - Control plane upgrades, nodepool upgrades
+1. **Cluster Lifecycle** (`Area:ClusterLifecycle`) - Cluster create/delete via OCM API, cluster state transitions (HCP and Classic)
+2. **Data Plane** (`Area:DataPlane`) - Workload deployments, storage, PVC, snapshots, node readiness (all topologies)
+3. **Managed Service Health** (`Area:ManagedService`) - ClusterOperators (all topologies), RMO/AVO on MC (HCP only), CloudTrail IAM validation, infrastructure tags, HostedCluster CRs (HCP only)
+4. **Customer Features** (`Area:CustomerFeatures`) - Log forwarding, external OIDC, PrivateLink, KMS (all topologies), NodePools (HCP), MachinePools (Classic)
+5. **Infrastructure Tiers** (`Area:Infrastructure`) - SC health, MC health (HCP only)
+6. **Management Plane** (`Area:ManagementPlane`) - OCM API health, OSDFM fleet management (HCP only), cluster-service responsiveness (all topologies)
+7. **Upgrade Validation** (`Area:Upgrade`) - Control plane upgrades, NodePool upgrades (HCP), cluster upgrades (Classic)
 
 ## Prerequisites
 
 - Go 1.24+
 - An OCM offline token (get from https://console.redhat.com/openshift/token)
-- For full lifecycle tests: Pre-provisioned AWS infrastructure (VPC, subnets, OIDC config, IAM roles)
+- For full lifecycle tests: Pre-provisioned AWS infrastructure (VPC, subnets, IAM roles; OIDC config for HCP only)
 - For existing cluster tests: Just the cluster ID
 
 ## Quick Start
 
-### Test against an existing cluster
+### Test against an existing cluster (any topology)
 
 ```bash
 export OCM_TOKEN="your-ocm-offline-token"
 export OCM_ENV=staging
 export CLUSTER_ID="your-cluster-id"
+# Topology is auto-detected from OCM API
 make test
 ```
 
-### Full lifecycle test (create, verify, delete)
+### Run only Classic tests
+
+```bash
+export OCM_TOKEN="your-ocm-offline-token"
+export OCM_ENV=staging
+export CLUSTER_ID="your-classic-cluster-id"
+LABEL_FILTER="Platform:Classic" make test
+```
+
+### Full lifecycle test: ROSA HCP (create, verify, delete)
 
 ```bash
 export OCM_TOKEN="your-ocm-offline-token"
@@ -64,8 +96,24 @@ export OIDC_CONFIG_ID=your-oidc-config-id
 export ACCOUNT_ROLE_PREFIX=ManagedOpenShift
 export OPERATOR_ROLE_PREFIX=ManagedOpenShift-oper
 export BILLING_ACCOUNT_ID=123456789012
-make test
+LABEL_FILTER="Platform:HCP" make test
 ```
+
+### Full lifecycle test: ROSA Classic STS (create, verify, delete)
+
+```bash
+export OCM_TOKEN="your-ocm-offline-token"
+export OCM_ENV=staging
+export AWS_REGION=us-east-1
+export AWS_ACCOUNT_ID=123456789012
+export SUBNET_IDS=subnet-abc123,subnet-def456
+export ACCOUNT_ROLE_PREFIX=ManagedOpenShift
+export OPERATOR_ROLE_PREFIX=ManagedOpenShift-oper
+export BILLING_ACCOUNT_ID=123456789012
+LABEL_FILTER="Platform:Classic" make test
+```
+
+Note: Classic STS does not require `OIDC_CONFIG_ID` or `BILLING_ACCOUNT_ID` (the cluster creates its own OIDC provider during install).
 
 ### Dry run (list tests without executing)
 
@@ -103,10 +151,11 @@ Configuration loads from environment variables with optional YAML file overlay. 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `CLUSTER_ID` | Existing cluster ID (skips create/delete when set) | - |
-| `MANAGEMENT_CLUSTER_ID` | Management cluster ID for HCP namespace checks | - |
-| `MC_KUBECONFIG` | Path to MC kubeconfig file (from backplane) | - |
-| `SC_KUBECONFIG` | Path to SC kubeconfig file (from backplane) | - |
-| `SECTOR_NAME` | Sector name for persistent sector tests | - |
+| `CLUSTER_TOPOLOGY` | Override topology detection: `hcp`, `classic`, `osd-gcp` (auto-detected if empty) | - |
+| `MANAGEMENT_CLUSTER_ID` | Management cluster ID for HCP namespace checks (HCP only) | - |
+| `MC_KUBECONFIG` | Path to MC kubeconfig file (from backplane, HCP only) | - |
+| `SC_KUBECONFIG` | Path to SC kubeconfig file (from backplane, HCP only) | - |
+| `SECTOR_NAME` | Sector name for persistent sector tests (HCP only) | - |
 
 ### AWS Infrastructure (for cluster provisioning)
 
@@ -115,11 +164,18 @@ Configuration loads from environment variables with optional YAML file overlay. 
 | `AWS_REGION` | AWS region | us-east-1 |
 | `AWS_ACCOUNT_ID` | AWS account ID for STS role ARNs | - |
 | `SUBNET_IDS` | Comma-separated VPC subnet IDs | - |
-| `OIDC_CONFIG_ID` | Pre-created OIDC config ID | - |
+| `OIDC_CONFIG_ID` | Pre-created OIDC config ID (HCP only) | - |
 | `ACCOUNT_ROLE_PREFIX` | STS account role prefix | - |
 | `OPERATOR_ROLE_PREFIX` | STS operator role prefix | - |
-| `BILLING_ACCOUNT_ID` | AWS billing account ID for HCP | - |
+| `BILLING_ACCOUNT_ID` | AWS billing account ID (HCP only) | - |
 | `CREATOR_ARN` | ARN of the IAM entity creating the cluster | - |
+
+### GCP Infrastructure (for OSD GCP clusters, planned)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GCP_PROJECT_ID` | GCP project ID | - |
+| `GCP_REGION` | GCP region | - |
 
 ### AWS Credentials (for CloudTrail validation and AWS API tests)
 
@@ -144,9 +200,22 @@ Configuration loads from environment variables with optional YAML file overlay. 
 Example `configs/rosa-hcp-default.yaml`:
 
 ```yaml
-ocm_env: integration
+ocm_env: staging
+cluster_topology: hcp
 aws_region: us-east-1
 cluster_name_prefix: e2e
+compute_machine_type: m5.xlarge
+compute_nodes: 2
+channel_group: stable
+```
+
+Example `configs/rosa-classic-default.yaml`:
+
+```yaml
+ocm_env: staging
+cluster_topology: classic
+aws_region: us-east-1
+cluster_name_prefix: e2e-classic
 compute_machine_type: m5.xlarge
 compute_nodes: 2
 channel_group: stable
@@ -196,10 +265,16 @@ Tests are labeled using Ginkgo v2 labels. Use `--label-filter` to run subsets of
 ### Filter Examples
 
 ```bash
+# Run only HCP tests
+LABEL_FILTER="Platform:HCP" make test
+
+# Run only Classic tests
+LABEL_FILTER="Platform:Classic" make test
+
 # Run only critical HCP tests
 LABEL_FILTER="Platform:HCP && Importance:Critical" make test
 
-# Run Managed Service Health area
+# Run Managed Service Health area (runs for both topologies)
 LABEL_FILTER="Area:ManagedService" make test
 
 # Run fast health checks (exclude slow tests)
@@ -212,7 +287,7 @@ LABEL_FILTER="Platform:HCP && Importance:Critical && Area:ManagedService" make t
 LABEL_FILTER="!Area:Upgrade" make test
 
 # Dry-run to see which tests match a filter
-LABEL_FILTER="Platform:HCP && Importance:Critical" make dry-run
+LABEL_FILTER="Platform:Classic" make dry-run
 ```
 
 ## Building and Running
