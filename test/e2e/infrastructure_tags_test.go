@@ -28,19 +28,14 @@ var _ = Describe("ROSA Infrastructure Tags", labels.High, labels.Positive, label
 			Skip("AWS credentials not available, skipping EBS tags test")
 		}
 
-		By("Resolving cluster identifier for EBS volume tags")
-		// HCP clusters tag volumes with the OCM cluster ID; Classic clusters use the infra ID.
-		clusterTag := cfg.ClusterID
-		if tc.IsClassic() {
-			infraID, err := tc.ResolveInfraID()
-			Expect(err).NotTo(HaveOccurred(), "failed to resolve infra ID from OCM")
-			clusterTag = infraID
-		}
+		By("Resolving cluster infrastructure ID")
+		infraID, err := tc.ResolveInfraID()
+		Expect(err).NotTo(HaveOccurred(), "failed to resolve infra ID from OCM")
 
 		By("Verifying EBS volumes have required cluster ownership tag")
 		expectedTags := map[string]string{
-			fmt.Sprintf("kubernetes.io/cluster/%s", clusterTag): "owned",
+			fmt.Sprintf("kubernetes.io/cluster/%s", infraID): "owned",
 		}
-		Expect(verifiers.VerifyEBSVolumesTags(ctx, tc.EC2Client(), clusterTag, expectedTags)).To(Succeed())
+		Expect(verifiers.VerifyEBSVolumesTags(ctx, tc.EC2Client(), infraID, expectedTags)).To(Succeed())
 	})
 })
