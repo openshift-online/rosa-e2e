@@ -80,7 +80,7 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		OCMEnv:             "staging",
 		AWSRegion:          "us-east-2",
-		ClusterNamePrefix:  "e2e",
+		ClusterNamePrefix:  "rosa-e2e",
 		ComputeMachineType: "m5.xlarge",
 		ComputeNodes:       2,
 		ChannelGroup:       "stable",
