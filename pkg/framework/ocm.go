@@ -40,6 +40,32 @@ func NewOCMConnection(cfg *config.Config) (*sdk.Connection, error) {
 	return conn, nil
 }
 
+// ResolveManagementClusterID returns the OCM cluster ID of the management cluster for
+// a given HCP cluster, using the /hypershift sub-resource to look up the MC name and
+// then searching OCM clusters by that name.
+func ResolveManagementClusterID(conn *sdk.Connection, clusterID string) (string, error) {
+	resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Hypershift().Get().Send()
+	if err != nil {
+		return "", fmt.Errorf("getting hypershift config for cluster %s: %w", clusterID, err)
+	}
+	mcName := resp.Body().ManagementCluster()
+	if mcName == "" {
+		return "", fmt.Errorf("cluster %s has no management cluster assigned", clusterID)
+	}
+
+	listResp, err := conn.ClustersMgmt().V1().Clusters().List().
+		Search(fmt.Sprintf("name='%s'", mcName)).
+		Size(1).
+		Send()
+	if err != nil {
+		return "", fmt.Errorf("searching for management cluster %q: %w", mcName, err)
+	}
+	if listResp.Total() == 0 {
+		return "", fmt.Errorf("management cluster %q not found in OCM", mcName)
+	}
+	return listResp.Items().Get(0).ID(), nil
+}
+
 // DetectClusterTopology queries the OCM API and returns "hcp", "classic", or "osd-gcp"
 // based on the cluster's product and hypershift configuration.
 func DetectClusterTopology(conn *sdk.Connection, clusterID string) (string, error) {

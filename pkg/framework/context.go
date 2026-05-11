@@ -91,9 +91,18 @@ func (tc *TestContext) InitHCClients() error {
 
 // InitMCClients initializes kube and dynamic clients for the management cluster.
 // If MC_KUBECONFIG is set, uses that kubeconfig file (e.g. from backplane).
-// Otherwise falls back to OCM credentials API.
+// Otherwise uses ManagementClusterID if configured, or resolves the MC dynamically
+// from the HCP cluster's /hypershift endpoint.
 func (tc *TestContext) InitMCClients() error {
-	restCfg, err := resolveKubeconfig("MC_KUBECONFIG", tc.conn, tc.cfg.ManagementClusterID)
+	mcID := tc.cfg.ManagementClusterID
+	if mcID == "" && os.Getenv("MC_KUBECONFIG") == "" && tc.cfg.ClusterID != "" {
+		resolved, err := ResolveManagementClusterID(tc.conn, tc.cfg.ClusterID)
+		if err != nil {
+			return fmt.Errorf("resolving management cluster ID: %w", err)
+		}
+		mcID = resolved
+	}
+	restCfg, err := resolveKubeconfig("MC_KUBECONFIG", tc.conn, mcID)
 	if err != nil {
 		return fmt.Errorf("getting MC credentials: %w", err)
 	}
@@ -277,9 +286,12 @@ func (tc *TestContext) HasSCAccess() bool {
 	return tc.cfg.ServiceClusterID != ""
 }
 
-// HasMCAccess returns true if the management cluster ID is configured.
+// HasMCAccess returns true if MC credentials can be obtained: either via MC_KUBECONFIG,
+// an explicit ManagementClusterID, or dynamic resolution from an HCP cluster.
 func (tc *TestContext) HasMCAccess() bool {
-	return tc.cfg.ManagementClusterID != ""
+	return os.Getenv("MC_KUBECONFIG") != "" ||
+		tc.cfg.ManagementClusterID != "" ||
+		(tc.cfg.ClusterID != "" && tc.IsHCP())
 }
 
 // HasAWSAccess returns true if AWS clients were successfully initialized.
