@@ -88,7 +88,7 @@ func DetectClusterTopology(conn *sdk.Connection, clusterID string) (string, erro
 
 // CreateRosaHCPCluster creates a ROSA HCP cluster via the OCM API and returns its ID.
 func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, error) {
-	name := generateClusterName(cfg.ClusterNamePrefix)
+	name := generateClusterName(cfg.ClusterNamePrefix, "hcp")
 
 	versionID, err := resolveVersionForTopology(conn, cfg, "hcp")
 	if err != nil {
@@ -160,7 +160,7 @@ func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, err
 
 // CreateRosaClassicCluster creates a ROSA Classic STS cluster via the OCM API and returns its ID.
 func CreateRosaClassicCluster(conn *sdk.Connection, cfg *config.Config) (string, error) {
-	name := generateClusterName(cfg.ClusterNamePrefix)
+	name := generateClusterName(cfg.ClusterNamePrefix, "classic")
 
 	versionID, err := resolveVersionForTopology(conn, cfg, "classic")
 	if err != nil {
@@ -387,13 +387,18 @@ func findShardForSector(conn *sdk.Connection, sector, region, status string) (st
 	return "", nil
 }
 
-func generateClusterName(prefix string) string {
+func generateClusterName(prefix, topology string) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	suffix := make([]byte, 5)
 	for i := range suffix {
 		suffix[i] = charset[rand.IntN(len(charset))]
 	}
-	return fmt.Sprintf("%s-%s", prefix, string(suffix))
+	topoTag := topology
+	if topoTag == "classic" {
+		topoTag = "sts"
+	}
+	date := time.Now().Format("0102")
+	return fmt.Sprintf("%s-%s-%s-%s", prefix, topoTag, date, string(suffix))
 }
 
 // clientConfigFromKubeconfig parses raw kubeconfig YAML into a rest.Config.
