@@ -72,7 +72,7 @@ jobs:
           echo "Verifying branch protection settings for default branch..."
 
           REPO="${{ github.repository }}"
-          BRANCH="master"
+          BRANCH="main"
 
           protection_response=$(curl -s -w "\n%{http_code}" \
             -H "Accept: application/vnd.github+json" \
