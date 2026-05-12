@@ -17,7 +17,7 @@ jobs:
     if: github.actor == 'dependabot[bot]' && github.repository == 'openshift-online/rosa-e2e'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Fetch Dependabot Metadata
         id: metadata
