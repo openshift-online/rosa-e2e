@@ -13,7 +13,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("ROSA HCP HostedCluster Health", labels.Critical, labels.Positive, labels.HCP, labels.ManagedService, func() {
+var _ = Describe("ROSA HCP HostedCluster Health", labels.Critical, labels.Positive, labels.HCP, labels.ManagedService, labels.MCAccess, func() {
 	It("should have all HCP namespace deployments healthy", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 

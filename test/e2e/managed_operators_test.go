@@ -29,7 +29,7 @@ var _ = Describe("ROSA Managed Operators: ClusterOperators", labels.Critical, la
 	})
 })
 
-var _ = Describe("ROSA HCP Managed Operators: MC Components", labels.Critical, labels.Positive, labels.HCP, labels.ManagedService, func() {
+var _ = Describe("ROSA HCP Managed Operators: MC Components", labels.Critical, labels.Positive, labels.HCP, labels.ManagedService, labels.MCAccess, func() {
 	It("should have RMO RouteMonitors on management cluster", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 

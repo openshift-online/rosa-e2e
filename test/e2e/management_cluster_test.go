@@ -16,7 +16,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("Infrastructure: Management Cluster Health", labels.High, labels.Positive, labels.HCP, labels.Infrastructure, func() {
+var _ = Describe("Infrastructure: Management Cluster Health", labels.High, labels.Positive, labels.HCP, labels.Infrastructure, labels.MCAccess, func() {
 	It("should have HyperShift operator running", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 		if !tc.HasMCAccess() {
