@@ -32,18 +32,64 @@ categories:
       - name: STS 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-sts-e2e-nightly-4-22
 
-  - id: ocm-fvt
-    name: OCM FVT
-    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*rosa*"
+  - id: ocm-fvt-hcp
+    name: OCM FVT HCP
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp*"
     jobs:
-      - name: FVT HCP AD
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
-      - name: FVT STS AD (stg)
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main
-      - name: FVT STS AD (int)
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main
-      - name: FVT ROSA AD
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-ad-staging-main
+      - name: HCP AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
+      - name: HCP Adobe
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-adobe-staging-main
+      - name: HCP AMD64
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-staging-main
+      - name: HCP ARM
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-arm-staging-main
+      - name: HCP E2E
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-hcp-e2e-staging-main
+      - name: HCP PL
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-pl-staging-main
+      - name: HCP Shared VPC
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-shared-vpc-staging-main
+      - name: HCP Y-Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-y-upgrade-staging-main
+      - name: HCP Zero Egress
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-staging-main
+      - name: HCP Zero Egress Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-upgrade-staging-main
+
+  - id: ocm-fvt-classic
+    name: OCM FVT Classic
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-classic*"
+    jobs:
+      - name: ROSA AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-ad-staging-main
+      - name: STS AD (stg)
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main
+      - name: STS AD (int)
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-integration-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main
+      - name: STS PL
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-pl-staging-main
+      - name: STS Shared VPC
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-shared-vpc-staging-main
+      - name: STS Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-upgrade-staging-main
+      - name: HCP Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-hcp-upgrade-staging-main
+      - name: OCM Resources
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-ocm-resources-staging-main
+      - name: OSD RH AWS
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-osd-rh-aws-staging-main
+
+  - id: ocm-fvt-gcp
+    name: OCM FVT GCP
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osd-gcp*"
+    jobs:
+      - name: GCP CCS AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-ccs-gcp-ad-staging-main
+      - name: GCP Marketplace
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-ccs-gcp-marketplace-staging-main
+      - name: GCP Non-Cross-Proj WIF
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-non-cross-proj-wif-staging-main
 
   - id: hcp
     name: HCP Conformance
