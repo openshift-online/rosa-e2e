@@ -1,0 +1,10 @@
+ocm_env: staging
+cluster_topology: osd-gcp
+gcp_project_id: ""  # Set via GCP_PROJECT_ID env var or update here
+gcp_region: us-central1
+gcp_wif_config: ""  # REQUIRED: Set via GCP_WIF_CONFIG env var or update here
+cluster_name_prefix: e2e-gcp
+compute_machine_type: n2-standard-4
+compute_nodes: 3
+channel_group: stable
+preserve_clusters: false  # Set to true to skip cluster deletion after tests
