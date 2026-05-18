@@ -11,26 +11,26 @@ sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
 categories:
   - id: rosa-e2e
     name: ROSA E2E
-    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-*e2e-nightly*"
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-e2e-main-periodics-rosa-*e2e*"
     jobs:
       - name: HCP 4.19
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-19
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-19
       - name: HCP 4.20
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-20
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-20
       - name: HCP 4.21
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-21
       - name: HCP 4.22
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-4-22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-candidate-4-22
       - name: HCP 5.0
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-5-0
       - name: STS 4.19
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-sts-e2e-nightly-4-19
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-19
       - name: STS 4.20
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-sts-e2e-nightly-4-20
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-20
       - name: STS 4.21
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-sts-e2e-nightly-4-21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-21
       - name: STS 4.22
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-sts-e2e-nightly-4-22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-candidate-4-22
 
   - id: ocm-fvt-hcp
     name: OCM FVT HCP
