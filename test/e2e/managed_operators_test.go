@@ -13,7 +13,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("ROSA Managed Operators: ClusterOperators", labels.Critical, labels.Positive, labels.HCP, labels.Classic, labels.ManagedService, func() {
+var _ = Describe("ROSA Managed Operators: ClusterOperators", labels.Critical, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.ManagedService, func() {
 	It("should have all ClusterOperators healthy", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not configured, skipping ClusterOperators test")

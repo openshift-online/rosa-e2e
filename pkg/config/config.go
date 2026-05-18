@@ -15,7 +15,7 @@ type Config struct {
 	OCMEnv   string `yaml:"ocm_env"`
 	OCMToken string `yaml:"-"` // never serialize tokens
 
-	// Cluster topology: "hcp" or "classic" (auto-detected from OCM if empty)
+	// Cluster topology: "hcp", "classic", or "osd-gcp" (auto-detected from OCM if empty)
 	ClusterTopology string `yaml:"cluster_topology"`
 
 	// Existing cluster (skip provisioning when set)

@@ -16,7 +16,7 @@ import (
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
-var _ = Describe("Data Plane: Storage", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.DataPlane, func() {
+var _ = Describe("Data Plane: Storage", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.DataPlane, func() {
 	It("should create a PVC and verify it is bound", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set, skipping storage test")
@@ -39,8 +39,13 @@ var _ = Describe("Data Plane: Storage", labels.High, labels.Positive, labels.HCP
 			_ = tc.HCKubeClient().CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 		})
 
-		By("Creating a PVC with gp3-csi storage class")
-		pvcName, err := framework.CreateTestPVC(ctx, tc.HCKubeClient(), namespace, "gp3-csi")
+		storageClass := "gp3-csi"
+		if tc.IsOSDGCP() {
+			storageClass = ""
+		}
+
+		By("Creating a PVC")
+		pvcName, err := framework.CreateTestPVC(ctx, tc.HCKubeClient(), namespace, storageClass)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a pod that mounts the PVC")

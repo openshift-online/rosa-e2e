@@ -163,3 +163,33 @@ var _ = Describe("ROSA Classic Cluster Lifecycle: Existing Cluster", labels.Crit
 		)).To(Succeed())
 	})
 })
+
+var _ = Describe("OSD GCP Cluster Lifecycle: Existing Cluster", labels.Critical, labels.Positive, labels.OSDGCP, labels.ClusterLifecycle, func() {
+	It("should verify an existing OSD GCP cluster is healthy", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set, skipping existing cluster verification")
+		}
+
+		tc := framework.NewTestContext(cfg, conn)
+		if !tc.IsOSDGCP() {
+			Skip("Not an OSD GCP cluster, skipping OSD GCP lifecycle test")
+		}
+
+		By("Verifying cluster is ready in OCM")
+		Expect(verifiers.VerifyClusterReady(tc.Connection(), cfg.ClusterID)).To(Succeed())
+
+		By("Verifying machine pools exist")
+		Expect(verifiers.VerifyMachinePoolsExist(tc.Connection(), cfg.ClusterID)).To(Succeed())
+
+		By("Verifying cluster health via Kubernetes API")
+		kubeConfig, err := framework.GetClusterCredentials(tc.Connection(), cfg.ClusterID)
+		Expect(err).NotTo(HaveOccurred())
+
+		kubeClient, err := framework.NewKubeClient(kubeConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(verifiers.RunVerifiers(ctx, kubeClient,
+			verifiers.VerifyAllNodesReady(),
+		)).To(Succeed())
+	})
+})

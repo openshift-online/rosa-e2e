@@ -105,7 +105,7 @@ var _ = Describe("Upgrade: Classic Cluster", labels.Critical, labels.Positive, l
 	})
 })
 
-var _ = Describe("Upgrade: Post-Upgrade Verification", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.Upgrade, func() {
+var _ = Describe("Upgrade: Post-Upgrade Verification", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.Upgrade, func() {
 	It("should have all ClusterOperators healthy after upgrade", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -143,5 +143,30 @@ var _ = Describe("Upgrade: Post-Upgrade Verification", labels.High, labels.Posit
 
 		By("Verifying workload is available")
 		Expect(verifiers.VerifyDeploymentAvailable(ctx, tc.HCKubeClient(), "e2e-post-upgrade", "test-nginx")).To(Succeed())
+	})
+})
+
+var _ = Describe("Upgrade: OSD GCP Cluster", labels.Critical, labels.Positive, labels.Slow, labels.OSDGCP, labels.Upgrade, func() {
+	It("should upgrade an OSD GCP cluster to target version", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+		if cfg.UpgradeTargetVersion == "" {
+			Skip("UPGRADE_TARGET_VERSION not set, skipping upgrade test")
+		}
+
+		tc := framework.NewTestContext(cfg, conn)
+		if !tc.IsOSDGCP() {
+			Skip("Not an OSD GCP cluster, skipping OSD GCP upgrade test")
+		}
+
+		By("Initiating cluster upgrade to " + cfg.UpgradeTargetVersion)
+		Expect(framework.InitiateClusterUpgrade(tc.Connection(), cfg.ClusterID, cfg.UpgradeTargetVersion)).To(Succeed())
+
+		By("Waiting for upgrade to complete (up to 90 minutes)")
+		Expect(framework.WaitForUpgradeComplete(tc.Connection(), cfg.ClusterID, cfg.UpgradeTargetVersion, 90*time.Minute)).To(Succeed())
+
+		By("Verifying cluster is ready after upgrade")
+		Expect(verifiers.VerifyClusterReady(tc.Connection(), cfg.ClusterID)).To(Succeed())
 	})
 })

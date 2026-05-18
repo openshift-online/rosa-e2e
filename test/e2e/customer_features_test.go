@@ -59,7 +59,7 @@ var _ = Describe("Customer Features: Machine Pools", labels.High, labels.Positiv
 	})
 })
 
-var _ = Describe("Customer Features: Cluster Admin RBAC", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: Cluster Admin RBAC", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
 	It("should have cluster-admin ClusterRoleBinding", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -85,7 +85,7 @@ var _ = Describe("Customer Features: Cluster Admin RBAC", labels.High, labels.Po
 	})
 })
 
-var _ = Describe("Customer Features: Network Policies", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: Network Policies", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
 	It("should support NetworkPolicy creation", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -125,7 +125,7 @@ var _ = Describe("Customer Features: Network Policies", labels.High, labels.Posi
 	})
 })
 
-var _ = Describe("Customer Features: Ingress", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: Ingress", labels.High, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
 	It("should have default IngressController", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -147,7 +147,7 @@ var _ = Describe("Customer Features: Ingress", labels.High, labels.Positive, lab
 	})
 })
 
-var _ = Describe("Customer Features: Log Forwarding", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: Log Forwarding", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
 	It("should have ClusterLogForwarder CRD available", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -194,11 +194,11 @@ var _ = Describe("Customer Features: Log Forwarding", labels.Medium, labels.Posi
 	})
 })
 
-var _ = Describe("Customer Features: External OIDC", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: External OIDC", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
 	PIt("should authenticate via external OIDC provider")
 })
 
-var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
 	It("should report KMS configuration via OCM API", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -218,7 +218,7 @@ var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Posi
 	})
 })
 
-var _ = Describe("Customer Features: PrivateLink", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: PrivateLink", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
 	It("should report PrivateLink status via OCM API", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
@@ -237,15 +237,15 @@ var _ = Describe("Customer Features: PrivateLink", labels.Medium, labels.Positiv
 	})
 })
 
-var _ = Describe("Customer Features: Machine Pools (Classic)", labels.High, labels.Positive, labels.Classic, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: Machine Pools (Classic/OSD-GCP)", labels.High, labels.Positive, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
 	It("should list machine pools for the cluster", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
 		}
 
 		tc := framework.NewTestContext(cfg, conn)
-		if !tc.IsClassic() {
-			Skip("Machine pool tests only apply to Classic clusters")
+		if !tc.IsClassic() && !tc.IsOSDGCP() {
+			Skip("Machine pool tests only apply to Classic and OSD GCP clusters")
 		}
 
 		By("Verifying machine pools exist via OCM API")
@@ -258,8 +258,8 @@ var _ = Describe("Customer Features: Machine Pools (Classic)", labels.High, labe
 		}
 
 		tc := framework.NewTestContext(cfg, conn)
-		if !tc.IsClassic() {
-			Skip("Machine pool tests only apply to Classic clusters")
+		if !tc.IsClassic() && !tc.IsOSDGCP() {
+			Skip("Machine pool tests only apply to Classic and OSD GCP clusters")
 		}
 
 		By("Getting machine pool details")

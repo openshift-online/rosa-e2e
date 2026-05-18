@@ -297,9 +297,14 @@ func resolveVersionForTopology(conn *sdk.Connection, cfg *config.Config, topolog
 		return "openshift-v" + cfg.OpenShiftVersion, nil
 	}
 
-	query := fmt.Sprintf("channel_group = '%s' AND rosa_enabled = 'true' AND enabled = 'true'", cfg.ChannelGroup)
-	if topology == "hcp" {
-		query += " AND hosted_control_plane_enabled = 'true'"
+	query := fmt.Sprintf("channel_group = '%s' AND enabled = 'true'", cfg.ChannelGroup)
+	switch topology {
+	case "hcp":
+		query += " AND rosa_enabled = 'true' AND hosted_control_plane_enabled = 'true'"
+	case "osd-gcp":
+		// OSD GCP versions are not rosa_enabled
+	default:
+		query += " AND rosa_enabled = 'true'"
 	}
 
 	resp, err := conn.ClustersMgmt().V1().Versions().List().

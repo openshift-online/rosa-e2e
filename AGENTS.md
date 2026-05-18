@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 ## What This Is
 
-Unified E2E test suite for ROSA and OSD. Go/Ginkgo v2 binary using OCM SDK directly for cluster lifecycle, with composable verifiers for health checks. Supports multiple cluster topologies: ROSA HCP, ROSA Classic STS, and (planned) OSD GCP.
+Unified E2E test suite for ROSA and OSD. Go/Ginkgo v2 binary using OCM SDK directly for cluster lifecycle, with composable verifiers for health checks. Supports multiple cluster topologies: ROSA HCP, ROSA Classic STS, and OSD GCP.
 
 ## Build and Test Commands
 
@@ -20,6 +20,7 @@ make clean          # Remove build artifacts
 # Run filtered tests by topology
 LABEL_FILTER="Platform:HCP" make test
 LABEL_FILTER="Platform:Classic" make test
+LABEL_FILTER="Platform:OSD-GCP" make test
 LABEL_FILTER="Platform:HCP && Importance:Critical" make test
 
 # Required env vars for test execution
@@ -43,7 +44,7 @@ configs/          YAML config files per environment
 |----------|-------|-----------------|-------------|----------------|
 | ROSA HCP | `Platform:HCP` | `CreateRosaHCPCluster()` | `ControlPlane().UpgradePolicies()` | NodePool |
 | ROSA Classic STS | `Platform:Classic` | `CreateRosaClassicCluster()` | `UpgradePolicies()` with `UpgradeType("OSD")` | MachinePool |
-| OSD GCP | `Platform:OSD-GCP` | Not yet implemented | Not yet implemented | Not yet implemented |
+| OSD GCP | `Platform:OSD-GCP` | External (Prow) | `UpgradePolicies()` with `UpgradeType("OSD")` | MachinePool |
 
 ### Topology Detection
 
@@ -72,12 +73,16 @@ The framework auto-detects topology from the OCM API via `DetectClusterTopology(
 
 Tests use dual platform labels when they work on both topologies.
 
-**Dual-topology tests** (labeled `Platform:HCP` + `Platform:Classic`):
+**Multi-topology tests** (labeled `Platform:HCP` + `Platform:Classic` + `Platform:OSD-GCP`):
 - Data plane: workload, networking, storage
-- Managed service: ClusterOperators, IAM validation, infrastructure tags
-- Customer features: RBAC, ingress, log forwarding, KMS, PrivateLink
-- Management plane: OCM API health, cluster service health
+- Managed service: ClusterOperators
+- Customer features: RBAC, ingress, log forwarding, network policies, KMS, PrivateLink, OIDC
+- Management plane: OCM API health, cluster service health, cluster health indicators
 - Upgrade: post-upgrade verification
+
+**HCP + Classic only** (labeled `Platform:HCP` + `Platform:Classic`):
+- IAM validation (AWS CloudTrail)
+- Infrastructure tags (AWS EBS)
 
 **HCP-only tests** (labeled `Platform:HCP` only):
 - HostedCluster/NodePool CR health (requires MC)
@@ -85,20 +90,27 @@ Tests use dual platform labels when they work on both topologies.
 - SC infrastructure: ACM hub, cert-manager, Hive, MCE
 - MC-based managed operators: RMO, AVO, audit-webhook
 - OSDFM health
-- NodePool upgrades
+- NodePool upgrades, control plane upgrades
+- HCP node pool listing
 
 **Classic-only tests** (labeled `Platform:Classic` only):
-- MachinePool list/verify
 - Classic cluster upgrade
 - Classic full lifecycle (create/verify/delete)
+
+**Classic + OSD GCP tests** (labeled `Platform:Classic` + `Platform:OSD-GCP`):
+- MachinePool list/verify
+
+**OSD GCP-only tests** (labeled `Platform:OSD-GCP` only):
+- OSD GCP existing cluster lifecycle verification
+- OSD GCP cluster upgrade
 
 ## Adding a New Test
 
 1. Create `test/e2e/<name>_test.go` with `//go:build E2Etests` and `package e2e`
 2. Use suite-level `cfg` and `conn` (don't create your own)
-3. Apply labels: include both `labels.HCP` and `labels.Classic` if the test works on both topologies
+3. Apply labels: include `labels.HCP`, `labels.Classic`, and `labels.OSDGCP` if the test works across topologies. Omit labels for topologies that don't apply (e.g., AWS-specific tests should not include `labels.OSDGCP`)
 4. Create TestContext, init required clients, skip if access unavailable
-5. For topology-specific behavior, use `tc.IsHCP()` / `tc.IsClassic()` to branch or skip
+5. For topology-specific behavior, use `tc.IsHCP()` / `tc.IsClassic()` / `tc.IsOSDGCP()` to branch or skip
 6. Use existing verifiers from `pkg/verifiers/` or create new ones
 7. Clean up with `DeferCleanup`
 
@@ -114,6 +126,9 @@ Tests use dual platform labels when they work on both topologies.
 - AWS SDK validates credentials lazily. `InitAWSClients` uses eager `Retrieve()` to fail fast.
 - golangci-lint v2 with k8s/OCM SDK dependencies can use excessive memory (48+ GB). Use `go vet` for local validation.
 - Classic STS clusters take 30-45 min to provision vs 15 min for HCP.
+- OSD GCP cluster creation is handled externally (Prow); `CreateOSDGCPCluster()` does not exist in the framework. Tests assume a pre-provisioned cluster via `CLUSTER_ID`.
+- OSD GCP storage tests use the cluster's default storage class (empty string) instead of the AWS-specific `gp3-csi`.
+- OSD GCP version queries omit `rosa_enabled` filter since OSD is a separate product from ROSA.
 
 ## Jira
 
