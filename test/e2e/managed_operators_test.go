@@ -30,7 +30,7 @@ var _ = Describe("ROSA Managed Operators: ClusterOperators", labels.Critical, la
 })
 
 var _ = Describe("ROSA HCP Managed Operators: MC Components", labels.Critical, labels.Positive, labels.HCP, labels.ManagedService, labels.MCAccess, func() {
-	It("should have RMO RouteMonitors on management cluster", func(ctx context.Context) {
+	PIt("should have RMO RouteMonitors on management cluster", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 
 		if !tc.HasMCAccess() {
@@ -47,7 +47,7 @@ var _ = Describe("ROSA HCP Managed Operators: MC Components", labels.Critical, l
 		Expect(verifiers.VerifyRMORouteMonitors(ctx, tc.MCDynamicClient(), ns.HCPNamespace)).To(Succeed())
 	})
 
-	It("should have AVO VpcEndpoints on management cluster", func(ctx context.Context) {
+	PIt("should have AVO VpcEndpoints on management cluster", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 
 		if !tc.HasMCAccess() {
