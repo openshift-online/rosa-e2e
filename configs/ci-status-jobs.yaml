@@ -32,6 +32,13 @@ categories:
       - name: STS 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-candidate-4-22
 
+  - id: osd-gcp-e2e
+    name: OSD GCP E2E
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-e2e-main-periodics-osd-gcp*"
+    jobs:
+      - name: OSD GCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-candidate-4-22
+
   - id: ocm-fvt-hcp
     name: OCM FVT HCP
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp*"
@@ -44,6 +51,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-staging-main
       - name: HCP ARM
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-arm-staging-main
+      - name: HCP Autonode
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-autonode-staging-main
       - name: HCP E2E
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-hcp-e2e-staging-main
       - name: HCP PL
@@ -56,6 +65,13 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-staging-main
       - name: HCP Zero Egress Upgrade
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-upgrade-staging-main
+
+  - id: ocm-fvt-hcp-integration
+    name: OCM FVT HCP Integration
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-integration*"
+    jobs:
+      - name: HCP Backup Restore
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-restore-integration-main
 
   - id: ocm-fvt-classic
     name: OCM FVT Classic
