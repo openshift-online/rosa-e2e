@@ -34,6 +34,7 @@ type Config struct {
 	// GCP infrastructure (for OSD GCP clusters)
 	GCPProjectID string `yaml:"gcp_project_id"`
 	GCPRegion    string `yaml:"gcp_region"`
+	GCPWifConfig string `yaml:"gcp_wif_config"`
 
 	// Cluster parameters
 	ClusterNamePrefix  string `yaml:"cluster_name_prefix"`
@@ -57,6 +58,9 @@ type Config struct {
 
 	// ClusterOperator exclusion list (for known staging issues)
 	ExcludeClusterOperators []string `yaml:"exclude_cluster_operators"`
+
+	// PreserveClusters prevents automatic cluster deletion after tests
+	PreserveClusters bool `yaml:"preserve_clusters"`
 }
 
 // OCMBaseURL returns the OCM API URL for the configured environment.
@@ -139,6 +143,9 @@ func Load() (*Config, error) {
 	if v := os.Getenv("GCP_REGION"); v != "" {
 		cfg.GCPRegion = v
 	}
+	if v := os.Getenv("GCP_WIF_CONFIG"); v != "" {
+		cfg.GCPWifConfig = v
+	}
 	if v := os.Getenv("CLUSTER_NAME_PREFIX"); v != "" {
 		cfg.ClusterNamePrefix = v
 	}
@@ -175,6 +182,13 @@ func Load() (*Config, error) {
 	}
 	if v := os.Getenv("EXCLUDE_CLUSTER_OPERATORS"); v != "" {
 		cfg.ExcludeClusterOperators = strings.Split(v, ",")
+	}
+	if v := os.Getenv("PRESERVE_CLUSTERS"); v != "" {
+		preserve, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid PRESERVE_CLUSTERS value %q: %w", v, err)
+		}
+		cfg.PreserveClusters = preserve
 	}
 
 	if cfg.OCMToken == "" {
