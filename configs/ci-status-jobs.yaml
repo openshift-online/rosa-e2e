@@ -39,6 +39,21 @@ categories:
       - name: OSD GCP 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-candidate-4-22
 
+  - id: rosa-gap-analysis
+    name: ROSA Gap Analysis
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-gap-analysis-main-periodics*"
+    jobs:
+      - name: ROSA Gap Analysis 4.19
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-19
+      - name: ROSA Gap Analysis 4.20
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-20
+      - name: ROSA Gap Analysis 4.21
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-21
+      - name: ROSA Gap Analysis 4.22
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-22
+      - name: ROSA Gap Analysis 5.0
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-5-0
+
   - id: ocm-fvt-hcp
     name: OCM FVT HCP
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp*"
