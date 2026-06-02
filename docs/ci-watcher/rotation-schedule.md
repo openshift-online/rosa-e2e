@@ -1,7 +1,5 @@
 # CI Watcher Rotation Schedule
 
-Jira: [ROSAENG-1427](https://redhat.atlassian.net/browse/ROSAENG-1427)
-
 ## Schedule
 
 The rotation is weekly (Monday 00:00 UTC to Sunday 23:59 UTC), managed via PagerDuty schedule **ROSA CI Watcher**.
@@ -11,17 +9,6 @@ This is a **tracking schedule only** — there is no escalation policy and no pa
 See the [PagerDuty schedule](https://redhat.pagerduty.com/schedules/PGLVMVG) for the current and upcoming rotation assignments.
 
 ## Rotation Members
-
-| Name | Org | Timezone |
-|------|-----|----------|
-| Dustin Row | SRE | NASA |
-| Bo Meng | SRE | APAC |
-| Ravi Trivedi | SRE | APAC |
-| Daniel Hall | SRE | APAC |
-| Lucas Ponce | OCM | EMEA |
-| Josh Branham | SRE | NASA |
-| Tim Williams | OCM | NASA |
-| Jeff Frazier | OCM | NASA |
 
 The rotation is intentionally cross-org (SRE + OCM) and cross-timezone (NASA, EMEA, APAC) to build shared understanding of the full CI surface.
 
