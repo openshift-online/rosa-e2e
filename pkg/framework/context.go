@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	sdk "github.com/openshift-online/ocm-sdk-go"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -297,6 +299,57 @@ func (tc *TestContext) HasMCAccess() bool {
 // HasAWSAccess returns true if AWS clients were successfully initialized.
 func (tc *TestContext) HasAWSAccess() bool {
 	return tc.ec2Client != nil
+}
+
+// HasRHOBSAccess returns true if RHOBS API access is configured.
+func (tc *TestContext) HasRHOBSAccess() bool {
+	return tc.cfg.RHOBSProbeAPIURL != "" &&
+		tc.cfg.RHOBSOIDCClientID != "" &&
+		tc.cfg.RHOBSOIDCClientSecret != ""
+}
+
+// LoadRHOBSCredentialsFromMC loads RHOBS API credentials from the route-monitor-operator
+// ConfigMap on the management cluster. Falls back to environment variables if MC is not accessible.
+// This should be called after InitMCClients() for HCP clusters.
+func (tc *TestContext) LoadRHOBSCredentialsFromMC(ctx context.Context) error {
+	// If credentials are already set via env vars, don't override
+	if tc.HasRHOBSAccess() {
+		return nil
+	}
+
+	// Requires MC access
+	if tc.mcKubeClient == nil {
+		return fmt.Errorf("management cluster client not initialized - call InitMCClients first")
+	}
+
+	// Get the ConfigMap from openshift-route-monitor-operator namespace
+	cm, err := tc.mcKubeClient.CoreV1().ConfigMaps("openshift-route-monitor-operator").Get(
+		ctx,
+		"route-monitor-operator-config",
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get route-monitor-operator-config ConfigMap: %w", err)
+	}
+
+	// Extract RHOBS credentials from ConfigMap
+	tc.cfg.RHOBSProbeAPIURL = cm.Data["probe-api-url"]
+	tc.cfg.RHOBSOIDCClientID = cm.Data["oidc-client-id"]
+	tc.cfg.RHOBSOIDCClientSecret = cm.Data["oidc-client-secret"]
+	tc.cfg.RHOBSOIDCIssuerURL = cm.Data["oidc-issuer-url"]
+
+	// Auto-derive metrics API URL from probe API URL if not explicitly set
+	// Pattern: https://...rhobs.../api/metrics/v1/hcp/probes -> https://...rhobs.../api/metrics/v1/hcp
+	if tc.cfg.RHOBSMetricsAPIURL == "" && tc.cfg.RHOBSProbeAPIURL != "" {
+		tc.cfg.RHOBSMetricsAPIURL = strings.TrimSuffix(tc.cfg.RHOBSProbeAPIURL, "/probes")
+	}
+
+	// Validate that we got all required fields
+	if !tc.HasRHOBSAccess() {
+		return fmt.Errorf("route-monitor-operator-config ConfigMap missing required RHOBS fields (probe-api-url, oidc-client-id, oidc-client-secret)")
+	}
+
+	return nil
 }
 
 // resolveKubeconfig loads a rest.Config from a kubeconfig file env var, or falls back to OCM credentials.
