@@ -29,13 +29,10 @@ var _ = Describe("RHOBS Synthetic Monitoring", labels.High, labels.Positive, lab
 
 		// Fetch cluster object to get external ID (used by RMO for probe creation)
 		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
-		if err != nil {
-			Skip("Unable to query cluster details from OCM: " + err.Error())
-		}
+		Expect(err).NotTo(HaveOccurred(), "Failed to query cluster details from OCM")
+
 		clusterExternalID = resp.Body().ExternalID()
-		if clusterExternalID == "" {
-			Skip("Cluster has no external ID, skipping RHOBS tests")
-		}
+		Expect(clusterExternalID).NotTo(BeEmpty(), "Cluster has no external ID - cannot validate RHOBS")
 
 		// Try to load RHOBS credentials from management cluster if not already set via env vars
 		if !tc.HasRHOBSAccess() {

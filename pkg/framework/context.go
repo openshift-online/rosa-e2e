@@ -305,7 +305,8 @@ func (tc *TestContext) HasAWSAccess() bool {
 func (tc *TestContext) HasRHOBSAccess() bool {
 	return tc.cfg.RHOBSProbeAPIURL != "" &&
 		tc.cfg.RHOBSOIDCClientID != "" &&
-		tc.cfg.RHOBSOIDCClientSecret != ""
+		tc.cfg.RHOBSOIDCClientSecret != "" &&
+		tc.cfg.RHOBSOIDCIssuerURL != ""
 }
 
 // LoadRHOBSCredentialsFromMC loads RHOBS API credentials from the route-monitor-operator
@@ -346,7 +347,7 @@ func (tc *TestContext) LoadRHOBSCredentialsFromMC(ctx context.Context) error {
 
 	// Validate that we got all required fields
 	if !tc.HasRHOBSAccess() {
-		return fmt.Errorf("route-monitor-operator-config ConfigMap missing required RHOBS fields (probe-api-url, oidc-client-id, oidc-client-secret)")
+		return fmt.Errorf("route-monitor-operator-config ConfigMap missing required RHOBS fields (probe-api-url, oidc-client-id, oidc-client-secret, oidc-issuer-url)")
 	}
 
 	return nil

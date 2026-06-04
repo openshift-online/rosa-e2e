@@ -43,17 +43,20 @@ func NewRHOBSConfig(cfg *config.Config) *RHOBSConfig {
 
 // IsConfigured returns true if RHOBS API access is configured.
 func (rc *RHOBSConfig) IsConfigured() bool {
-	return rc.ProbeAPIURL != "" && rc.OIDCClientID != "" && rc.OIDCClientSecret != ""
+	return rc.ProbeAPIURL != "" &&
+		rc.OIDCClientID != "" &&
+		rc.OIDCClientSecret != "" &&
+		rc.OIDCIssuerURL != ""
 }
 
 // getOIDCAccessToken fetches an OIDC access token using client credentials flow.
-func getOIDCAccessToken(cfg *RHOBSConfig) (string, error) {
+func getOIDCAccessToken(ctx context.Context, cfg *RHOBSConfig) (string, error) {
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
 	data.Set("client_id", cfg.OIDCClientID)
 	data.Set("client_secret", cfg.OIDCClientSecret)
 
-	req, err := http.NewRequest("POST", cfg.OIDCIssuerURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", cfg.OIDCIssuerURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("failed to create token request: %w", err)
 	}
@@ -82,9 +85,9 @@ func getOIDCAccessToken(cfg *RHOBSConfig) (string, error) {
 }
 
 // queryRHOBSProbes queries the RHOBS API for probes matching a label selector.
-func queryRHOBSProbes(cfg *RHOBSConfig, labelSelector string) ([]RHOBSProbe, error) {
+func queryRHOBSProbes(ctx context.Context, cfg *RHOBSConfig, labelSelector string) ([]RHOBSProbe, error) {
 	// Get OIDC access token
-	accessToken, err := getOIDCAccessToken(cfg)
+	accessToken, err := getOIDCAccessToken(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get OIDC access token: %w", err)
 	}
@@ -96,7 +99,7 @@ func queryRHOBSProbes(cfg *RHOBSConfig, labelSelector string) ([]RHOBSProbe, err
 		reqURL += "?label_selector=" + url.QueryEscape(labelSelector)
 	}
 
-	req, err := http.NewRequest("GET", reqURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -136,7 +139,7 @@ func queryRHOBSProbes(cfg *RHOBSConfig, labelSelector string) ([]RHOBSProbe, err
 
 // VerifyRHOBSProbeExists verifies that a probe exists for the cluster with the correct private label.
 func VerifyRHOBSProbeExists(ctx context.Context, clusterID string, expectedPrivate bool, cfg *RHOBSConfig) error {
-	probes, err := queryRHOBSProbes(cfg, fmt.Sprintf("cluster-id=%s", clusterID))
+	probes, err := queryRHOBSProbes(ctx, cfg, fmt.Sprintf("cluster-id=%s", clusterID))
 	if err != nil {
 		return fmt.Errorf("querying RHOBS API for cluster %s: %w", clusterID, err)
 	}
@@ -177,7 +180,7 @@ func VerifyRHOBSProbeExists(ctx context.Context, clusterID string, expectedPriva
 
 // VerifyProbeLabels verifies that the probe has the expected labels.
 func VerifyProbeLabels(ctx context.Context, clusterID string, expectedLabels map[string]string, cfg *RHOBSConfig) error {
-	probes, err := queryRHOBSProbes(cfg, fmt.Sprintf("cluster-id=%s", clusterID))
+	probes, err := queryRHOBSProbes(ctx, cfg, fmt.Sprintf("cluster-id=%s", clusterID))
 	if err != nil {
 		return fmt.Errorf("querying RHOBS API: %w", err)
 	}
@@ -202,8 +205,8 @@ func VerifyProbeLabels(ctx context.Context, clusterID string, expectedLabels map
 }
 
 // queryRHOBSMetrics queries the RHOBS metrics API for a PromQL query.
-func queryRHOBSMetrics(cfg *RHOBSConfig, query string) (map[string]interface{}, error) {
-	accessToken, err := getOIDCAccessToken(cfg)
+func queryRHOBSMetrics(ctx context.Context, cfg *RHOBSConfig, query string) (map[string]interface{}, error) {
+	accessToken, err := getOIDCAccessToken(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get OIDC access token: %w", err)
 	}
@@ -212,7 +215,7 @@ func queryRHOBSMetrics(cfg *RHOBSConfig, query string) (map[string]interface{}, 
 
 	reqURL := cfg.MetricsAPIURL + "/api/v1/query?query=" + url.QueryEscape(query)
 
-	req, err := http.NewRequest("GET", reqURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -240,7 +243,7 @@ func queryRHOBSMetrics(cfg *RHOBSConfig, query string) (map[string]interface{}, 
 // VerifyProbeSuccessMetrics verifies that probe_success metrics exist for the cluster.
 func VerifyProbeSuccessMetrics(ctx context.Context, clusterID string, cfg *RHOBSConfig) error {
 	query := fmt.Sprintf(`probe_success{_id="%s"}`, clusterID)
-	result, err := queryRHOBSMetrics(cfg, query)
+	result, err := queryRHOBSMetrics(ctx, cfg, query)
 	if err != nil {
 		return fmt.Errorf("querying probe_success metrics: %w", err)
 	}
@@ -268,7 +271,7 @@ func VerifyProbeSuccessMetrics(ctx context.Context, clusterID string, cfg *RHOBS
 func VerifyRecordingRules(ctx context.Context, clusterID string, cfg *RHOBSConfig) error {
 	// Check for sre:hcp:probe_active recording rule
 	probeActiveQuery := fmt.Sprintf(`sre:hcp:probe_active{_id="%s"}`, clusterID)
-	result, err := queryRHOBSMetrics(cfg, probeActiveQuery)
+	result, err := queryRHOBSMetrics(ctx, cfg, probeActiveQuery)
 	if err != nil {
 		return fmt.Errorf("querying sre:hcp:probe_active: %w", err)
 	}
@@ -290,7 +293,7 @@ func VerifyRecordingRules(ctx context.Context, clusterID string, cfg *RHOBSConfi
 
 	// Check for sre:hcp:blackbox_probe_active recording rule
 	blackboxQuery := fmt.Sprintf(`sre:hcp:blackbox_probe_active{_id="%s"}`, clusterID)
-	result, err = queryRHOBSMetrics(cfg, blackboxQuery)
+	result, err = queryRHOBSMetrics(ctx, cfg, blackboxQuery)
 	if err != nil {
 		return fmt.Errorf("querying sre:hcp:blackbox_probe_active: %w", err)
 	}
