@@ -72,11 +72,16 @@ jobs:
           retry=0
 
           get_smoke_checks() {
+            # Prow reports as commit statuses, not check runs
             curl -s \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/${REPO}/commits/${SHA}/check-runs?per_page=100" \
-              | jq -r '.check_runs[] | select(.name | test("e2e.*smoke")) | "\(.name)|\(.status)|\(.conclusion // "none")"'
+              "https://api.github.com/repos/${REPO}/commits/${SHA}/status" \
+              | jq -r '.statuses[] | select(.context | test("e2e.*smoke")) |
+                if .state == "pending" then "\(.context)|in_progress|none"
+                elif .state == "success" then "\(.context)|completed|success"
+                else "\(.context)|completed|failure"
+                end'
           }
 
           post_retest() {
