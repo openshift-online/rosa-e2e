@@ -67,7 +67,7 @@ func getOIDCAccessToken(ctx context.Context, cfg *RHOBSConfig) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get access token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -109,7 +109,7 @@ func queryRHOBSProbes(ctx context.Context, cfg *RHOBSConfig, labelSelector strin
 	if err != nil {
 		return nil, fmt.Errorf("failed to query RHOBS API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -205,12 +205,9 @@ func VerifyProbeLabels(ctx context.Context, clusterID string, expectedLabels map
 }
 
 // queryRHOBSMetrics queries the RHOBS metrics API for a PromQL query.
+// When OIDC credentials are configured, authenticates via bearer token.
+// When running inside a cell cluster, queries Thanos directly without auth.
 func queryRHOBSMetrics(ctx context.Context, cfg *RHOBSConfig, query string) (map[string]interface{}, error) {
-	accessToken, err := getOIDCAccessToken(ctx, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get OIDC access token: %w", err)
-	}
-
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	reqURL := cfg.MetricsAPIURL + "/api/v1/query?query=" + url.QueryEscape(query)
@@ -219,13 +216,20 @@ func queryRHOBSMetrics(ctx context.Context, cfg *RHOBSConfig, query string) (map
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	if cfg.OIDCClientID != "" && cfg.OIDCClientSecret != "" {
+		accessToken, err := getOIDCAccessToken(ctx, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get OIDC access token: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query RHOBS metrics API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -238,6 +242,162 @@ func queryRHOBSMetrics(ctx context.Context, cfg *RHOBSConfig, query string) (map
 	}
 
 	return result, nil
+}
+
+// CardinalityResult holds the outcome of a cardinality threshold check.
+type CardinalityResult struct {
+	MetricName string
+	Current    float64
+	Baseline   float64
+	DeltaPct   float64
+	Threshold  float64
+	Passed     bool
+}
+
+func extractScalarValue(result map[string]interface{}) (float64, error) {
+	data, ok := result["data"].(map[string]interface{})
+	if !ok {
+		return 0, fmt.Errorf("no data in response")
+	}
+	resultData, ok := data["result"].([]interface{})
+	if !ok || len(resultData) == 0 {
+		return 0, fmt.Errorf("empty result set")
+	}
+	first, ok := resultData[0].(map[string]interface{})
+	if !ok {
+		return 0, fmt.Errorf("unexpected result format")
+	}
+	value, ok := first["value"].([]interface{})
+	if !ok || len(value) < 2 {
+		return 0, fmt.Errorf("no value in result")
+	}
+	strVal, ok := value[1].(string)
+	if !ok {
+		return 0, fmt.Errorf("value is not a string: %v", value[1])
+	}
+	var f float64
+	if _, err := fmt.Sscanf(strVal, "%f", &f); err != nil {
+		return 0, fmt.Errorf("failed to parse value %q: %w", strVal, err)
+	}
+	return f, nil
+}
+
+func extractVectorValues(result map[string]interface{}, labelKey string) (map[string]float64, error) {
+	data, ok := result["data"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no data in response")
+	}
+	resultData, ok := data["result"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no result array in response")
+	}
+	values := make(map[string]float64, len(resultData))
+	for _, item := range resultData {
+		entry, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		metric, ok := entry["metric"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		label, _ := metric[labelKey].(string)
+		value, ok := entry["value"].([]interface{})
+		if !ok || len(value) < 2 {
+			continue
+		}
+		strVal, _ := value[1].(string)
+		var f float64
+		if _, err := fmt.Sscanf(strVal, "%f", &f); err != nil {
+			continue
+		}
+		values[label] = f
+	}
+	return values, nil
+}
+
+// VerifyCardinalityThreshold checks that TSDB head series and remote-write
+// sample rate have not increased by more than maxDeltaPct compared to 2 hours
+// ago. Also checks that no single metric exceeds maxSeriesPerMetric series.
+func VerifyCardinalityThreshold(ctx context.Context, cfg *RHOBSConfig, maxDeltaPct float64, maxSeriesPerMetric float64) ([]CardinalityResult, error) {
+	var results []CardinalityResult
+
+	currentResult, err := queryRHOBSMetrics(ctx, cfg, `sum(prometheus_tsdb_head_series{container="prometheus"})`)
+	if err != nil {
+		return nil, fmt.Errorf("querying current TSDB head series: %w", err)
+	}
+	baselineResult, err := queryRHOBSMetrics(ctx, cfg, `sum(prometheus_tsdb_head_series{container="prometheus"} offset 2h)`)
+	if err != nil {
+		return nil, fmt.Errorf("querying baseline TSDB head series: %w", err)
+	}
+	current, err := extractScalarValue(currentResult)
+	if err != nil {
+		return nil, fmt.Errorf("extracting current TSDB head series: %w", err)
+	}
+	baseline, err := extractScalarValue(baselineResult)
+	if err != nil {
+		return nil, fmt.Errorf("extracting baseline TSDB head series: %w", err)
+	}
+	deltaPct := 0.0
+	if baseline > 0 {
+		deltaPct = (current - baseline) / baseline * 100
+	}
+	results = append(results, CardinalityResult{
+		MetricName: "prometheus_tsdb_head_series",
+		Current:    current,
+		Baseline:   baseline,
+		DeltaPct:   deltaPct,
+		Threshold:  maxDeltaPct,
+		Passed:     deltaPct <= maxDeltaPct,
+	})
+
+	currentRWResult, err := queryRHOBSMetrics(ctx, cfg, `sum(rate(prometheus_remote_storage_samples_total[5m]))`)
+	if err != nil {
+		return nil, fmt.Errorf("querying current remote-write rate: %w", err)
+	}
+	baselineRWResult, err := queryRHOBSMetrics(ctx, cfg, `sum(rate(prometheus_remote_storage_samples_total[5m] offset 2h))`)
+	if err != nil {
+		return nil, fmt.Errorf("querying baseline remote-write rate: %w", err)
+	}
+	currentRW, err := extractScalarValue(currentRWResult)
+	if err != nil {
+		return nil, fmt.Errorf("extracting current remote-write rate: %w", err)
+	}
+	baselineRW, err := extractScalarValue(baselineRWResult)
+	if err != nil {
+		return nil, fmt.Errorf("extracting baseline remote-write rate: %w", err)
+	}
+	rwDeltaPct := 0.0
+	if baselineRW > 0 {
+		rwDeltaPct = (currentRW - baselineRW) / baselineRW * 100
+	}
+	results = append(results, CardinalityResult{
+		MetricName: "prometheus_remote_storage_samples_total (rate)",
+		Current:    currentRW,
+		Baseline:   baselineRW,
+		DeltaPct:   rwDeltaPct,
+		Threshold:  maxDeltaPct,
+		Passed:     rwDeltaPct <= maxDeltaPct,
+	})
+
+	perMetricResult, err := queryRHOBSMetrics(ctx, cfg, `topk(10, count by (__name__) ({source="MC"}))`)
+	if err != nil {
+		return nil, fmt.Errorf("querying per-metric cardinality: %w", err)
+	}
+	perMetric, err := extractVectorValues(perMetricResult, "__name__")
+	if err != nil {
+		return nil, fmt.Errorf("extracting per-metric cardinality: %w", err)
+	}
+	for name, count := range perMetric {
+		results = append(results, CardinalityResult{
+			MetricName: name,
+			Current:    count,
+			Threshold:  maxSeriesPerMetric,
+			Passed:     count <= maxSeriesPerMetric,
+		})
+	}
+
+	return results, nil
 }
 
 // VerifyProbeSuccessMetrics verifies that probe_success metrics exist for the cluster.
