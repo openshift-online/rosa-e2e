@@ -288,12 +288,11 @@ func (tc *TestContext) HasSCAccess() bool {
 	return tc.cfg.ServiceClusterID != ""
 }
 
-// HasMCAccess returns true if MC credentials can be obtained: either via MC_KUBECONFIG,
-// an explicit ManagementClusterID, or dynamic resolution from an HCP cluster.
+// HasMCAccess returns true if MC credentials are explicitly configured via
+// MC_KUBECONFIG or MANAGEMENT_CLUSTER_ID.
 func (tc *TestContext) HasMCAccess() bool {
 	return os.Getenv("MC_KUBECONFIG") != "" ||
-		tc.cfg.ManagementClusterID != "" ||
-		(tc.cfg.ClusterID != "" && tc.IsHCP())
+		tc.cfg.ManagementClusterID != ""
 }
 
 // HasAWSAccess returns true if AWS clients were successfully initialized.
