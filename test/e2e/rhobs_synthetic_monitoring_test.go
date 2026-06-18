@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -15,8 +16,8 @@ import (
 
 var _ = Describe("RHOBS Synthetic Monitoring", labels.High, labels.Positive, labels.HCP, labels.ManagedService, labels.MCAccess, func() {
 	var (
-		tc              *framework.TestContext
-		rhobsConfig     *verifiers.RHOBSConfig
+		tc                *framework.TestContext
+		rhobsConfig       *verifiers.RHOBSConfig
 		clusterExternalID string
 	)
 
@@ -76,8 +77,10 @@ var _ = Describe("RHOBS Synthetic Monitoring", labels.High, labels.Positive, lab
 	})
 
 	It("should have recording rules evaluating", func(ctx context.Context) {
-		By("Verifying sre:hcp:probe_active and sre:hcp:blackbox_probe_active recording rules")
-		Expect(verifiers.VerifyRecordingRules(ctx, clusterExternalID, rhobsConfig)).To(Succeed(),
+		By("Waiting for sre:hcp:probe_active and sre:hcp:blackbox_probe_active recording rules (up to 5 minutes)")
+		Eventually(func() error {
+			return verifiers.VerifyRecordingRules(ctx, clusterExternalID, rhobsConfig)
+		}).WithContext(ctx).WithTimeout(5*time.Minute).WithPolling(30*time.Second).Should(Succeed(),
 			"recording rules should be evaluating for cluster %s", clusterExternalID)
 	})
 
