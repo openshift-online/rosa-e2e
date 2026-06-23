@@ -8,7 +8,7 @@
 #
 # Categories are grouped by environment. Job names use long-form env names
 # (staging/integration/production); category display names use short-form
-# (STG/INT/PRD) for compact Slack rendering.
+# (STG/INT/PROD) for compact Slack rendering.
 
 sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
 
@@ -195,7 +195,7 @@ categories:
 
 
   - id: ocm-fvt-hcp-prd
-    name: OCM FVT HCP PRD
+    name: OCM FVT HCP PROD
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-production*"
     jobs:
       - name: HCP AD
