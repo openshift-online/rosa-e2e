@@ -155,8 +155,6 @@ categories:
         prow_job: periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-hcp-ovn
       - name: HCP 4.22
         prow_job: periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-hcp-ovn
-      - name: HCP 4.23
-        prow_job: periodic-ci-openshift-release-main-nightly-4.23-e2e-rosa-hcp-ovn
       - name: HCP 5.0
         prow_job: periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn
 
