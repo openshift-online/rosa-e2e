@@ -234,6 +234,8 @@ categories:
         prow_job: periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-sts-ovn
 
   - id: rosa-cli-jobs
+    scope: component
+    components: [rosa-cli]
     name: ROSA CLI E2E
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift%2Frosa&type=periodic"
     jobs:
@@ -297,6 +299,8 @@ categories:
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-upgrade-z-stream-f3
 
   - id: terraform-provider-rhcs-jobs
+    scope: component
+    components: [terraform-provider-rhcs]
     name: ROSA TF E2E
     prow_filter: "https://prow.ci.openshift.org/?repo=terraform-redhat%2Fterraform-provider-rhcs&type=periodic"
     jobs:
