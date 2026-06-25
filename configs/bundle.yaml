@@ -4,7 +4,7 @@
 # process. The rosa-eng-dashboard uses this to track deployment
 # progression and CI readiness across bundle components.
 #
-# Bundle releases are coordinated in #forum-rosa-bundle-release.
+# Bundle releases are coordinated in #forum-hcm-deployments.
 # HyperShift Operator and upstream components have separate rollout
 # cadences but are tracked here for visibility.
 
