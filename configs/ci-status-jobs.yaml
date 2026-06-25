@@ -1,19 +1,24 @@
 # ci-status-jobs.yaml -- Single source of truth for ROSA CI daily status tracking.
 #
 # The ci-status-report.sh script reads this file to determine which Prow jobs
-# to check and how to group them in the Slack summary.
+# to check and how to group them in the Slack summary. The rosa-eng-dashboard
+# also fetches this file to build CI health views and component mappings.
 #
 # To add a new job: add an entry under the appropriate category.
 # To add a new category: add a new top-level entry to the categories list.
 #
-# Categories are consolidated by test framework/repo, with environment splits
-# (STG/INT/PROD) kept separate for visibility. Variants like FIPS, upgrade,
-# and OSD GCP are merged into their parent category.
+# Each category has a scope that determines how its CI health maps to components:
+#   component: Tests specific component(s). Must have a components list with
+#              keys matching the hybrid-platforms/org component registry.
+#   platform:  Tests the managed service platform as a whole. CI health from
+#              platform tests contributes to every component's health indicator.
+#   upstream:  Tests upstream OCP/HyperShift. Shown in exec summary only.
 
 sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
 
 categories:
   - id: rosa-e2e-stg
+    scope: platform
     name: ROSA E2E STG
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-e2e-main-periodics-rosa-*"
     jobs:
@@ -69,6 +74,7 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-4-20-to-4-21
 
   - id: rosa-gap-analysis
+    scope: platform
     name: GAP E2E
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-gap-analysis-main-periodics*"
     jobs:
@@ -84,6 +90,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-5-0
 
   - id: ocm-fvt-hcp-stg
+    scope: component
+    components: [clusters-service]
     name: OCM FVT HCP STG
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-staging*"
     jobs:
@@ -117,6 +125,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-staging-main
 
   - id: ocm-fvt-hcp-int
+    scope: component
+    components: [clusters-service]
     name: OCM FVT HCP INT
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-integration*"
     jobs:
@@ -136,6 +146,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-2-integration-main
 
   - id: ocm-fvt-hcp-prd
+    scope: component
+    components: [clusters-service]
     name: OCM FVT HCP PROD
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-production*"
     jobs:
@@ -143,6 +155,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-production-ocm-fvt-periodic-cs-rosa-hcp-ad-production-main
 
   - id: ocm-fvt-classic-stg
+    scope: component
+    components: [clusters-service]
     name: OCM FVT Classic STG
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-classic-staging*"
     jobs:
@@ -162,6 +176,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-osd-rh-aws-staging-main
 
   - id: ocm-fvt-classic-int
+    scope: component
+    components: [clusters-service]
     name: OCM FVT Classic INT
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-classic-integration*,*ocm-fvt-osd-aws-integration*"
     jobs:
@@ -171,6 +187,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-aws-integration-ocm-fvt-periodic-cs-osd-ccs-aws-ad-integration-main
 
   - id: ocm-fvt-gcp-stg
+    scope: component
+    components: [clusters-service]
     name: OCM FVT GCP STG
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osd-gcp-staging*"
     jobs:
@@ -186,6 +204,7 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main
 
   - id: hcp-conformance
+    scope: upstream
     name: HCP Conformance
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-hcp-ovn"
     jobs:
@@ -201,6 +220,7 @@ categories:
         prow_job: periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn
 
   - id: classic-conformance
+    scope: upstream
     name: Classic STS Conformance
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-sts-ovn"
     jobs:
