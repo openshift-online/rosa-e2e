@@ -27,13 +27,13 @@ tiers:
       - custom-domains-operator
       - rbac-permissions-operator
       - osd-metrics-exporter
+      - ocm-agent-operator
 
   - name: Observability
     components:
       - rhobs-synthetics-agent
       - rhobs-synthetics-api
       - osd-rhobs-rules-and-dashboards
-      - hypershift-platform-rhobs-rules
       - hypershift-dataplane-metrics-forwarder
       - hypershift-logging-operator
 
@@ -55,7 +55,6 @@ tiers:
       - backplane-api
       - osdctl
       - ocm-agent
-      - ocm-agent-operator
       - configuration-anomaly-detection
       - managed-scripts
 
