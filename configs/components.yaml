@@ -1,0 +1,106 @@
+# components.yaml -- ROSA component registry.
+#
+# Single source of truth for tracked ROSA components, consumed by the
+# rosa-eng-dashboard for the Component Catalog and CI health views.
+#
+# To add a component: add an entry below with its repo and team.
+# Components with app_interface config get deployment tracking (SHA per env).
+# Components without app_interface still appear with upstream HEAD tracking.
+#
+# Extraction methods for app_interface:
+#   ref:       Use the target's ref field directly (40-char hex SHA)
+#   parameter: Extract from merged template+target parameters
+#              param: parameter name to read
+#              regex: optional regex to extract value from parameter
+
+components:
+  - key: cluster-service
+    name: Cluster Service
+    repo: openshift-online/uhc-clusters-service
+    platform: gitlab
+    team: ROSA Platform
+    app_interface:
+      saas_file: saas-uhc-clusters-service
+      resource_template: uhc-clusters-service
+      extraction: ref
+      environments:
+        integration: /services/ocm/namespaces/uhc-integration.yml
+        stage: /services/ocm/namespaces/uhc-stage.yml
+        production: /services/ocm/namespaces/uhc-production.yml
+
+  - key: account-manager
+    name: Account Manager
+    repo: openshift-online/uhc-account-manager
+    platform: gitlab
+    team: ROSA Platform
+    app_interface:
+      saas_file: saas-uhc-account-manager
+      resource_template: uhc-account-manager-blue
+      extraction: ref
+      environments:
+        integration: /services/ocm/namespaces/uhc-integration.yml
+        stage: /services/ocm/namespaces/uhc-stage.yml
+        production: /services/ocm/namespaces/uhc-production.yml
+
+  - key: hypershift-operator
+    name: HyperShift Operator
+    repo: openshift/hypershift
+    platform: github
+    team: HyperShift
+    app_interface:
+      saas_file: osd-fleet-manager
+      extraction: parameter
+      param: HYPERSHIFT_OPERATOR_OVERRIDING_DATA
+      regex: "git-commit: (\\S+)"
+      environments:
+        integration: /services/ocm/osd-fleet-manager/namespaces/integration.yml
+        stage: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+        production: /services/ocm/osd-fleet-manager/namespaces/production.yml
+
+  - key: osd-fleet-manager
+    name: OSD Fleet Manager
+    repo: openshift-online/osd-fleet-manager
+    platform: gitlab
+    team: ROSA Platform
+
+  - key: route-monitor-operator
+    name: Route Monitor Operator
+    repo: openshift/route-monitor-operator
+    platform: github
+    team: ROSA Rocket
+
+  - key: configure-alertmanager-operator
+    name: Configure Alertmanager Operator
+    repo: openshift/configure-alertmanager-operator
+    platform: github
+    team: ROSA Rocket
+
+  - key: managed-upgrade-operator
+    name: Managed Upgrade Operator
+    repo: openshift/managed-upgrade-operator
+    platform: github
+    team: ROSA Rocket
+
+  - key: splunk-forwarder-operator
+    name: Splunk Forwarder Operator
+    repo: openshift/splunk-forwarder-operator
+    platform: github
+    team: ROSA Rocket
+
+  - key: must-gather-operator
+    name: Must Gather Operator
+    repo: openshift/must-gather-operator
+    platform: github
+    team: ROSA Rocket
+
+  - key: rbac-permissions-operator
+    name: RBAC Permissions Operator
+    repo: openshift/rbac-permissions-operator
+    platform: github
+    team: ROSA Rocket
+
+  - key: custom-domains-operator
+    name: Custom Domains Operator
+    repo: openshift/custom-domains-operator
+    platform: github
+    team: ROSA Rocket
