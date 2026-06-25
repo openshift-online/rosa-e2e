@@ -1,0 +1,49 @@
+# bundle.yaml -- ROSA managed release bundle composition.
+#
+# Defines the components that are promoted as part of the ROSA release
+# process. The rosa-eng-dashboard uses this to track deployment
+# progression and CI readiness across bundle components.
+#
+# Bundle releases are coordinated in #forum-rosa-bundle-release.
+# HyperShift Operator and upstream components have separate rollout
+# cadences but are tracked here for visibility.
+
+bundles:
+  - name: OCM Core
+    description: Promoted together from staging to production as a coordinated bundle release
+    components:
+      - clusters-service
+      - account-manager
+      - osd-fleet-manager
+      - ocm-service-log
+      - hive
+
+  - name: HyperShift Operator
+    description: Rolled out independently in waves across management clusters
+    components:
+      - hypershift-operator
+
+  - name: Upstream Platform
+    description: OCP-owned components deployed to ROSA management and service clusters
+    components:
+      - cert-manager-operator
+      - external-dns-operator
+      - aws-load-balancer-controller
+      - acm
+      - addon-operator
+
+  - name: SRE Operators
+    description: SRE-owned operators deployed via PKO/SSS to management and classic clusters
+    components:
+      - route-monitor-operator
+      - configure-alertmanager-operator
+      - managed-upgrade-operator
+      - pagerduty-operator
+      - deadmanssnitch-operator
+      - splunk-forwarder-operator
+      - must-gather-operator
+      - custom-domains-operator
+      - rbac-permissions-operator
+      - osd-metrics-exporter
+      - ocm-agent
+      - ocm-agent-operator
