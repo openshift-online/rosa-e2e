@@ -1,0 +1,64 @@
+# component-tiers.yaml -- ROSA component prioritization for dashboard views.
+#
+# Defines the display order and grouping of components in the exec dashboard
+# Component Catalog. Component keys must match the hybrid-platforms/org
+# component registry.
+#
+# Components not listed here appear under "Other" at the bottom.
+# Long-term, tier definitions should move to the org repo.
+
+tiers:
+  - name: Core Platform
+    components:
+      - clusters-service
+      - account-manager
+      - hypershift
+      - osd-fleet-manager
+
+  - name: SRE Operators
+    components:
+      - route-monitor-operator
+      - configure-alertmanager-operator
+      - managed-upgrade-operator
+      - pagerduty-operator
+      - deadmanssnitch-operator
+      - splunk-forwarder-operator
+      - must-gather-operator
+      - custom-domains-operator
+      - rbac-permissions-operator
+      - osd-metrics-exporter
+
+  - name: Observability
+    components:
+      - rhobs-synthetics-agent
+      - rhobs-synthetics-api
+      - osd-rhobs-rules-and-dashboards
+      - hypershift-platform-rhobs-rules
+      - hypershift-dataplane-metrics-forwarder
+      - hypershift-logging-operator
+
+  - name: Infrastructure
+    components:
+      - aws-account-operator
+      - gcp-project-operator
+      - cloud-ingress-operator
+      - certman-operator
+      - aws-vpce-operator
+      - managed-cluster-config
+      - managed-velero-operator
+      - managed-node-metadata-operator
+
+  - name: CLI & Tooling
+    components:
+      - rosa-cli
+      - backplane-cli
+      - backplane-api
+      - osdctl
+      - ocm-agent
+      - ocm-agent-operator
+      - configuration-anomaly-detection
+      - managed-scripts
+
+  - name: Console
+    components:
+      - console
