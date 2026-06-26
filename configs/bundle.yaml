@@ -16,7 +16,6 @@ bundles:
       - account-manager
       - osd-fleet-manager
       - ocm-service-log
-      - hive
 
   - name: HyperShift Operator
     description: Rolled out independently in waves across management clusters
@@ -24,8 +23,9 @@ bundles:
       - hypershift-operator
 
   - name: Upstream Platform
-    description: OCP-owned components deployed to ROSA management and service clusters
+    description: OCP-owned components deployed to ROSA infrastructure clusters
     components:
+      - hive
       - cert-manager-operator
       - external-dns-operator
       - aws-load-balancer-controller
