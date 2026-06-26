@@ -11,6 +11,12 @@
 
 components:
   # Core Platform (OCM namespace pattern)
+  - key: clusters-service
+    saas_name: saas-uhc-clusters-service
+    strategy: ocm
+  - key: account-manager
+    saas_name: saas-uhc-account-manager
+    strategy: ocm
   - key: osd-fleet-manager
     saas_name: osd-fleet-manager
     strategy: ocm
