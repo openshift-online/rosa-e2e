@@ -21,16 +21,19 @@ bundles:
     description: Rolled out independently in waves across management clusters
     components:
       - hypershift-operator
+      - external-dns-operator
 
   - name: Upstream Platform
     description: OCP-owned components deployed to ROSA infrastructure clusters
     components:
       - hive
       - cert-manager-operator
-      - external-dns-operator
       - aws-load-balancer-controller
       - acm
-      - addon-operator
+      - multicluster-engine
+      - oadp
+      - vertical-pod-autoscaler-operator
+      - cluster-logging-operator
 
   - name: SRE Operators
     description: SRE-owned operators deployed via PKO/SSS to management and classic clusters
@@ -41,9 +44,9 @@ bundles:
       - pagerduty-operator
       - deadmanssnitch-operator
       - splunk-forwarder-operator
-      - must-gather-operator
       - custom-domains-operator
       - rbac-permissions-operator
       - osd-metrics-exporter
       - ocm-agent
       - ocm-agent-operator
+      - addon-operator
