@@ -25,33 +25,41 @@ components:
   - key: route-monitor-operator
     saas_name: saas-route-monitor-operator-pko
     strategy: hive
+    e2e_saas: saas-route-monitor-operator-e2e-test
   - key: pagerduty-operator
     saas_name: saas-pagerduty-operator-pko
     strategy: hive
   - key: configure-alertmanager-operator
     saas_name: saas-configure-am-operator-pko
     strategy: hive
+    e2e_saas: saas-configure-am-operator-e2e-test
   - key: ocm-agent-operator
     saas_name: saas-ocm-agent-operator
     strategy: hive
+    e2e_saas: saas-ocm-agent-operator-e2e
   - key: managed-upgrade-operator
     saas_name: saas-muo
     strategy: hive
+    e2e_saas: saas-muo-e2e-test
   - key: rbac-permissions-operator
     saas_name: saas-rbac-p-operator
     strategy: hive
+    e2e_saas: saas-rbac-p-operator-e2e
   - key: deadmanssnitch-operator
     saas_name: saas-dms-pko
     strategy: hive
   - key: splunk-forwarder-operator
     saas_name: saas-sfo-pko
     strategy: hive
+    e2e_saas: saas-sfo-e2e-test
   - key: custom-domains-operator
     saas_name: saas-cdo-pko
     strategy: hive
+    e2e_saas: saas-cdo-e2e-test
   - key: osd-metrics-exporter
     saas_name: saas-ome-pko
     strategy: hive
+    e2e_saas: saas-osd-metrics-exporter-e2e
 
   # Infrastructure (hive cluster pattern)
   - key: aws-account-operator
@@ -60,12 +68,15 @@ components:
   - key: aws-vpce-operator
     saas_name: saas-avo-pko
     strategy: hive
+    e2e_saas: saas-avo-e2e-test
   - key: certman-operator
     saas_name: saas-certman-operator
     strategy: hive
+    e2e_saas: saas-certman-operator-e2e-test
   - key: cloud-ingress-operator
     saas_name: saas-cloud-ingress-operator-pko
     strategy: hive
+    e2e_saas: saas-cio-e2e-test
   - key: gcp-project-operator
     saas_name: saas-gcp-project-operator-pko
     strategy: hive
