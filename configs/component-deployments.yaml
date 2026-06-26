@@ -14,6 +14,12 @@ components:
   - key: osd-fleet-manager
     saas_name: osd-fleet-manager
     strategy: ocm
+  - key: ocm-service-log
+    saas_name: saas-ocm-service-log
+    strategy: ocm
+  - key: hive
+    saas_name: saas-hive
+    strategy: hive
 
   # SRE Operators (hive cluster pattern)
   - key: route-monitor-operator
