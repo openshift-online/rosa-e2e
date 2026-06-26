@@ -23,7 +23,6 @@ tiers:
       - pagerduty-operator
       - deadmanssnitch-operator
       - splunk-forwarder-operator
-      - must-gather-operator
       - custom-domains-operator
       - rbac-permissions-operator
       - osd-metrics-exporter
