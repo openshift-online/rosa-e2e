@@ -1,0 +1,85 @@
+# component-deployments.yaml -- Maps ROSA components to app-interface saas files.
+#
+# The rosa-eng-dashboard fetches this file to extract deployment SHAs
+# for each component across integration, stage, and production.
+#
+# strategy: how targets map to environments
+#   hive:  Cluster name prefix: hivei* = integration, hives*/hive-stage-* = stage, hivep* = production
+#   ocm:   Namespace path contains: integration, stage, or production
+#
+# Components not listed here show no deployment data in the catalog.
+
+components:
+  # Core Platform (OCM namespace pattern)
+  - key: osd-fleet-manager
+    saas_name: osd-fleet-manager
+    strategy: ocm
+
+  # SRE Operators (hive cluster pattern)
+  - key: route-monitor-operator
+    saas_name: saas-route-monitor-operator-pko
+    strategy: hive
+  - key: pagerduty-operator
+    saas_name: saas-pagerduty-operator-pko
+    strategy: hive
+  - key: configure-alertmanager-operator
+    saas_name: saas-configure-am-operator-pko
+    strategy: hive
+  - key: ocm-agent-operator
+    saas_name: saas-ocm-agent-operator
+    strategy: hive
+  - key: managed-upgrade-operator
+    saas_name: saas-muo
+    strategy: hive
+  - key: rbac-permissions-operator
+    saas_name: saas-rbac-p-operator
+    strategy: hive
+  - key: deadmanssnitch-operator
+    saas_name: saas-dms-pko
+    strategy: hive
+  - key: splunk-forwarder-operator
+    saas_name: saas-sfo-pko
+    strategy: hive
+  - key: custom-domains-operator
+    saas_name: saas-cdo-pko
+    strategy: hive
+  - key: osd-metrics-exporter
+    saas_name: saas-ome-pko
+    strategy: hive
+
+  # Infrastructure (hive cluster pattern)
+  - key: aws-account-operator
+    saas_name: saas-aws-account-operator-pko
+    strategy: hive
+  - key: aws-vpce-operator
+    saas_name: saas-avo-pko
+    strategy: hive
+  - key: certman-operator
+    saas_name: saas-certman-operator
+    strategy: hive
+  - key: cloud-ingress-operator
+    saas_name: saas-cloud-ingress-operator-pko
+    strategy: hive
+  - key: gcp-project-operator
+    saas_name: saas-gcp-project-operator-pko
+    strategy: hive
+  - key: managed-cluster-config
+    saas_name: saas-managed-cluster-config
+    strategy: hive
+  - key: managed-velero-operator
+    saas_name: saas-mvo
+    strategy: hive
+  - key: managed-node-metadata-operator
+    saas_name: saas-mnmo
+    strategy: hive
+
+  # Observability (hive cluster pattern)
+  - key: rhobs-synthetics-agent
+    saas_name: rhobs-synthetics-agent
+    strategy: hive
+  - key: rhobs-synthetics-api
+    saas_name: rhobs-synthetics-api
+    strategy: hive
+  - key: osd-rhobs-rules-and-dashboards
+    saas_name: saas-osd-rhobs-rules-and-dashboards
+    strategy: hive
