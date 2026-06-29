@@ -44,7 +44,6 @@ tiers:
       - certman-operator
       - aws-vpce-operator
       - managed-cluster-config
-      - managed-velero-operator
       - managed-node-metadata-operator
 
   - name: CLI & Tooling
