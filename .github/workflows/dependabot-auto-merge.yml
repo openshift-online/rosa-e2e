@@ -27,42 +27,19 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Enable Auto-Merge for Safe Updates
-        id: enable-auto-merge
+      - name: Wait for E2E Smoke Checks
+        id: wait-e2e
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
           steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
           steps.metadata.outputs.update-type == 'version-update:semver-digest'
-        run: |
-          echo "Enabling auto-merge for ${{ steps.metadata.outputs.update-type }} update"
-          echo "Dependency: ${{ steps.metadata.outputs.dependency-names }}"
-
-          if gh pr merge "$PR_NUMBER" --auto --squash; then
-            echo "Auto-merge enabled successfully"
-            echo "auto-merge-enabled=true" >> $GITHUB_OUTPUT
-          else
-            echo "::warning::Could not enable auto-merge. Manual review required."
-            echo "auto-merge-enabled=false" >> $GITHUB_OUTPUT
-            gh pr comment "$PR_NUMBER" --body "**Dependabot Auto-Merge Status**
-
-          This PR meets the criteria for auto-merge but could not be automatically merged due to repository permissions.
-
-          - Update type: ${{ steps.metadata.outputs.update-type }}
-          - Dependencies: ${{ steps.metadata.outputs.dependency-names }}
-
-          Please review and merge manually if appropriate."
-          fi
-
-      - name: Wait for E2E Smoke Checks
-        id: wait-e2e
-        if: steps.enable-auto-merge.outputs.auto-merge-enabled == 'true'
         run: |
           SHA="${{ github.event.pull_request.head.sha }}"
           MAX_WAIT=7200  # 2 hours
           POLL_INTERVAL=60
           elapsed=0
 
-          echo "Waiting for e2e smoke checks (auto-merge already enabled, will disable if smokes fail)..."
+          echo "Waiting for e2e smoke checks before enabling auto-merge..."
 
           while [[ $elapsed -lt $MAX_WAIT ]]; do
             smoke_checks=$(gh api "repos/${{ github.repository }}/commits/${SHA}/status" \
@@ -92,16 +69,15 @@ jobs:
 
             if [[ "$all_complete" == "true" ]]; then
               if [[ "$any_failed" == "false" ]]; then
-                echo "All e2e smoke checks passed. Auto-merge remains enabled."
+                echo "All e2e smoke checks passed."
                 echo "e2e-result=passed" >> $GITHUB_OUTPUT
                 exit 0
               fi
 
-              echo "E2E smoke checks failed. Disabling auto-merge."
-              gh pr merge "$PR_NUMBER" --disable-auto
+              echo "E2E smoke checks failed."
               gh pr comment "$PR_NUMBER" --body "**E2E Smoke Tests Failed**
 
-          Auto-merge has been disabled because e2e smoke tests failed. Please investigate and /retest when ready."
+          Auto-merge was not enabled because e2e smoke tests failed. Please investigate and /retest when ready."
               echo "e2e-result=failed" >> $GITHUB_OUTPUT
               exit 0
             fi
@@ -111,8 +87,33 @@ jobs:
           done
 
           echo "Timed out waiting for e2e smoke checks after ${MAX_WAIT}s."
-          echo "Auto-merge remains enabled (smoke checks still running or not triggered)."
+          echo "Enabling auto-merge anyway (smoke checks did not complete in time)."
           echo "e2e-result=timeout" >> $GITHUB_OUTPUT
+
+      - name: Enable Auto-Merge for Safe Updates
+        if: |
+          steps.wait-e2e.outputs.e2e-result != 'failed' && (
+            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+            steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+            steps.metadata.outputs.update-type == 'version-update:semver-digest'
+          )
+        run: |
+          echo "Enabling auto-merge for ${{ steps.metadata.outputs.update-type }} update"
+          echo "Dependency: ${{ steps.metadata.outputs.dependency-names }}"
+
+          if gh pr merge "$PR_NUMBER" --auto --squash; then
+            echo "Auto-merge enabled successfully"
+          else
+            echo "::warning::Could not enable auto-merge. Manual review required."
+            gh pr comment "$PR_NUMBER" --body "**Dependabot Auto-Merge Status**
+
+          This PR meets the criteria for auto-merge but could not be automatically merged due to repository permissions.
+
+          - Update type: ${{ steps.metadata.outputs.update-type }}
+          - Dependencies: ${{ steps.metadata.outputs.dependency-names }}
+
+          Please review and merge manually if appropriate."
+          fi
 
       - name: Comment on Major Version Updates
         if: steps.metadata.outputs.update-type == 'version-update:semver-major'
@@ -132,6 +133,5 @@ jobs:
         run: |
           echo "Auto-merge decision for PR #${PR_NUMBER}:"
           echo "- Update type: ${{ steps.metadata.outputs.update-type }}"
-          echo "- Auto-merge enabled: ${{ steps.enable-auto-merge.outputs.auto-merge-enabled }}"
           echo "- E2E result: ${{ steps.wait-e2e.outputs.e2e-result }}"
           echo "- Dependency: ${{ steps.metadata.outputs.dependency-names }}"
