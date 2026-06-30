@@ -14,6 +14,9 @@ jobs:
   auto-merge:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]' && github.repository == 'openshift-online/rosa-e2e'
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,206 +27,111 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Check PR Labels
-        id: check-labels
-        run: |
-          REQUIRED_LABELS=("area/dependency" "ok-to-test")
-          PR_LABELS=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
-            | jq -r '.labels[].name')
-
-          all_present=true
-          for label in "${REQUIRED_LABELS[@]}"; do
-            if echo "$PR_LABELS" | grep -qx "$label"; then
-              echo "Found required label: $label"
-            else
-              echo "Missing required label: $label"
-              all_present=false
-            fi
-          done
-
-          echo "has-required-labels=$all_present" >> $GITHUB_OUTPUT
-
-          if [[ "$all_present" == "true" ]]; then
-            echo "Dependabot PR has required labels, auto-merge enabled for safe updates"
-          else
-            echo "Required labels missing, auto-merge disabled"
-          fi
-
-      - name: Wait for E2E Smoke Checks
-        id: wait-e2e
-        if: |
-          steps.check-labels.outputs.has-required-labels == 'true' && (
-            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-            steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
-            steps.metadata.outputs.update-type == 'version-update:semver-digest'
-          )
-        run: |
-          GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          export GH_TOKEN
-          REPO="${{ github.repository }}"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          SHA="${{ github.event.pull_request.head.sha }}"
-          MAX_RETRIES=3
-          MAX_WAIT_PER_ATTEMPT=7200  # 2 hours per attempt
-          POLL_INTERVAL=60
-          retry=0
-
-          get_smoke_checks() {
-            # Prow reports as commit statuses, not check runs
-            curl -s \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/${REPO}/commits/${SHA}/status" \
-              | jq -r '.statuses[] | select(.context | test("e2e.*smoke")) |
-                if .state == "pending" then "\(.context)|in_progress|none"
-                elif .state == "success" then "\(.context)|completed|success"
-                else "\(.context)|completed|failure"
-                end'
-          }
-
-          post_retest() {
-            echo "Posting /retest comment (retry $((retry + 1))/${MAX_RETRIES})..."
-            curl -s -X POST \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments" \
-              -d "{\"body\":\"/retest\"}"
-          }
-
-          while [[ $retry -lt $MAX_RETRIES ]]; do
-            elapsed=0
-            echo "Waiting for e2e smoke checks on commit ${SHA} (attempt $((retry + 1))/${MAX_RETRIES})..."
-
-            while [[ $elapsed -lt $MAX_WAIT_PER_ATTEMPT ]]; do
-              smoke_checks=$(get_smoke_checks)
-
-              if [[ -z "$smoke_checks" ]]; then
-                echo "No e2e smoke checks found yet (${elapsed}s elapsed), waiting..."
-                sleep $POLL_INTERVAL
-                elapsed=$((elapsed + POLL_INTERVAL))
-                continue
-              fi
-
-              echo "Current e2e smoke check status:"
-              echo "$smoke_checks" | while IFS='|' read -r name status conclusion; do
-                echo "  $name: status=$status conclusion=$conclusion"
-              done
-
-              all_complete=true
-              any_failed=false
-              while IFS='|' read -r name status conclusion; do
-                if [[ "$status" != "completed" ]]; then
-                  all_complete=false
-                elif [[ "$conclusion" != "success" && "$conclusion" != "neutral" ]]; then
-                  any_failed=true
-                fi
-              done <<< "$smoke_checks"
-
-              if [[ "$all_complete" == "true" ]]; then
-                if [[ "$any_failed" == "false" ]]; then
-                  echo "All e2e smoke checks passed."
-                  echo "e2e-passed=true" >> $GITHUB_OUTPUT
-                  exit 0
-                fi
-                # Failed: retry if attempts remain
-                retry=$((retry + 1))
-                if [[ $retry -lt $MAX_RETRIES ]]; then
-                  echo "E2E smoke checks failed. Retrying (${retry}/${MAX_RETRIES})..."
-                  post_retest
-                  sleep 120  # wait for Prow to pick up the retest
-                fi
-                break
-              fi
-
-              sleep $POLL_INTERVAL
-              elapsed=$((elapsed + POLL_INTERVAL))
-              echo "Waiting for e2e smoke checks to complete (${elapsed}s)..."
-            done
-
-            # If we broke out of the inner loop due to timeout (not failure), also retry
-            if [[ $elapsed -ge $MAX_WAIT_PER_ATTEMPT ]]; then
-              retry=$((retry + 1))
-              if [[ $retry -lt $MAX_RETRIES ]]; then
-                echo "Timed out waiting. Retrying (${retry}/${MAX_RETRIES})..."
-                post_retest
-                sleep 120
-              fi
-            fi
-          done
-
-          echo "E2E smoke checks failed after ${MAX_RETRIES} attempts. Skipping auto-merge."
-          echo "e2e-passed=false" >> $GITHUB_OUTPUT
-
       - name: Enable Auto-Merge for Safe Updates
+        id: enable-auto-merge
         if: |
-          steps.check-labels.outputs.has-required-labels == 'true' &&
-          steps.wait-e2e.outputs.e2e-passed == 'true' && (
-            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-            steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
-            steps.metadata.outputs.update-type == 'version-update:semver-digest'
-          )
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-digest'
         run: |
           echo "Enabling auto-merge for ${{ steps.metadata.outputs.update-type }} update"
           echo "Dependency: ${{ steps.metadata.outputs.dependency-names }}"
 
-          GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          export GH_TOKEN
-
-          PR_NODE_ID=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
-            | jq -r '.node_id')
-
-          if [[ -z "$PR_NODE_ID" || "$PR_NODE_ID" == "null" ]]; then
-            echo "Failed to fetch PR node ID"
-            exit 1
-          fi
-
-          response=$(curl -s -w "%{http_code}" -o /tmp/response.json \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/graphql" \
-            -d "{\"query\":\"mutation { enablePullRequestAutoMerge(input: { pullRequestId: \\\"$PR_NODE_ID\\\", mergeMethod: SQUASH }) { pullRequest { autoMergeRequest { enabledAt } } } }\"}")
-
-          if [[ "$response" -eq 200 ]] && \
-             jq -e '.errors == null and (.data.enablePullRequestAutoMerge.pullRequest.autoMergeRequest.enabledAt != null)' /tmp/response.json >/dev/null; then
+          if gh pr merge "$PR_NUMBER" --auto --squash; then
             echo "Auto-merge enabled successfully"
-            cat /tmp/response.json
+            echo "auto-merge-enabled=true" >> $GITHUB_OUTPUT
           else
-            echo "Failed to enable auto-merge. HTTP status: $response"
-            cat /tmp/response.json
             echo "::warning::Could not enable auto-merge. Manual review required."
+            echo "auto-merge-enabled=false" >> $GITHUB_OUTPUT
+            gh pr comment "$PR_NUMBER" --body "**Dependabot Auto-Merge Status**
 
-            curl -s -X POST \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-              -d "{\"body\":\"**Dependabot Auto-Merge Status**\n\nThis PR meets the criteria for auto-merge but could not be automatically merged due to repository permissions.\n\n- Update type: ${{ steps.metadata.outputs.update-type }}\n- Dependencies: ${{ steps.metadata.outputs.dependency-names }}\n\nPlease review and merge manually if appropriate.\"}"
+          This PR meets the criteria for auto-merge but could not be automatically merged due to repository permissions.
+
+          - Update type: ${{ steps.metadata.outputs.update-type }}
+          - Dependencies: ${{ steps.metadata.outputs.dependency-names }}
+
+          Please review and merge manually if appropriate."
           fi
+
+      - name: Wait for E2E Smoke Checks
+        id: wait-e2e
+        if: steps.enable-auto-merge.outputs.auto-merge-enabled == 'true'
+        run: |
+          SHA="${{ github.event.pull_request.head.sha }}"
+          MAX_WAIT=7200  # 2 hours
+          POLL_INTERVAL=60
+          elapsed=0
+
+          echo "Waiting for e2e smoke checks (auto-merge already enabled, will disable if smokes fail)..."
+
+          while [[ $elapsed -lt $MAX_WAIT ]]; do
+            smoke_checks=$(gh api "repos/${{ github.repository }}/commits/${SHA}/status" \
+              --jq '.statuses[] | select(.context | test("e2e.*smoke")) | "\(.context)|\(.state)"')
+
+            if [[ -z "$smoke_checks" ]]; then
+              echo "No e2e smoke checks found yet (${elapsed}s elapsed), waiting..."
+              sleep $POLL_INTERVAL
+              elapsed=$((elapsed + POLL_INTERVAL))
+              continue
+            fi
+
+            echo "Current e2e smoke check status:"
+            echo "$smoke_checks" | while IFS='|' read -r name state; do
+              echo "  $name: $state"
+            done
+
+            all_complete=true
+            any_failed=false
+            while IFS='|' read -r name state; do
+              if [[ "$state" == "pending" ]]; then
+                all_complete=false
+              elif [[ "$state" != "success" ]]; then
+                any_failed=true
+              fi
+            done <<< "$smoke_checks"
+
+            if [[ "$all_complete" == "true" ]]; then
+              if [[ "$any_failed" == "false" ]]; then
+                echo "All e2e smoke checks passed. Auto-merge remains enabled."
+                echo "e2e-result=passed" >> $GITHUB_OUTPUT
+                exit 0
+              fi
+
+              echo "E2E smoke checks failed. Disabling auto-merge."
+              gh pr merge "$PR_NUMBER" --disable-auto
+              gh pr comment "$PR_NUMBER" --body "**E2E Smoke Tests Failed**
+
+          Auto-merge has been disabled because e2e smoke tests failed. Please investigate and /retest when ready."
+              echo "e2e-result=failed" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            sleep $POLL_INTERVAL
+            elapsed=$((elapsed + POLL_INTERVAL))
+          done
+
+          echo "Timed out waiting for e2e smoke checks after ${MAX_WAIT}s."
+          echo "Auto-merge remains enabled (smoke checks still running or not triggered)."
+          echo "e2e-result=timeout" >> $GITHUB_OUTPUT
 
       - name: Comment on Major Version Updates
-        if: |
-          steps.check-labels.outputs.has-required-labels == 'true' &&
-          steps.metadata.outputs.update-type == 'version-update:semver-major'
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
         run: |
-          GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          export GH_TOKEN
+          gh pr comment "$PR_NUMBER" --body "**Major Version Update Detected**
 
-          curl -s -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            -d "{\"body\":\"**Major Version Update Detected**\n\nThis PR contains a major version update that requires manual review:\n- **Dependency:** ${{ steps.metadata.outputs.dependency-names }}\n- **Previous version:** ${{ steps.metadata.outputs.previous-version }}\n- **New version:** ${{ steps.metadata.outputs.new-version }}\n\nPlease review the changelog and breaking changes before merging.\n\nAuto-merge has been disabled for this PR.\"}"
+          This PR contains a major version update that requires manual review:
+          - **Dependency:** ${{ steps.metadata.outputs.dependency-names }}
+          - **Previous version:** ${{ steps.metadata.outputs.previous-version }}
+          - **New version:** ${{ steps.metadata.outputs.new-version }}
+
+          Please review the changelog and breaking changes before merging.
+
+          Auto-merge has been disabled for this PR."
 
       - name: Log Auto-Merge Decision
         run: |
-          echo "Auto-merge decision for PR #${{ github.event.pull_request.number }}:"
+          echo "Auto-merge decision for PR #${PR_NUMBER}:"
           echo "- Update type: ${{ steps.metadata.outputs.update-type }}"
-          echo "- Has required labels: ${{ steps.check-labels.outputs.has-required-labels }}"
-          echo "- E2E passed: ${{ steps.wait-e2e.outputs.e2e-passed }}"
+          echo "- Auto-merge enabled: ${{ steps.enable-auto-merge.outputs.auto-merge-enabled }}"
+          echo "- E2E result: ${{ steps.wait-e2e.outputs.e2e-result }}"
           echo "- Dependency: ${{ steps.metadata.outputs.dependency-names }}"
