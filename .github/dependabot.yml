@@ -5,7 +5,6 @@ updates:
     labels:
       - "area/dependency"
       - "ok-to-test"
-      - "lgtm"
       - "approved"
     schedule:
       interval: "weekly"
@@ -15,7 +14,6 @@ updates:
     labels:
       - "area/dependency"
       - "ok-to-test"
-      - "lgtm"
       - "approved"
     schedule:
       interval: "weekly"
@@ -39,7 +37,6 @@ updates:
     labels:
       - "area/dependency"
       - "ok-to-test"
-      - "lgtm"
       - "approved"
     schedule:
       interval: "weekly"
