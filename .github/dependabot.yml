@@ -2,6 +2,11 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
+    labels:
+      - "area/dependency"
+      - "ok-to-test"
+      - "lgtm"
+      - "approved"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -10,6 +15,8 @@ updates:
     labels:
       - "area/dependency"
       - "ok-to-test"
+      - "lgtm"
+      - "approved"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -29,6 +36,11 @@ updates:
           - "github.com/openshift-online/ocm-sdk-go*"
   - package-ecosystem: "docker"
     directory: "/"
+    labels:
+      - "area/dependency"
+      - "ok-to-test"
+      - "lgtm"
+      - "approved"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
