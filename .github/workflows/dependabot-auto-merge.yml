@@ -74,10 +74,11 @@ jobs:
                 exit 0
               fi
 
-              echo "E2E smoke checks failed."
+              echo "E2E smoke checks failed. Disabling auto-merge."
+              gh pr merge "$PR_NUMBER" --disable-auto 2>/dev/null || true
               gh pr comment "$PR_NUMBER" --body "**E2E Smoke Tests Failed**
 
-          Auto-merge was not enabled because e2e smoke tests failed. Please investigate and /retest when ready."
+          Auto-merge has been disabled because e2e smoke tests failed. Please investigate and /retest when ready."
               echo "e2e-result=failed" >> $GITHUB_OUTPUT
               exit 0
             fi
