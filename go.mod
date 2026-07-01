@@ -1,6 +1,6 @@
 module github.com/openshift-online/rosa-e2e
 
-go 1.24.0
+go 1.26
 
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.26
