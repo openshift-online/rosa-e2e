@@ -68,10 +68,18 @@ categories:
       - name: OSD GCP FIPS 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-fips-e2e-stable-4-22
       # Upgrade
-      - name: HCP Upgrade 4.20-4.21
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-4-20-to-4-21
-      - name: STS Upgrade 4.20-4.21
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-4-20-to-4-21
+      - name: HCP Upgrade Y-3
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-3
+      - name: HCP Upgrade Y-2
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-2
+      - name: HCP Upgrade Y-1
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-1
+      - name: STS Upgrade Y-3
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-3
+      - name: STS Upgrade Y-2
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-2
+      - name: STS Upgrade Y-1
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-1
 
   - id: rosa-gap-analysis
     scope: platform
