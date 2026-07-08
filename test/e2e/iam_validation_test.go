@@ -28,11 +28,11 @@ var _ = Describe("ROSA IAM Validation", labels.Critical, labels.Positive, labels
 			Skip("AWS credentials not available, skipping CloudTrail test")
 		}
 
-		By("Resolving cluster infrastructure ID")
-		infraID, err := tc.ResolveInfraID()
-		Expect(err).NotTo(HaveOccurred(), "failed to resolve cluster infra ID")
+		By("Resolving operator role prefix")
+		operatorRolePrefix, err := tc.ResolveOperatorRolePrefix()
+		Expect(err).NotTo(HaveOccurred(), "failed to resolve operator role prefix from OCM")
 
 		By("Querying CloudTrail for AccessDenied events in the last 6 hours")
-		Expect(verifiers.VerifyNoAccessDenied(ctx, tc.CloudTrailClient(), infraID, 6*time.Hour)).To(Succeed())
+		Expect(verifiers.VerifyNoAccessDenied(ctx, tc.CloudTrailClient(), operatorRolePrefix, 6*time.Hour)).To(Succeed())
 	})
 })

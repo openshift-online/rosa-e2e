@@ -158,6 +158,19 @@ func (tc *TestContext) ResolveInfraID() (string, error) {
 	return infraID, nil
 }
 
+// ResolveOperatorRolePrefix gets the operator role prefix from the cluster's STS configuration in OCM.
+func (tc *TestContext) ResolveOperatorRolePrefix() (string, error) {
+	resp, err := tc.conn.ClustersMgmt().V1().Clusters().Cluster(tc.cfg.ClusterID).Get().Send()
+	if err != nil {
+		return "", fmt.Errorf("getting cluster from OCM: %w", err)
+	}
+	prefix := resp.Body().AWS().STS().OperatorRolePrefix()
+	if prefix == "" {
+		return "", fmt.Errorf("cluster %s has no operator role prefix", tc.cfg.ClusterID)
+	}
+	return prefix, nil
+}
+
 // HCPNamespaces returns the resolved HCP namespace info, or nil if not resolved.
 func (tc *TestContext) HCPNamespaces() *HCPNamespaces {
 	return tc.hcpNamespaces
