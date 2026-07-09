@@ -33,11 +33,12 @@ func isKnownDenial(eventName string, callerARN string) bool {
 
 // VerifyNoAccessDenied queries CloudTrail for AccessDenied or UnauthorizedAccess events
 // within the specified lookback window and returns an error if any are found.
-// Events are filtered to only include those related to the given cluster infraID.
-func VerifyNoAccessDenied(ctx context.Context, ctClient *cloudtrail.Client, infraID string, lookback time.Duration) error {
+// Events are filtered to only include those containing the given filterString
+// (typically the operator role prefix to scope results to a specific cluster).
+func VerifyNoAccessDenied(ctx context.Context, ctClient *cloudtrail.Client, filterString string, lookback time.Duration) error {
 	startTime := time.Now().Add(-lookback)
 
-	const maxPages = 20
+	const maxPages = 5
 	var deniedEvents []string
 	var nextToken *string
 
@@ -56,7 +57,7 @@ func VerifyNoAccessDenied(ctx context.Context, ctClient *cloudtrail.Client, infr
 			}
 			eventJSON := *event.CloudTrailEvent
 
-			if infraID != "" && !strings.Contains(eventJSON, infraID) {
+			if filterString != "" && !strings.Contains(eventJSON, filterString) {
 				continue
 			}
 
@@ -90,8 +91,8 @@ func VerifyNoAccessDenied(ctx context.Context, ctClient *cloudtrail.Client, infr
 	}
 
 	if len(deniedEvents) > 0 {
-		return fmt.Errorf("found %d AccessDenied events for cluster %s in the last %s:\n%s",
-			len(deniedEvents), infraID, lookback, strings.Join(deniedEvents, "\n"))
+		return fmt.Errorf("found %d AccessDenied events matching %q in the last %s:\n%s",
+			len(deniedEvents), filterString, lookback, strings.Join(deniedEvents, "\n"))
 	}
 
 	return nil
