@@ -16,6 +16,12 @@
 
 sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
 
+# Component-level Prow filter overrides for the CI health badge link.
+# When a component has jobs from multiple categories, this specifies
+# the Prow query URL shown when clicking the CI badge.
+component_prow_filters:
+  clusters-service: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*staging*"
+
 categories:
   - id: rosa-e2e-stg
     scope: platform

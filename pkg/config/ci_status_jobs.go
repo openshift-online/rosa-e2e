@@ -1,8 +1,9 @@
 package config
 
 type CIStatusConfig struct {
-	SippyURL   string           `yaml:"sippy_url"`
-	Categories []StatusCategory `yaml:"categories"`
+	SippyURL             string            `yaml:"sippy_url"`
+	ComponentProwFilters map[string]string  `yaml:"component_prow_filters,omitempty"`
+	Categories           []StatusCategory   `yaml:"categories"`
 }
 
 type StatusCategory struct {
