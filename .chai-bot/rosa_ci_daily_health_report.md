@@ -74,15 +74,16 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 
 ### 5. Failure analysis (threaded replies)
 
-For each category below 80%, post a **separate threaded reply** to the top-level message with a deep investigation. One reply per failing category.
+After posting the top-level summary, use `post_thread_update` to post **separate threaded replies** for each category below 80%. One reply per failing category. Each call to `post_thread_update` creates a new message in the thread under your top-level summary.
 
 For each failing job in the category:
 1. Fetch the build log from the most recent failure using Prow CI tools or `fetch_web_content` on the artifacts URL
 2. Identify the specific failure: key error messages, failing test names, failing step
-3. Perform root cause analysis using Sippy, Prow CI tools, or other available tools
-4. Classify the failure based on what you find in the logs
-5. Note how frequently the job has failed recently (e.g., "3 of last 10 runs failed")
-6. Link to the failing Prow job run(s)
+3. For OCM FVT jobs, also check the `cs-telemetry` logs in the Prow artifacts. These contain Clusters Service-side request/response data that can reveal CS errors, timeouts, or API failures that caused the test to fail. Look in the artifacts directory for files matching `cs-telemetry*` or `cs_telemetry*`.
+4. Perform root cause analysis using Sippy, Prow CI tools, or other available tools
+5. Classify the failure based on what you find in the logs
+6. Note how frequently the job has failed recently (e.g., "3 of last 10 runs failed")
+7. Link to the failing Prow job run(s)
 
 For deeper pass rate analysis, query the Sippy API:
 `https://sippy.dptools.openshift.org/api/jobs?release=rosa-stage&limit=100`
@@ -110,6 +111,33 @@ These are patterns that come up often. Use them as hints, not a rigid checklist.
 - OCM login: `Cannot login` or `401 Unauthorized`, expired SSO credentials
 - Boskos lease timeout: `failed to acquire lease`, all quota slices in use
 - Prometheus alert flakes: transient alerts firing on fresh clusters
+
+### 6. Auto-fix (for pattern-matched failures)
+
+After completing the failure analysis, check if any failures match fixable patterns. Use `post_thread_update` to post the results as another threaded reply.
+
+**Conformance skip list pattern:**
+If a conformance test (HCP or Classic STS) is failing persistently (3+ consecutive failures) and the failing test is in an OCP-owned sig (sig-apps, sig-auth, sig-network, sig-storage), AND the same test is NOT failing in rosa-e2e HCP/STS jobs (confirming it's upstream, not ROSA-specific):
+
+1. Search for existing open PRs in `openshift/release` with `[ci-fix]` in the title targeting the same test. If found, skip and note the existing PR.
+2. Clone `openshift/release` via workspace tools
+3. Add the test name to the `TEST_SKIPS` env var in the appropriate workflow YAML:
+   - HCP: `ci-operator/step-registry/rosa/aws/hcp/conformance/rosa-aws-hcp-conformance-workflow.yaml`
+   - Classic STS: `ci-operator/step-registry/rosa/aws/sts/conformance/rosa-aws-sts-conformance-workflow.yaml`
+4. Run `make jobs` to regenerate Prow job configs
+5. Scan the diff for sensitive content (credentials, IP addresses, account IDs) before pushing
+6. Open a PR with title `[ci-fix] Skip <test-name> in <workflow> (upstream OCP regression)`
+7. PR description must link to the failing Prow job run(s) and reference the upstream OCP bug if identifiable
+8. Use `post_thread_update` to post a threaded reply with the PR link
+
+**Stale PR cleanup:**
+Before creating new PRs, check for any open `[ci-fix]` PRs older than 7 days. Auto-close them with a comment explaining they were not reviewed in time.
+
+**Constraints:**
+- Maximum 3 auto-fix PRs per scheduled run
+- Allowed repos for fixes: `openshift/release` (step registry, workflow YAMLs), `openshift-online/rosa-e2e` (test code), `service/ocm-backend-tests` (FVT test code on GitLab), `openshift/origin` (conformance test fixes)
+- Never modify production configs or operator code
+- PRs require human `/lgtm` and `/approve` before merge (no auto-merge)
 
 ## Constraints
 
