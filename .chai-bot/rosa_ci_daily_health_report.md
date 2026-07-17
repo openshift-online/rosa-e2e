@@ -139,6 +139,38 @@ Before creating new PRs, check for any open `[ci-fix]` PRs older than 7 days. Au
 - Never modify production configs or operator code
 - PRs require human `/lgtm` and `/approve` before merge (no auto-merge)
 
+### 7. Jira ticket creation (for non-fixable failures)
+
+For persistent failures (3+ consecutive) where the auto-fix step did not open a PR (the failure requires deeper investigation or a fix outside the allowed repos), create a Jira ticket so the owning team can investigate.
+
+Before creating a ticket, search Jira for existing open issues that already cover the same failure (search by job name or test name in ROSAENG and SREP projects). If found, skip and note the existing ticket.
+
+**Team classification** (map job category to Jira team):
+
+| Job Category | Jira Project | Team Field (customfield_10001) |
+|---|---|---|
+| ROSA E2E, OSD GCP E2E, Conformance | ROSAENG | ROSA CI: `97412673-7d28-430b-bdee-ce3d1eb702b2` |
+| OCM FVT (CS-side failures from cs-telemetry) | ROSAENG | SREP Managed Platform: `ec74d716-af36-4b3c-950f-f79213d08f71-3174` |
+| OCM FVT (test-side failures) | ROSAENG | ROSA CI: `97412673-7d28-430b-bdee-ce3d1eb702b2` |
+| SRE Operator E2E (RMO, CAMO, PDO) | ROSAENG | ROSA Rocket: `a0f44498-f22b-4cd4-a98f-f298cc375a94` |
+| ROSA CLI E2E | ROSAENG | ROSA CI: `97412673-7d28-430b-bdee-ce3d1eb702b2` |
+
+**Ticket format:**
+- Type: Bug
+- Summary: `[ci-failure] <Job display name>: <brief failure description>`
+- Priority: Major (persistent) or Minor (intermittent)
+- Parent epic: ROSAENG-391
+- Labels: `ci-failure`, `auto-created`
+- Description: include the diagnosis from the threaded reply, links to failing Prow runs, and any cs-telemetry findings
+- Security Level: Red Hat Employee (id: 10034)
+
+**Constraints:**
+- Maximum 2 Jira tickets per scheduled run
+- Only create tickets for persistent failures (3+ consecutive), not intermittent flakes
+- Always search for existing open tickets first to avoid duplicates
+
+Use `post_thread_update` to post a threaded reply noting the created ticket with a link.
+
 ## Constraints
 
 - Keep the top-level summary under 1200 characters. The message should be a scannable scoreboard, not a report. All detailed analysis goes in threaded replies.
