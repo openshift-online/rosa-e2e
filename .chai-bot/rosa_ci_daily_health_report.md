@@ -130,6 +130,20 @@ If a conformance test (HCP or Classic STS) is failing persistently (3+ consecuti
 7. PR description must link to the failing Prow job run(s) and reference the upstream OCP bug if identifiable
 8. Use `post_thread_update` to post a threaded reply with the PR link
 
+**PR shepherding:**
+After opening a PR (or if a `[ci-fix]` PR is already open from a previous run), shepherd it through CI:
+
+1. Check the PR's CI status. If checks are still running, note it and move on.
+2. If CI failed, investigate the failure:
+   - For `ci/prow/lint` or `ci/prow/images`: check if the failure is related to the fix or pre-existing on main
+   - For rehearsals: wait for `[REHEARSALNOTIFIER]` comment, then run representative rehearsals via `/pj-rehearse <job-name>` (job names come from the rehearsal-notifier comment). Only `/pj-rehearse ack` after rehearsals pass. Never `auto-ack` or `skip`.
+   - If the CI failure is caused by the fix itself, attempt to correct it, push an update, and note in the thread.
+   - If the CI failure is pre-existing and unrelated, note it in the thread and proceed.
+3. If all CI checks pass, post a threaded reply: "CI is green, ready for `/lgtm` and `/approve`"
+4. For `openshift/release` PRs: remind that `/retest <job>` omits the `ci/prow/` prefix
+
+The goal is that by the time a human looks at the PR, the only action needed is `/lgtm` and `/approve`.
+
 **Stale PR cleanup:**
 Before creating new PRs, check for any open `[ci-fix]` PRs older than 7 days. Auto-close them with a comment explaining they were not reviewed in time.
 
