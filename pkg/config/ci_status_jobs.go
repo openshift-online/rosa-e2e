@@ -12,10 +12,19 @@ type StatusCategory struct {
 	Scope      string      `yaml:"scope,omitempty"`
 	Components []string    `yaml:"components,omitempty"`
 	ProwFilter string      `yaml:"prow_filter"`
+	Team       *JiraTeam   `yaml:"team,omitempty"`
+	Labels     []string    `yaml:"labels,omitempty"`
 	Jobs       []StatusJob `yaml:"jobs"`
 }
 
 type StatusJob struct {
-	Name    string `yaml:"name"`
-	ProwJob string `yaml:"prow_job"`
+	Name    string    `yaml:"name"`
+	ProwJob string    `yaml:"prow_job"`
+	Team    *JiraTeam `yaml:"team,omitempty"`
+	Labels  []string  `yaml:"labels,omitempty"`
+}
+
+type JiraTeam struct {
+	ID   string `yaml:"id"`
+	Name string `yaml:"name"`
 }

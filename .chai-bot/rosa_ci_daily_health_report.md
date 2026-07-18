@@ -145,22 +145,24 @@ For persistent failures (3+ consecutive) where the auto-fix step did not open a 
 
 Before creating a ticket, search Jira for existing open issues that already cover the same failure (search by job name or test name in ROSAENG and SREP projects). If found, skip and note the existing ticket.
 
-**Team classification** (map job category to Jira team):
+**Team and label classification:**
 
-| Job Category | Jira Project | Team Field (customfield_10001) |
-|---|---|---|
-| ROSA E2E, OSD GCP E2E, Conformance | ROSAENG | ROSA CI: `97412673-7d28-430b-bdee-ce3d1eb702b2` |
-| OCM FVT (CS-side failures from cs-telemetry) | ROSAENG | SREP Managed Platform: `ec74d716-af36-4b3c-950f-f79213d08f71-3174` |
-| OCM FVT (test-side failures) | ROSAENG | ROSA CI: `97412673-7d28-430b-bdee-ce3d1eb702b2` |
-| SRE Operator E2E (RMO, CAMO, PDO) | ROSAENG | ROSA Rocket: `a0f44498-f22b-4cd4-a98f-f298cc375a94` |
-| ROSA CLI E2E | ROSAENG | ROSA CI: `97412673-7d28-430b-bdee-ce3d1eb702b2` |
+The `ci-status-jobs.yaml` config includes `team` and `labels` fields per category (and optionally per job). Use these directly:
+- `team.id` maps to the Jira Team field (`customfield_10001`)
+- `team.name` is for display only
+- `labels` is the list of Jira labels to apply
+- Job-level `team` and `labels` override category-level when present
+
+If a category or job has no `team` field, fall back to ROSA CI (`97412673-7d28-430b-bdee-ce3d1eb702b2`) with label `ci-failure`.
+
+For OCM FVT failures, also check cs-telemetry to determine if the failure is CS-side (API errors, timeouts) vs test-side (assertion errors, framework issues). If test-side, use ROSA CI team instead of the category's team.
 
 **Ticket format:**
 - Type: Bug
 - Summary: `[ci-failure] <Job display name>: <brief failure description>`
 - Priority: Major (persistent) or Minor (intermittent)
 - Parent epic: ROSAENG-391
-- Labels: `ci-failure`, `auto-created`
+- Labels: from the `labels` field in ci-status-jobs.yaml
 - Description: include the diagnosis from the threaded reply, links to failing Prow runs, and any cs-telemetry findings
 - Security Level: Red Hat Employee (id: 10034)
 
