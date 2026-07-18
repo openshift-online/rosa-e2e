@@ -139,8 +139,9 @@ After opening a PR (or if a `[ci-fix]` PR is already open from a previous run), 
    - For rehearsals: wait for `[REHEARSALNOTIFIER]` comment, then run representative rehearsals via `/pj-rehearse <job-name>` (job names come from the rehearsal-notifier comment). Only `/pj-rehearse ack` after rehearsals pass. Never `auto-ack` or `skip`.
    - If the CI failure is caused by the fix itself, attempt to correct it, push an update, and note in the thread.
    - If the CI failure is pre-existing and unrelated, note it in the thread and proceed.
-3. If all CI checks pass, post a threaded reply: "CI is green, ready for `/lgtm` and `/approve`"
-4. For `openshift/release` PRs: remind that `/retest <job>` omits the `ci/prow/` prefix
+3. Check for review comments from CodeRabbit (`coderabbitai`) or human reviewers. If there are unresolved comments, read them and attempt to address them (push code fixes, respond to questions, or explain the rationale for the change). Mark resolved comments as addressed.
+4. If all CI checks pass and no unresolved review comments remain, post a threaded reply: "CI is green, reviews addressed, ready for `/lgtm` and `/approve`"
+5. For `openshift/release` PRs: remind that `/retest <job>` omits the `ci/prow/` prefix
 
 The goal is that by the time a human looks at the PR, the only action needed is `/lgtm` and `/approve`.
 
