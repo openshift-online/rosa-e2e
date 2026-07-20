@@ -25,6 +25,8 @@ type StatusJob struct {
 }
 
 type JiraTeam struct {
-	ID   string `yaml:"id"`
-	Name string `yaml:"name"`
+	ID           string `yaml:"id"`
+	Name         string `yaml:"name"`
+	SlackChannel string `yaml:"slack_channel,omitempty"`
+	SlackAlias   string `yaml:"slack_alias,omitempty"`
 }

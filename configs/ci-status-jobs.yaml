@@ -30,6 +30,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
+      slack_channel: wg-rosa-ci-enhancement
+      slack_alias: rosa-ci-team
     labels: [ci-failure, rosa-e2e]
     jobs:
       # HCP
@@ -97,6 +99,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
+      slack_channel: wg-rosa-ci-enhancement
+      slack_alias: rosa-ci-team
     labels: [ci-failure, gap-analysis]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-gap-analysis-main-periodics*"
     jobs:
@@ -118,6 +122,8 @@ categories:
     team:
       id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
       name: ROSA Coffee
+      slack_channel: rosa-coffee
+      slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-staging*"
     jobs:
@@ -157,6 +163,8 @@ categories:
     team:
       id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
       name: ROSA Coffee
+      slack_channel: rosa-coffee
+      slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-integration*"
     jobs:
@@ -182,6 +190,8 @@ categories:
     team:
       id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
       name: ROSA Coffee
+      slack_channel: rosa-coffee
+      slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-production*"
     jobs:
@@ -195,6 +205,8 @@ categories:
     team:
       id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
       name: ROSA Coffee
+      slack_channel: rosa-coffee
+      slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-classic-staging*"
     jobs:
@@ -220,6 +232,8 @@ categories:
     team:
       id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
       name: ROSA Coffee
+      slack_channel: rosa-coffee
+      slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-classic-integration*,*ocm-fvt-osd-aws-integration*"
     jobs:
@@ -235,6 +249,8 @@ categories:
     team:
       id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
       name: ROSA Coffee
+      slack_channel: rosa-coffee
+      slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osd-gcp-staging*"
     jobs:
@@ -255,6 +271,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
+      slack_channel: wg-rosa-ci-enhancement
+      slack_alias: rosa-ci-team
     labels: [ci-failure, conformance]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-hcp-ovn"
     jobs:
@@ -275,6 +293,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
+      slack_channel: wg-rosa-ci-enhancement
+      slack_alias: rosa-ci-team
     labels: [ci-failure, conformance]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-sts-ovn"
     jobs:
@@ -294,6 +314,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CLI/Terraform
+      slack_channel: team-rosa-cli-terraform
+      slack_alias: rosa-cli-tf-team
     labels: [ci-failure, rosa-cli]
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift%2Frosa&type=periodic"
     jobs:
@@ -363,6 +385,8 @@ categories:
     team:
       id: "a0f44498-f22b-4cd4-a98f-f298cc375a94"
       name: ROSA Rocket
+      slack_channel: hcm-sre-team-rocket
+      slack_alias: sd-srep-team-rocket
     labels: [ci-failure, sre-operator]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*route-monitor-operator*rosa*e2e*"
     jobs:
@@ -377,6 +401,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CLI/Terraform
+      slack_channel: team-rosa-cli-terraform
+      slack_alias: rosa-cli-tf-team
     labels: [ci-failure, terraform-provider-rhcs]
     prow_filter: "https://prow.ci.openshift.org/?repo=terraform-redhat%2Fterraform-provider-rhcs&type=periodic"
     jobs:
