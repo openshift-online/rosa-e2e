@@ -166,10 +166,14 @@ Before creating a ticket, search Jira for existing open issues that already cove
 The `ci-status-jobs.yaml` config includes `team` and `labels` fields per category (and optionally per job). Use these directly:
 - `team.id` maps to the Jira Team field (`customfield_10001`)
 - `team.name` is for display only
+- `team.slack_channel` is the team's Slack channel for notifications
+- `team.slack_alias` is the team's Slack user group handle (e.g., `@sd-srep-team-hulk`)
 - `labels` is the list of Jira labels to apply
 - Job-level `team` and `labels` override category-level when present
 
 If a category or job has no `team` field, fall back to ROSA CI (`97412673-7d28-430b-bdee-ce3d1eb702b2`) with label `ci-failure`.
+
+**Team notifications:** When creating a Jira ticket, also post a notification to the team's `slack_channel` (if defined) mentioning the `slack_alias` (if defined). Keep the notification brief: link to the Jira ticket and a one-line summary of the failure.
 
 For OCM FVT failures, also check cs-telemetry to determine if the failure is CS-side (API errors, timeouts) vs test-side (assertion errors, framework issues). If test-side, use ROSA CI team instead of the category's team.
 
