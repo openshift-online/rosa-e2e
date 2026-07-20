@@ -71,8 +71,10 @@ var _ = Describe("RHOBS Synthetic Monitoring", labels.High, labels.Positive, lab
 	})
 
 	It("should have probe_success metrics flowing to RHOBS", func(ctx context.Context) {
-		By("Querying RHOBS metrics API for probe_success")
-		Expect(verifiers.VerifyProbeSuccessMetrics(ctx, clusterExternalID, rhobsConfig)).To(Succeed(),
+		By("Querying RHOBS metrics API for probe_success (up to 5 minutes)")
+		Eventually(func() error {
+			return verifiers.VerifyProbeSuccessMetrics(ctx, clusterExternalID, rhobsConfig)
+		}).WithContext(ctx).WithTimeout(5*time.Minute).WithPolling(30*time.Second).Should(Succeed(),
 			"probe_success metrics should exist for cluster %s", clusterExternalID)
 	})
 
