@@ -56,7 +56,7 @@ Then call `no_action_required()`.
 **If any category < 80%**: use this format:
 
 ```
-*ROSA CI Daily Health -- {DATE}*
+*ROSA CI Daily Health -- {DATE} -- {overall_rate}%*
 
 {emoji} *{Category}:* {rate}% ({pass}/{total}) {trend}
 {emoji} *{Category}:* {rate}% ({pass}/{total}) {trend} -- {brief inline note}
@@ -66,6 +66,7 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 ```
 
 **Rules:**
+- `{overall_rate}` is the weighted pass rate across all jobs with data (total passes / total builds, rounded to nearest integer).
 - List categories with data, sorted by pass rate descending.
 - For yellow/red categories, add a **short** inline note after the trend emoji (e.g., `-- AMD64 & E2E at 40%`, `-- stale since Jun 17`, `-- 1 run in 30d`). Keep notes under 40 characters.
 - If any categories had zero Prow run data, mention the count in the footer line (e.g., `2 categories skipped (no runs)`). Omit this part if all categories have data.
