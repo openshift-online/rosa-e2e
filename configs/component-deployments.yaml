@@ -31,14 +31,14 @@ components:
   - key: route-monitor-operator
     saas_name: saas-route-monitor-operator-pko
     strategy: hive
-    e2e_saas: saas-route-monitor-operator-e2e-test
+    e2e_saas: saas-route-monitor-operator-prow-e2e
   - key: pagerduty-operator
     saas_name: saas-pagerduty-operator-pko
     strategy: hive
   - key: configure-alertmanager-operator
     saas_name: saas-configure-am-operator-pko
     strategy: hive
-    e2e_saas: saas-configure-am-operator-e2e-test
+    e2e_saas: saas-configure-am-operator-prow-e2e
   - key: ocm-agent-operator
     saas_name: saas-ocm-agent-operator
     strategy: hive
