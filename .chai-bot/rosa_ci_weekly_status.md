@@ -10,20 +10,13 @@ Provide a weekly snapshot of ROSA CI initiative progress to #wg-rosa-ci-enhancem
 
 ### 1. Query Jira epic progress
 
-Look up the current status of the epics under initiative [ROSA-727](https://redhat.atlassian.net/browse/ROSA-727) (ROSA Canonical E2E Test Suite and Signals). Use Jira tools to query child epics and their story counts. Report any epics that have active work (stories in progress or recently closed this week).
+Query all epics under initiative [ROSA-727](https://redhat.atlassian.net/browse/ROSA-727) (ROSA Canonical E2E Test Suite and Signals). Use Jira tools to find all child epics dynamically (do not rely on a hardcoded list). For each epic, query its child stories to get counts.
 
-Key epics to check:
-- ROSAENG-391: E2E Suite Reliability & Component Readiness (main active epic)
-- ROSAENG-326: Unified ROSA CI Visibility
-- ROSAENG-394: CI Watcher Role and Rotation
-- ROSAENG-307: CNCF Conformance to Prow and Enforce Release Gating
-- ROSAENG-743: E2E Coverage Gap Improvement
-- ROSAENG-308: Consolidate Customer-Facing Tests into rosa-e2e
-- ROSAENG-309: E2E Test Ownership Model and Enforcement
+Report all epics with their current progress, not just those with activity this week. This gives a full initiative scorecard.
 
-For each epic with activity this week, report: how many stories closed this week, how many in progress, how many total.
+For each epic, report: epic key, summary, stories closed / total, stories in progress. Highlight epics with activity this week (stories closed or moved to in progress since last Monday).
 
-Also check initiative [ROSA-714](https://redhat.atlassian.net/browse/ROSA-714) (SRE Operator Production Compliance) for any active epics.
+Also query all epics under initiative [ROSA-714](https://redhat.atlassian.net/browse/ROSA-714) (SRE Operator Production Compliance) and report the same way.
 
 ### 2. Find key PRs/MRs from the past week
 
@@ -56,12 +49,15 @@ Do NOT reproduce per-job pass rates. The daily report covers that.
 
 Post the report as your channel response. Format:
 
-```
+```text
 :fyi: *ROSA CI Weekly Status ({MM/DD})*
 
-*Jira Progress:*
-<https://redhat.atlassian.net/browse/ROSAENG-391|*ROSAENG-391*> E2E Reliability: {closed_this_week} closed, {in_progress} in progress ({total} total)
-{other active epics with similar format}
+*ROSA-727 Epics:*
+<https://redhat.atlassian.net/browse/{KEY}|*{KEY}*> {Summary}: {closed}/{total} closed, {in_progress} in progress {activity_indicator}
+{repeat for all epics}
+
+*ROSA-714 Epics:*
+{same format}
 
 *Key PRs/MRs this week:*
 - {Description} (<{url}|#{number}>) -- merged
@@ -74,9 +70,11 @@ Post the report as your channel response. Format:
 ### Formatting rules
 
 **Jira section:**
-- Only include epics with activity this week (stories closed or moved to in progress)
+- List ALL epics under each initiative, not just active ones
 - Link epic keys as `<url|*KEY*>`
-- Show closed-this-week count, in-progress count, and total
+- Show closed/total and in-progress counts
+- Mark epics with activity this week with `:sparkle:` emoji
+- Sort by completion percentage descending
 
 **Key activity section:**
 - Include merged PRs/MRs and notable open ones
@@ -94,6 +92,12 @@ Post the report as your channel response. Format:
 - Keep the entire report in one message (no threaded replies)
 - Use Slack `mrkdwn` formatting
 - The report should be scannable in 15 seconds
+
+**Empty-state handling:**
+- If no epics have activity this week, write: "No epic activity this week."
+- If no PRs/MRs found, write: "No ROSA CI PRs/MRs this week."
+- If CI health is stable with no notable changes, write: "CI health stable, no significant changes from daily reports."
+- Always produce a report with all three sections, even if some are empty.
 
 ## Constraints
 
