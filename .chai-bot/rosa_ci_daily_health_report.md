@@ -4,7 +4,7 @@ You are running a **cron** scheduled task that produces a daily CI health report
 
 ## Goal
 
-Check the pass/fail history (last 10 completed builds per job) for 44 ROSA CI periodic jobs across 8 categories. Report per-category pass rates, 7-day trends, and failure classifications. If all categories are >= 80%, respond with a brief summary and `no_action_required()`.
+Check the pass/fail history (last completed builds over 7 days per job) for all ROSA CI periodic jobs across all categories defined in the job registry. Report per-category pass rates, 7-day trends, and failure classifications. If all categories are >= 80%, respond with a brief summary and `no_action_required()`.
 
 ## Procedure
 
@@ -19,7 +19,7 @@ If the fetch fails, fall back to the Job Registry at the bottom of this document
 
 ### 2. Collect build history
 
-For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prowjobs`, etc.) to find the **last 10 completed builds** (exclude PENDING). Record pass count, fail count, and build timestamps.
+For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prowjobs`, etc.) to find the **last completed builds over 7 days** (exclude PENDING). Record pass count, fail count, and build timestamps.
 
 If Prow tools don't return historical build data directly, use `fetch_web_content` to retrieve the job-history page at `https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{JOB_NAME}`. The HTML contains `var allBuilds = [{ID, Result, Started, Duration}];`.
 
@@ -94,11 +94,11 @@ Format each threaded reply like:
 ```
 {emoji} *{Category} -- {rate}% pass rate* {trend}
 
-*{Job Name}* -- {pass}/10 (<job-history link>)
+*{Job Name}* -- {pass}/{total} (<job-history link>)
 {Short summary of failure: key error, failing test/step}
 Failing since {date}. {Root cause analysis.}
 
-*{Job Name}* -- {pass}/10 (<job-history link>)
+*{Job Name}* -- {pass}/{total} (<job-history link>)
 {Short summary and analysis}
 ```
 
@@ -201,73 +201,116 @@ Use `post_thread_update` to post a threaded reply noting the created ticket with
 
 ## Job Registry (fallback)
 
-> Only used if the live fetch from `https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/ci-status-jobs.yaml` fails. This list may be stale.
+> Only used if the live fetch from `https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/ci-status-jobs.yaml` fails. This list may be stale. When updating, regenerate from the live YAML.
 
-### ROSA E2E (9 jobs)
-
-| Name | Prow Job |
-|---|---|
-| HCP 4.19 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-19 |
-| HCP 4.20 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-20 |
-| HCP 4.21 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-21 |
-| HCP 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-candidate-4-22 |
-| HCP 5.0 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-5-0 |
-| STS 4.19 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-19 |
-| STS 4.20 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-20 |
-| STS 4.21 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-21 |
-| STS 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-candidate-4-22 |
-
-### OSD GCP E2E (1 job)
+### ROSA E2E STG (26 jobs)
 
 | Name | Prow Job |
 |---|---|
-| OSD GCP 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-candidate-4-22 |
+| HCP 4.19 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-19 |
+| HCP 4.20 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-20 |
+| HCP 4.21 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-21 |
+| HCP 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-22 |
+| HCP 5.0 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-nightly-5-0 |
+| HCP FIPS 4.19 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-stable-4-19 |
+| HCP FIPS 4.20 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-stable-4-20 |
+| HCP FIPS 4.21 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-stable-4-21 |
+| HCP FIPS 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-stable-4-22 |
+| HCP FIPS 5.0 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-nightly-5-0 |
+| STS 4.19 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-19 |
+| STS 4.20 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-20 |
+| STS 4.21 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-21 |
+| STS 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-22 |
+| STS FIPS 4.19 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-staging-stable-4-19 |
+| STS FIPS 4.20 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-staging-stable-4-20 |
+| STS FIPS 4.21 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-staging-stable-4-21 |
+| STS FIPS 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-staging-stable-4-22 |
+| OSD GCP 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-staging-stable-4-22 |
+| OSD GCP FIPS 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-fips-e2e-staging-stable-4-22 |
+| HCP Upgrade Y-3 | periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-3 |
+| HCP Upgrade Y-2 | periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-2 |
+| HCP Upgrade Y-1 | periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-1 |
+| STS Upgrade Y-3 | periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-3 |
+| STS Upgrade Y-2 | periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-2 |
+| STS Upgrade Y-1 | periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-1 |
 
-### OCM FVT HCP (11 jobs)
+### GAP E2E (5 jobs)
+
+| Name | Prow Job |
+|---|---|
+| GAP 4.19 | periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-19 |
+| GAP 4.20 | periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-20 |
+| GAP 4.21 | periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-21 |
+| GAP 4.22 | periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-22 |
+| GAP 5.0 | periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-5-0 |
+
+### OCM FVT HCP STG (14 jobs)
 
 | Name | Prow Job |
 |---|---|
 | HCP AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main |
 | HCP Adobe | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-adobe-staging-main |
 | HCP AMD64 | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-staging-main |
+| HCP AMD64 Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-upgrade-staging-main |
 | HCP ARM | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-arm-staging-main |
 | HCP Autonode | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-autonode-staging-main |
 | HCP E2E | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-hcp-e2e-staging-main |
 | HCP PL | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-pl-staging-main |
 | HCP Shared VPC | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-shared-vpc-staging-main |
+| HCP Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-upgrade-staging-main |
 | HCP Y-Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-y-upgrade-staging-main |
 | HCP Zero Egress | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-staging-main |
 | HCP Zero Egress Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-upgrade-staging-main |
+| Sanity | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-staging-main |
 
-### OCM FVT HCP Integration (1 job)
+### OCM FVT HCP INT (7 jobs)
 
 | Name | Prow Job |
 |---|---|
-| HCP Backup Restore | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-restore-integration-main |
+| HCP Autonode | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-autonode-integration-main |
+| HCP Backup Restore | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-rest-integration-main |
+| HCP Backup Restore 2 | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-rest-2-integration-main |
+| HCP Backup Scale | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-scale-integration-main |
+| HCP Backup Scale 2 | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-scale-2-integration-main |
+| HCP Backup CP Up | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-ip-integration-main |
+| HCP Backup CP Up 2 | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-cpup-ip2-integration-main |
 
-### OCM FVT Classic (9 jobs)
+### OCM FVT HCP PROD (1 job)
+
+| Name | Prow Job |
+|---|---|
+| HCP AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-production-ocm-fvt-periodic-cs-rosa-hcp-ad-production-main |
+
+### OCM FVT Classic STG (7 jobs)
 
 | Name | Prow Job |
 |---|---|
 | ROSA AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-ad-staging-main |
-| STS AD (stg) | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main |
-| STS AD (int) | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-integration-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main |
+| STS AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main |
 | STS PL | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-pl-staging-main |
 | STS Shared VPC | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-shared-vpc-staging-main |
 | STS Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-upgrade-staging-main |
-| HCP Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-hcp-upgrade-staging-main |
 | OCM Resources | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-ocm-resources-staging-main |
 | OSD RH AWS | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-osd-rh-aws-staging-main |
 
-### OCM FVT GCP (3 jobs)
+### OCM FVT Classic INT (2 jobs)
+
+| Name | Prow Job |
+|---|---|
+| STS AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-integration-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main |
+| OSD CCS AWS AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-aws-integration-ocm-fvt-periodic-cs-osd-ccs-aws-ad-integration-main |
+
+### OCM FVT GCP STG (5 jobs)
 
 | Name | Prow Job |
 |---|---|
 | GCP CCS AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-ccs-gcp-ad-staging-main |
 | GCP Marketplace | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-ccs-gcp-marketplace-staging-main |
 | GCP Non-Cross-Proj WIF | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-non-cross-proj-wif-staging-main |
+| GCP Root Disk | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-root-disk-staging-main |
+| GCP WIF SV | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main |
 
-### HCP Conformance (6 jobs)
+### HCP Conformance (5 jobs)
 
 | Name | Prow Job |
 |---|---|
@@ -275,7 +318,6 @@ Use `post_thread_update` to post a threaded reply noting the created ticket with
 | HCP 4.20 | periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-hcp-ovn |
 | HCP 4.21 | periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-hcp-ovn |
 | HCP 4.22 | periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-hcp-ovn |
-| HCP 4.23 | periodic-ci-openshift-release-main-nightly-4.23-e2e-rosa-hcp-ovn |
 | HCP 5.0 | periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn |
 
 ### Classic STS Conformance (4 jobs)
@@ -286,3 +328,69 @@ Use `post_thread_update` to post a threaded reply noting the created ticket with
 | STS 4.20 | periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-sts-ovn |
 | STS 4.21 | periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-sts-ovn |
 | STS 4.22 | periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-sts-ovn |
+
+### ROSA CLI E2E (29 jobs)
+
+| Name | Prow Job |
+|---|---|
+| Day-1 Negative | periodic-ci-openshift-rosa-master-e2e-rosa-day1-negative-f7 |
+| Day-1 Supplemental | periodic-ci-openshift-rosa-master-e2e-rosa-day1-supplemental-f3 |
+| HCP ARM (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-arm-f7 |
+| HCP Advanced (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-critical-high-f3 |
+| HCP Advanced (Medium/Low) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-medium-low-f7 |
+| HCP Advanced (Prod) (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-prod-critical-high-f3 |
+| HCP Advanced Regional (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-regional-f3 |
+| HCP External Auth (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-external-auth-critical-high-f3 |
+| HCP External Auth (Medium/Low) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-external-auth-medium-low-f7 |
+| HCP Private Link (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-private-link-critical-high-f3 |
+| HCP Shared VPC (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-shared-vpc-critical-high-f3 |
+| HCP Shared VPC (Medium/Low) | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-shared-vpc-medium-low-f7 |
+| HCP Upgrade Y-Stream | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-upgrade-y-stream-f3 |
+| HCP Upgrade Z-Stream | periodic-ci-openshift-rosa-master-e2e-rosa-hcp-upgrade-z-stream-f3 |
+| Non-STS Advanced (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-non-sts-advanced-critical-high-f3 |
+| Non-STS Upgrade Y-Stream | periodic-ci-openshift-rosa-master-e2e-rosa-non-sts-upgrade-y-stream-f7 |
+| OCM Resources | periodic-ci-openshift-rosa-master-e2e-rosa-ocm-resources-f3 |
+| STS Advanced (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-sts-advanced-critical-high-f3 |
+| STS Advanced (Medium/Low) | periodic-ci-openshift-rosa-master-e2e-rosa-sts-advanced-medium-low-f7 |
+| STS Advanced (Prod) (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-sts-advanced-prod-critical-high-f3 |
+| STS Hibernation | periodic-ci-openshift-rosa-master-e2e-rosa-sts-hibernation-f14 |
+| STS Private Link (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-sts-private-link-critical-high-f3 |
+| STS Private Link (Medium/Low) | periodic-ci-openshift-rosa-master-e2e-rosa-sts-private-link-medium-low-f7 |
+| STS Shared VPC (Critical/High) | periodic-ci-openshift-rosa-master-e2e-rosa-sts-shared-vpc-critical-high-f3 |
+| STS Shared VPC Upgrade Y-Stream | periodic-ci-openshift-rosa-master-e2e-rosa-sts-shared-vpc-upgrade-y-stream-f3 |
+| STS Shared-VPC (Medium/Low) | periodic-ci-openshift-rosa-master-e2e-rosa-sts-shared-vpc-medium-low-f7 |
+| STS Upgrade Y-Stream | periodic-ci-openshift-rosa-master-e2e-rosa-sts-upgrade-y-stream-f3 |
+| STS Upgrade Y-Stream (Prod) | periodic-ci-openshift-rosa-master-e2e-rosa-sts-upgrade-y-stream-prod-f3 |
+| STS Upgrade Z-Stream | periodic-ci-openshift-rosa-master-e2e-rosa-sts-upgrade-z-stream-f3 |
+
+### SRE Operator E2E (1 job)
+
+| Name | Prow Job |
+|---|---|
+| RMO Promotion STG | periodic-ci-openshift-route-monitor-operator-master-rosa-sts-e2e-promotion-stage |
+
+### ROSA TF E2E (21 jobs)
+
+| Name | Prow Job |
+|---|---|
+| Day-1 Supplemental | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-day1-supplemental-f3 |
+| HCP Advanced (Critical/High) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-advanced-critical-high-f3 |
+| HCP Advanced (Medium/Low) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-advanced-medium-low-f7 |
+| HCP Arm | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-arm-f7 |
+| HCP Encryption | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-encryption-f7 |
+| HCP Full Resources (Critical/High) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-full-resource-f7 |
+| HCP Network | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-network-f7 |
+| HCP Private (Critical/High) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-private-critical-high-f3 |
+| HCP Private (Medium/Low) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-private-medium-low-f7 |
+| HCP Upgrade Y-Stream | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-upgrade-y-f7 |
+| HCP Upgrade Z-Stream | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-upgrade-z-f7 |
+| STS Advanced (Critical/High) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-critical-high-f3 |
+| STS Advanced (Day-1 Negative) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-day1-negative-f7 |
+| STS Advanced (Medium/Low) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-medium-low-f7 |
+| STS Full Resources (Critical/High) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-classic-full-resource-f7 |
+| STS Private (Critical/High) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-critical-high-f3 |
+| STS Private (Day-1 Negative) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-day1-negative-f7 |
+| STS Private (Medium/Low) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-medium-low-f7 |
+| STS Shared VPC (Critical/High) | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-shared-vpc-critical-high-f3 |
+| STS Upgrade Y-Stream | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-upgrade-y-f7 |
+| STS Upgrade Z-Stream | periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-upgrade-z-f7 |
