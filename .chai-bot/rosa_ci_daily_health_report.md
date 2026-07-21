@@ -4,7 +4,7 @@ You are running a **cron** scheduled task that produces a daily CI health report
 
 ## Goal
 
-Check the pass/fail history (last 10 completed builds per job) for 44 ROSA CI periodic jobs across 8 categories. Report per-category pass rates, 7-day trends, and failure classifications. If all categories are >= 80%, respond with a brief summary and `no_action_required()`.
+Check the pass/fail history (last completed builds over 7 days per job) for all ROSA CI periodic jobs across all categories defined in the job registry. Report per-category pass rates, 7-day trends, and failure classifications. If all categories are >= 80%, respond with a brief summary and `no_action_required()`.
 
 ## Procedure
 
@@ -15,11 +15,11 @@ Fetch the job registry from the single source of truth:
 
 Use `fetch_web_content` to retrieve this YAML file. It defines all jobs organized into categories. Each category has an `id`, `name`, and list of `jobs` with `name` (display name) and `prow_job` (full Prow job name). There is also a top-level `sippy_url` for the dashboard link.
 
-If the fetch fails, fall back to the Job Registry at the bottom of this document.
+If the fetch fails, report the error and skip the health check. Do not use a hardcoded fallback (it goes stale and causes incorrect "no runs" reports).
 
 ### 2. Collect build history
 
-For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prowjobs`, etc.) to find the **last 10 completed builds** (exclude PENDING). Record pass count, fail count, and build timestamps.
+For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prowjobs`, etc.) to find the **last completed builds over 7 days** (exclude PENDING). Record pass count, fail count, and build timestamps.
 
 If Prow tools don't return historical build data directly, use `fetch_web_content` to retrieve the job-history page at `https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{JOB_NAME}`. The HTML contains `var allBuilds = [{ID, Result, Started, Duration}];`.
 
@@ -83,7 +83,7 @@ For each failing job in the category:
 3. For OCM FVT jobs, also check the `cs-telemetry` logs in the Prow artifacts. These contain Clusters Service-side request/response data that can reveal CS errors, timeouts, or API failures that caused the test to fail. Look in the artifacts directory for files matching `cs-telemetry*` or `cs_telemetry*`.
 4. Perform root cause analysis using Sippy, Prow CI tools, or other available tools
 5. Classify the failure based on what you find in the logs
-6. Note how frequently the job has failed recently (e.g., "3 of last 10 runs failed")
+6. Note how frequently the job has failed recently (e.g., "3 of 7 runs failed this week")
 7. Link to the failing Prow job run(s)
 
 For deeper pass rate analysis, query the Sippy API:
@@ -94,11 +94,11 @@ Format each threaded reply like:
 ```
 {emoji} *{Category} -- {rate}% pass rate* {trend}
 
-*{Job Name}* -- {pass}/10 (<job-history link>)
+*{Job Name}* -- {pass}/{total} (<job-history link>)
 {Short summary of failure: key error, failing test/step}
 Failing since {date}. {Root cause analysis.}
 
-*{Job Name}* -- {pass}/10 (<job-history link>)
+*{Job Name}* -- {pass}/{total} (<job-history link>)
 {Short summary and analysis}
 ```
 
@@ -199,90 +199,3 @@ Use `post_thread_update` to post a threaded reply noting the created ticket with
 - Never add sections, headers, or bullet lists below the category lines. The only thing after the last category line is the footer.
 - If more than half the jobs return no data, warn about possible Prow/GCS issues at the top.
 
-## Job Registry (fallback)
-
-> Only used if the live fetch from `https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/ci-status-jobs.yaml` fails. This list may be stale.
-
-### ROSA E2E (9 jobs)
-
-| Name | Prow Job |
-|---|---|
-| HCP 4.19 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-19 |
-| HCP 4.20 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-20 |
-| HCP 4.21 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-21 |
-| HCP 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-candidate-4-22 |
-| HCP 5.0 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-5-0 |
-| STS 4.19 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-19 |
-| STS 4.20 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-20 |
-| STS 4.21 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-21 |
-| STS 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-candidate-4-22 |
-
-### OSD GCP E2E (1 job)
-
-| Name | Prow Job |
-|---|---|
-| OSD GCP 4.22 | periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-candidate-4-22 |
-
-### OCM FVT HCP (11 jobs)
-
-| Name | Prow Job |
-|---|---|
-| HCP AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main |
-| HCP Adobe | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-adobe-staging-main |
-| HCP AMD64 | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-staging-main |
-| HCP ARM | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-arm-staging-main |
-| HCP Autonode | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-autonode-staging-main |
-| HCP E2E | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-hcp-e2e-staging-main |
-| HCP PL | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-pl-staging-main |
-| HCP Shared VPC | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-shared-vpc-staging-main |
-| HCP Y-Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-y-upgrade-staging-main |
-| HCP Zero Egress | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-staging-main |
-| HCP Zero Egress Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-upgrade-staging-main |
-
-### OCM FVT HCP Integration (1 job)
-
-| Name | Prow Job |
-|---|---|
-| HCP Backup Restore | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-restore-integration-main |
-
-### OCM FVT Classic (9 jobs)
-
-| Name | Prow Job |
-|---|---|
-| ROSA AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-ad-staging-main |
-| STS AD (stg) | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main |
-| STS AD (int) | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-integration-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main |
-| STS PL | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-pl-staging-main |
-| STS Shared VPC | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-shared-vpc-staging-main |
-| STS Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-upgrade-staging-main |
-| HCP Upgrade | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-hcp-upgrade-staging-main |
-| OCM Resources | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-ocm-resources-staging-main |
-| OSD RH AWS | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-osd-rh-aws-staging-main |
-
-### OCM FVT GCP (3 jobs)
-
-| Name | Prow Job |
-|---|---|
-| GCP CCS AD | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-ccs-gcp-ad-staging-main |
-| GCP Marketplace | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-ccs-gcp-marketplace-staging-main |
-| GCP Non-Cross-Proj WIF | periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-non-cross-proj-wif-staging-main |
-
-### HCP Conformance (6 jobs)
-
-| Name | Prow Job |
-|---|---|
-| HCP 4.19 | periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-hcp-ovn |
-| HCP 4.20 | periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-hcp-ovn |
-| HCP 4.21 | periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-hcp-ovn |
-| HCP 4.22 | periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-hcp-ovn |
-| HCP 4.23 | periodic-ci-openshift-release-main-nightly-4.23-e2e-rosa-hcp-ovn |
-| HCP 5.0 | periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn |
-
-### Classic STS Conformance (4 jobs)
-
-| Name | Prow Job |
-|---|---|
-| STS 4.19 | periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-sts-ovn |
-| STS 4.20 | periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-sts-ovn |
-| STS 4.21 | periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-sts-ovn |
-| STS 4.22 | periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-sts-ovn |
