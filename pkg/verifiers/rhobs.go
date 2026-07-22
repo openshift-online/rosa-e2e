@@ -50,38 +50,61 @@ func (rc *RHOBSConfig) IsConfigured() bool {
 }
 
 // getOIDCAccessToken fetches an OIDC access token using client credentials flow.
+// Retries on 5xx errors with exponential backoff to handle intermittent SSO endpoint issues.
 func getOIDCAccessToken(ctx context.Context, cfg *RHOBSConfig) (string, error) {
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
 	data.Set("client_id", cfg.OIDCClientID)
 	data.Set("client_secret", cfg.OIDCClientSecret)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", cfg.OIDCIssuerURL, strings.NewReader(data.Encode()))
-	if err != nil {
-		return "", fmt.Errorf("failed to create token request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to get access token: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
+	var lastErr error
+	delays := []time.Duration{5 * time.Second, 10 * time.Second, 20 * time.Second}
+	for attempt := 0; attempt <= len(delays); attempt++ {
+		req, err := http.NewRequestWithContext(ctx, "POST", cfg.OIDCIssuerURL, strings.NewReader(data.Encode()))
+		if err != nil {
+			return "", fmt.Errorf("failed to create token request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to get access token (attempt %d): %w", attempt+1, err)
+			if attempt < len(delays) {
+				time.Sleep(delays[attempt])
+				continue
+			}
+			break
+		}
+
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("OIDC token endpoint returned status %d: %s", resp.StatusCode, string(body))
+		_ = resp.Body.Close()
+
+		if resp.StatusCode >= 500 {
+			lastErr = fmt.Errorf("OIDC token endpoint returned status %d (attempt %d): %s", resp.StatusCode, attempt+1, string(body))
+			if attempt < len(delays) {
+				time.Sleep(delays[attempt])
+				continue
+			}
+			break
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("OIDC token endpoint returned status %d: %s", resp.StatusCode, string(body))
+		}
+
+		var tokenResp struct {
+			AccessToken string `json:"access_token"`
+		}
+		if err := json.Unmarshal(body, &tokenResp); err != nil {
+			return "", fmt.Errorf("failed to decode token response: %w", err)
+		}
+
+		return tokenResp.AccessToken, nil
 	}
 
-	var tokenResp struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return "", fmt.Errorf("failed to decode token response: %w", err)
-	}
-
-	return tokenResp.AccessToken, nil
+	return "", fmt.Errorf("failed to get OIDC access token after %d attempts: %w", len(delays)+1, lastErr)
 }
 
 // queryRHOBSProbes queries the RHOBS API for probes matching a label selector.
