@@ -23,6 +23,8 @@ For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prow
 
 If Prow tools don't return historical build data directly, use `fetch_web_content` to retrieve the job-history page at `https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{JOB_NAME}`. The HTML contains `var allBuilds = [{ID, Result, Started, Duration}];`.
 
+**Important: fetch ALL categories.** There are 13+ categories with ~139 total jobs. Process every category completely. If a fetch fails or times out for a specific job, mark that job as "fetch error" (not "no runs") and continue with the next job. Do not skip entire categories due to fetch issues. A category should only show "no runs" if every job in it genuinely returned zero completed builds in the data, not because the fetch failed.
+
 ### 3. Compute pass rates and trends
 
 **Per-category pass rate**: aggregate pass/fail across all jobs in each category.
@@ -195,7 +197,13 @@ For OCM FVT failures, also check cs-telemetry to determine if the failure is CS-
 - Type: Bug
 - Summary: `[ci-failure] <Job display name>: <brief failure description>`
 - Priority: Major (persistent) or Minor (intermittent)
-- Parent epic: ROSAENG-391
+- Parent epic: choose the most relevant open epic under [ROSA-727](https://redhat.atlassian.net/browse/ROSA-727) or [ROSA-714](https://redhat.atlassian.net/browse/ROSA-714) based on the failure type:
+  - Conformance failures (hcp-conformance, classic-conformance): ROSAENG-307 (Conformance to Prow)
+  - E2E suite reliability (rosa-e2e-stg, rosa-gap-analysis): ROSAENG-391 (E2E Suite Reliability)
+  - Coverage gaps or missing tests: ROSAENG-743 (Coverage Gap Improvement)
+  - OCM FVT or component test failures: ROSAENG-391 as default, or search for a more specific epic matching the component
+  - SRE operator failures: search for an open epic under ROSA-714 matching the operator
+  - If unsure, use ROSAENG-391 as the fallback
 - Labels: from the `labels` field in ci-status-jobs.yaml
 - Description: include the diagnosis from the threaded reply, links to failing Prow runs, and any cs-telemetry findings
 - Security Level: Red Hat Employee (id: 10034)
