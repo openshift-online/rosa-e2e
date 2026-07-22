@@ -58,8 +58,8 @@ Then call `no_action_required()`.
 ```
 *ROSA CI Daily Health -- {DATE} -- {overall_rate}%*
 
-{emoji} *{Category}:* {rate}% ({pass}/{total}) {trend}
-{emoji} *{Category}:* {rate}% ({pass}/{total}) {trend} -- {brief inline note}
+{emoji} *{Category}:* {rate}% ({pass}/{total}) {trend} (<prow_filter|jobs>)
+{emoji} *{Category}:* {rate}% ({pass}/{total}) {trend} -- {brief inline note} (<prow_filter|jobs>)
 ...
 
 _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow>_
@@ -71,6 +71,7 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 - For yellow/red categories, add a **short** inline note after the trend emoji (e.g., `-- AMD64 & E2E at 40%`, `-- stale since Jun 17`, `-- 1 run in 30d`). Keep notes under 40 characters.
 - If any categories had zero Prow run data, mention the count in the footer line (e.g., `2 categories skipped (no runs)`). Omit this part if all categories have data.
 - Combine Sippy and Prow links on the footer line separated by ` · `.
+- Append a small `(<prow_filter_url|jobs>)` link at the end of each category line using the `prow_filter` URL from ci-status-jobs.yaml. This lets readers click through to the Prow job-history for that category.
 - Do NOT repeat category details in a separate section below the list.
 
 ### 5. Failure analysis (threaded replies)
