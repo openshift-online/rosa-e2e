@@ -320,7 +320,7 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CLI/Terraform
-      slack_channel: team-rosa-cli-terraform
+      slack_channel: ocm-qe-prow-ci-jobs
       slack_alias: rosa-cli-tf-team
     labels: [ci-failure, rosa-cli]
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift%2Frosa&type=periodic"
@@ -434,7 +434,7 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CLI/Terraform
-      slack_channel: team-rosa-cli-terraform
+      slack_channel: ocm-qe-prow-ci-jobs
       slack_alias: rosa-cli-tf-team
     labels: [ci-failure, terraform-provider-rhcs]
     prow_filter: "https://prow.ci.openshift.org/?repo=terraform-redhat%2Fterraform-provider-rhcs&type=periodic"
