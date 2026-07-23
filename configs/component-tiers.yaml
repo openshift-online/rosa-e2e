@@ -30,6 +30,9 @@ tiers:
 
   - name: Observability
     components:
+      - rhobs-hcp-rules
+      - rhobs-mc-rules
+      - rhobs-sc-rules
       - rhobs-synthetics-agent
       - rhobs-synthetics-api
       - osd-rhobs-rules-and-dashboards
