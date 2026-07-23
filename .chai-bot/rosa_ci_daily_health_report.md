@@ -82,7 +82,7 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 
 ### 5. Failure analysis (threaded replies)
 
-After the top-level summary, include **separate threaded replies** for each category below 80% using the delimiter-based threading system. Put `---THREAD_DETAILS---` after your main summary, then each threaded reply separated by `---THREAD_BREAK---`. One reply per failing category.
+After the top-level summary, include **separate threaded replies** for the selected failing categories (see scope cap below) using the delimiter-based threading system. Put `---THREAD_DETAILS---` after your main summary, then each threaded reply separated by `---THREAD_BREAK---`. One reply per analyzed category.
 
 **Response delivery:** Compose your entire output — summary + all threaded replies — as a single `set_response_element` call. The `---THREAD_DETAILS---` delimiter separates the top-level message from threaded content. Do NOT use separate `set_response_element` calls for the summary and threads — the threading system splits on delimiters within a single element.
 
@@ -99,7 +99,7 @@ Example structure:
 {second category failure analysis}
 ```
 
-For each failing job in the category:
+For each selected failing job in the category (up to the scope cap):
 1. Fetch the build log from the most recent failure using Prow CI tools or `fetch_web_content` on the artifacts URL
 2. Identify the specific failure: key error messages, failing test names, failing step
 3. For OCM FVT jobs, also check the `cs-telemetry` logs in the Prow artifacts. These contain Clusters Service-side request/response data that can reveal CS errors, timeouts, or API failures that caused the test to fail. Look in the artifacts directory for files matching `cs-telemetry*` or `cs_telemetry*`.
