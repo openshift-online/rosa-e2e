@@ -197,12 +197,14 @@ For OCM FVT failures, also check cs-telemetry to determine if the failure is CS-
 - Type: Bug
 - Summary: `[ci-failure] <Job display name>: <brief failure description>`
 - Priority: Major (persistent) or Minor (intermittent)
-- Parent epic: choose the most relevant open epic under [ROSA-727](https://redhat.atlassian.net/browse/ROSA-727) or [ROSA-714](https://redhat.atlassian.net/browse/ROSA-714) based on the failure type:
-  - Conformance failures (hcp-conformance, classic-conformance): ROSAENG-307 (Conformance to Prow)
-  - E2E suite reliability (rosa-e2e-stg, rosa-gap-analysis): ROSAENG-391 (E2E Suite Reliability)
-  - Coverage gaps or missing tests: ROSAENG-743 (Coverage Gap Improvement)
-  - OCM FVT or component test failures: ROSAENG-391 as default, or search for a more specific epic matching the component
-  - SRE operator failures: search for an open epic under ROSA-714 matching the operator
+- Parent epic: choose the most relevant open epic under these ROSA initiatives based on the failure type:
+  - [ROSA-727](https://redhat.atlassian.net/browse/ROSA-727) (Canonical E2E Test Suite and Signals):
+    - Search child epics of ROSA-727 for the best match based on the failure type, category, and component
+  - [ROSA-714](https://redhat.atlassian.net/browse/ROSA-714) (SRE Operator Production Compliance):
+    - SRE operator failures: search for an open epic matching the operator
+  - [ROSA-798](https://redhat.atlassian.net/browse/ROSA-798) (OCM UI, ROSA CLI, and Terraform CI):
+    - ROSA CLI E2E failures (rosa-cli-jobs): search for an open epic under ROSA-798
+    - Terraform provider failures (terraform-provider-rhcs-jobs): search for an open epic under ROSA-798
   - If unsure, use ROSAENG-391 as the fallback
 - Labels: from the `labels` field in ci-status-jobs.yaml
 - Description: include the diagnosis from the threaded reply, links to failing Prow runs, and any cs-telemetry findings
