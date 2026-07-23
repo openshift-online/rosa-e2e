@@ -329,26 +329,18 @@ categories:
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-day1-negative-f7
       - name: Day-1 Supplemental
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-day1-supplemental-f3
-      - name: HCP ARM (Critical/High)
+      - name: HCP ARM
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-arm-f7
-      - name: HCP Advanced (Critical/High)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-critical-high-f3
-      - name: HCP Advanced (Medium/Low)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-medium-low-f7
-      - name: HCP Advanced (Prod) (Critical/High)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-prod-critical-high-f3
-      - name: HCP Advanced Regional (Critical/High)
+      - name: HCP Advanced
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-f3
+      - name: HCP Advanced Regional
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-regional-f3
-      - name: HCP External Auth (Critical/High)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-external-auth-critical-high-f3
-      - name: HCP External Auth (Medium/Low)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-external-auth-medium-low-f7
-      - name: HCP Private Link (Critical/High)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-private-link-critical-high-f3
-      - name: HCP Shared VPC (Critical/High)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-shared-vpc-critical-high-f3
-      - name: HCP Shared VPC (Medium/Low)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-shared-vpc-medium-low-f7
+      - name: HCP External Auth
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-external-auth-f3
+      - name: HCP Private Link
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-private-link-f3
+      - name: HCP Shared VPC
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-shared-vpc-f3
       - name: HCP Upgrade Y-Stream
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-upgrade-y-stream-f3
       - name: HCP Upgrade Z-Stream
@@ -359,28 +351,18 @@ categories:
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-non-sts-upgrade-y-stream-f7
       - name: OCM Resources
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-ocm-resources-f3
-      - name: STS Advanced (Critical/High)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-advanced-critical-high-f3
-      - name: STS Advanced (Medium/Low)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-advanced-medium-low-f7
-      - name: STS Advanced (Prod) (Critical/High)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-advanced-prod-critical-high-f3
+      - name: STS Advanced
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-advanced-f3
       - name: STS Hibernation
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-hibernation-f14
-      - name: STS Private Link (Critical/High)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-private-link-critical-high-f3
-      - name: STS Private Link (Medium/Low)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-private-link-medium-low-f7
-      - name: STS Shared VPC (Critical/High)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-shared-vpc-critical-high-f3
+      - name: STS Private Link
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-private-link-f3
+      - name: STS Shared VPC
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-shared-vpc-f3
       - name: STS Shared VPC Upgrade Y-Stream
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-shared-vpc-upgrade-y-stream-f3
-      - name: STS Shared-VPC (Medium/Low)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-shared-vpc-medium-low-f7
       - name: STS Upgrade Y-Stream
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-upgrade-y-stream-f3
-      - name: STS Upgrade Y-Stream (Prod)
-        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-upgrade-y-stream-prod-f3
       - name: STS Upgrade Z-Stream
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-upgrade-z-stream-f3
 
@@ -441,42 +423,34 @@ categories:
     jobs:
       - name: Day-1 Supplemental
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-day1-supplemental-f3
-      - name: HCP Advanced (Critical/High)
-        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-advanced-critical-high-f3
-      - name: HCP Advanced (Medium/Low)
-        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-advanced-medium-low-f7
+      - name: HCP Advanced
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-advanced-f3
       - name: HCP Arm
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-arm-f7
       - name: HCP Encryption
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-encryption-f7
-      - name: HCP Full Resources (Critical/High)
+      - name: HCP Full Resources
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-full-resource-f7
       - name: HCP Network
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-network-f7
-      - name: HCP Private (Critical/High)
-        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-private-critical-high-f3
-      - name: HCP Private (Medium/Low)
-        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-private-medium-low-f7
+      - name: HCP Private
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-private-f3
       - name: HCP Upgrade Y-Stream
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-upgrade-y-f7
       - name: HCP Upgrade Z-Stream
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-upgrade-z-f7
-      - name: STS Advanced (Critical/High)
-        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-critical-high-f3
+      - name: STS Advanced
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-f3
       - name: STS Advanced (Day-1 Negative)
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-day1-negative-f7
-      - name: STS Advanced (Medium/Low)
-        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-medium-low-f7
-      - name: STS Full Resources (Critical/High)
+      - name: STS Classic Full Resources
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-classic-full-resource-f7
-      - name: STS Private (Critical/High)
-        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-critical-high-f3
+      - name: STS Private
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-f3
       - name: STS Private (Day-1 Negative)
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-day1-negative-f7
-      - name: STS Private (Medium/Low)
-        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-medium-low-f7
-      - name: STS Shared VPC (Critical/High)
-        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-shared-vpc-critical-high-f3
+      - name: STS Shared VPC
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-shared-vpc-f3
       - name: STS Upgrade Y-Stream
         prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-upgrade-y-f7
       - name: STS Upgrade Z-Stream
