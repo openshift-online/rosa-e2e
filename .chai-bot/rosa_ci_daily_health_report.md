@@ -17,6 +17,8 @@ Use `fetch_web_content` to retrieve this YAML file. It defines all jobs organize
 
 If the fetch fails, report the error and skip the health check. Do not use a hardcoded fallback (it goes stale and causes incorrect "no runs" reports).
 
+**Procedure adherence:** Follow steps 1→2→3→4→5→6→7 sequentially. Do not use broad CI analysis tools as a shortcut for steps 1-3. The job registry is the authoritative source for which jobs to check and how to categorize them.
+
 ### 2. Collect build history
 
 For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prowjobs`, etc.) to find the **last completed builds over 7 days** (exclude PENDING). Record pass count, fail count, and build timestamps.
@@ -76,9 +78,13 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 - Append a small `(<prow_filter_url|jobs>)` link at the end of each category line using the `prow_filter` URL from ci-status-jobs.yaml. This lets readers click through to the Prow job-history for that category.
 - Do NOT repeat category details in a separate section below the list.
 
+**Threading gate:** Before proceeding, check: does your summary contain any :red_circle: or :large_yellow_circle: categories? If yes, step 5 is **mandatory** — do not call `send_response()` until threaded replies are composed. If all categories are :large_green_circle:, skip to `no_action_required()`.
+
 ### 5. Failure analysis (threaded replies)
 
 After the top-level summary, include **separate threaded replies** for each category below 80% using the delimiter-based threading system. Put `---THREAD_DETAILS---` after your main summary, then each threaded reply separated by `---THREAD_BREAK---`. One reply per failing category.
+
+**Response delivery:** Compose your entire output — summary + all threaded replies — as a single `set_response_element` call. The `---THREAD_DETAILS---` delimiter separates the top-level message from threaded content. Do NOT use separate `set_response_element` calls for the summary and threads — the threading system splits on delimiters within a single element.
 
 Example structure:
 ```
@@ -117,6 +123,8 @@ Failing since {date}. {Root cause analysis.}
 *{Job Name}* -- {pass}/{total} (<job-history link>)
 {Short summary and analysis}
 ```
+
+**Scope cap:** Analyze the 5 worst categories first (lowest pass rate). For each, analyze at most 5 failing jobs (worst pass rate first). This keeps the report actionable without requiring excessive tool calls. If more categories are failing, note the count in the last threaded reply (e.g., "2 additional categories below 80% — see Prow dashboard for details").
 
 ### Reference: common failure patterns
 
@@ -222,4 +230,5 @@ Add a `---THREAD_BREAK---` section to post a threaded reply noting the created t
 - Keep the top-level summary under 1200 characters. The message should be a scannable scoreboard, not a report. All detailed analysis goes in threaded replies.
 - Never add sections, headers, or bullet lists below the category lines. The only thing after the last category line is the footer.
 - If more than half the jobs return no data, warn about possible Prow/GCS issues at the top.
+- Before sending: if any category is below 80%, verify your response content contains `---THREAD_DETAILS---` followed by at least one threaded reply section. If these delimiters are missing, your threaded replies will not be posted — go back to step 5.
 
