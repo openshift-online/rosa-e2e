@@ -111,9 +111,12 @@ components:
   - key: rhobs-hcp-rules
     saas_name: rhobs-hcp-rules
     strategy: ocm
+    e2e_saas: rhobs-post-deploy-check-rules
   - key: rhobs-mc-rules
     saas_name: rhobs-mc-rules
     strategy: ocm
+    e2e_saas: rhobs-post-deploy-check-rules
   - key: rhobs-sc-rules
     saas_name: rhobs-sc-rules
     strategy: ocm
+    e2e_saas: rhobs-post-deploy-check-rules
