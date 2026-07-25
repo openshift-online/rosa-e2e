@@ -8,10 +8,11 @@
 # Long-term, tier definitions should move to the org repo.
 
 tiers:
-  - name: Core Platform
+  - name: OCM Services
     components:
       - clusters-service
       - account-manager
+      - ocm-service-log
       - hypershift
       - osd-fleet-manager
 
