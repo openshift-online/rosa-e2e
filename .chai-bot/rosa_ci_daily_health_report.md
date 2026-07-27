@@ -55,7 +55,7 @@ Post a concise summary as your channel response. This is the top-level message t
 
 **If all categories >= 80%**: respond with a single line like:
 `:large_green_circle: *ROSA CI Daily Health -- {DATE}:* all {N} categories passing (overall {rate}%)`
-Then call `send_response()` to deliver the summary, proceed to step 6 (write handoff artifact), then call `no_action_required()`.
+Proceed to step 6 (write handoff artifact), then step 7 (deliver response and schedule thread_ts update).
 
 **If any category < 80%**: use this format:
 
@@ -139,13 +139,13 @@ These are patterns that come up often. Use them as hints, not a rigid checklist.
 
 ### 6. Write handoff artifact
 
-After calling `send_response()` (whether or not step 5 ran), write a YAML handoff artifact for the remediation task. This step runs even if all categories are green (the remediation task uses the artifact for PR shepherding of previously opened PRs).
+**Before** calling `send_response()`, write a YAML handoff artifact for the remediation task. This step runs even if all categories are green (the remediation task uses the artifact for PR shepherding of previously opened PRs).
 
 **Artifact location:** Push to the bot's fork of `openshift-online/rosa-e2e` at path `.chai-bot/reports/daily_health_latest.yaml`.
 
 **Steps:**
 1. Call `priv_scm_ensure_fork("github.com", "openshift-online/rosa-e2e")` to ensure the bot's fork exists and get the fork repo path.
-2. Call `get_current_thread_url()` to capture the thread reference (channel_id, thread_ts) of the posted health report.
+2. Set `thread_reference.thread_ts` to `"pending"` — the actual thread_ts is not available until after `send_response()` creates the top-level message. It will be updated in step 7.
 3. Compose the YAML artifact (schema below).
 4. Use a workspace to clone the fork, write the file, commit, and push to the fork's default branch.
 5. Verify the push succeeded. If cloning, committing, or pushing fails, post a warning in the thread: ":warning: Handoff artifact write failed — remediation task will not run today." Do NOT call `no_action_required()` without a successful push — the artifact is required for the remediation task.
@@ -192,7 +192,7 @@ categories:
 ```
 
 **Field notes:**
-- `thread_reference`: actual channel_id and thread_ts from the posted summary. The remediation task uses this to post threaded replies to the same thread.
+- `thread_reference`: channel_id is always `C0ADGRNAT8U`. thread_ts is initially `pending` and updated ~2 minutes after the health report posts via a scheduled follow-up. The remediation task uses this to post threaded replies to the same thread.
 - Include **ALL** categories and **ALL** jobs, not just failing ones. The remediation task needs the full picture.
 - `consecutive_failures`: count of consecutive recent failed builds (0 if the latest passed).
 - `failure_classification`: short label from your analysis (e.g., "conformance skip list", "STS account-roles crash", "Boskos lease timeout"). Empty string if the job is passing.
@@ -202,11 +202,22 @@ categories:
 - `team` and `labels`: from the job registry (`ci-status-jobs.yaml`). Include them verbatim. If a job overrides the category-level team/labels, use the job-level values.
 - If a job had a fetch error in step 2, set `pass_count` and `fail_count` to -1 and `failure_classification` to "fetch_error".
 
+### 7. Deliver response and update thread reference
+
+1. Call `send_response()` to deliver the summary (and threaded replies if applicable). **This ends your current turn.**
+2. Before calling `send_response()`, also call `schedule_followup` with a 2-minute delay and this description:
+
+   > Update the handoff artifact thread_ts. Call `get_current_thread_url()` to get the real thread_ts. Then use a workspace to clone the fork at `<fork_repo>`, update `.chai-bot/reports/daily_health_latest.yaml` — replace `thread_ts: 'pending'` with the actual thread_ts value. Commit and push. If the artifact doesn't exist or thread_ts is already set, call `no_action_required()`.
+
+   Replace `<fork_repo>` in the description with the actual fork repo path from step 6.1.
+
+3. Call `send_response()` last (this ends the turn). The scheduled follow-up will fire ~2 minutes later and update the artifact with the real thread_ts.
+
 ## Constraints
 
 - Keep the top-level summary under 1200 characters. The message should be a scannable scoreboard, not a report. All detailed analysis goes in threaded replies.
 - Never add sections, headers, or bullet lists below the category lines. The only thing after the last category line is the footer.
 - If more than half the jobs return no data, warn about possible Prow/GCS issues at the top.
 - Before sending: if any category is below 80%, verify your response content contains `---THREAD_DETAILS---` followed by at least one threaded reply section. If these delimiters are missing, your threaded replies will not be posted — go back to step 5.
-- Always write the handoff artifact (step 6) after posting, even if all categories are green.
+- Always write the handoff artifact (step 6) before posting, even if all categories are green. Step 7 delivers the response and schedules the thread_ts update.
 
