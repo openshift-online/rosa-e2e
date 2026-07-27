@@ -12,14 +12,14 @@ Read the handoff artifact from the daily health report. For fixable failures, op
 
 Read the YAML handoff artifact from the bot's fork of `openshift-online/rosa-e2e`:
 
-1. Call `priv_scm_ensure_fork("github.com", "openshift-online/rosa-e2e")` to get the fork repo path.
-2. Read the artifact at path `.chai-bot/reports/daily_health_latest.yaml` from the fork.
+1. **Resolve the fork path first** — call `priv_scm_ensure_fork("github.com", "openshift-online/rosa-e2e")`. Extract the `fork_repo` value from the response (e.g. `redhat-chai-bot/openshift-online_rosa-e2e`). The fork path is NOT predictable — you must resolve it dynamically every run.
+2. Read the artifact using `github_file_content(repo=<fork_repo>, path=".chai-bot/reports/daily_health_latest.yaml")`. Do NOT guess or hardcode the fork path.
 3. Parse the YAML to extract:
    - `thread_reference` (channel_id, thread_ts) — for posting threaded replies
    - `report_date` — verify it's today's date. If stale (not today), log a warning and call `no_action_required()`.
    - `categories` with per-job failure data, team metadata, and labels
 
-If the artifact is missing or unreadable, report the error and call `no_action_required()`.
+If the artifact is missing or unreadable, report the error **including the fork path you checked** so the failure is diagnosable, and call `no_action_required()`.
 
 **Schema validation:** After parsing, validate the artifact has all required fields before taking any action. Required: `thread_reference` (with `channel_id` and `thread_ts`), `report_date`, `categories` (non-empty list). For each job entry, require: `prow_job`, `pass_count`, `fail_count`, `consecutive_failures` (must be numeric). If the artifact is malformed, partially populated, or missing required fields, treat it the same as missing — report the error and call `no_action_required()`.
 
