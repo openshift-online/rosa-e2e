@@ -42,11 +42,11 @@ components:
   - key: ocm-agent-operator
     saas_name: saas-ocm-agent-operator
     strategy: hive
-    e2e_saas: saas-ocm-agent-operator-e2e
+    e2e_saas: saas-oao-prow-e2e
   - key: managed-upgrade-operator
     saas_name: saas-muo
     strategy: hive
-    e2e_saas: saas-muo-e2e-test
+    e2e_saas: saas-muo-prow-e2e
   - key: rbac-permissions-operator
     saas_name: saas-rbac-p-operator
     strategy: hive
@@ -74,7 +74,7 @@ components:
   - key: aws-vpce-operator
     saas_name: saas-avo-pko
     strategy: hive
-    e2e_saas: saas-avo-e2e-test
+    e2e_saas: saas-avo-prow-e2e
   - key: certman-operator
     saas_name: saas-certman-operator
     strategy: hive
