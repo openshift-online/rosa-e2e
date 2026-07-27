@@ -53,8 +53,14 @@ If a conformance test (HCP or Classic STS) is failing persistently (3+ consecuti
 
 **Constraints:**
 - Maximum **5** auto-fix PRs per scheduled run
-- Allowed repos for fixes: `openshift/release` (step registry, workflow YAMLs), `openshift-online/rosa-e2e` (test code), `service/ocm-backend-tests` (FVT test code on GitLab), `openshift/origin` (conformance test fixes)
-- Never modify production configs or operator code
+- Allowed repos for fixes:
+  - `openshift/release` (step registry, workflow YAMLs)
+  - `openshift-online/rosa-e2e` (test code)
+  - `service/ocm-backend-tests` (FVT test code on GitLab)
+  - `openshift/origin` (conformance test fixes)
+  - `openshift/rosa` (ROSA CLI)
+  - Any SRE operator repo referenced in the `components` field of `ci-status-jobs.yaml` (e.g., `openshift/route-monitor-operator`, `openshift/configure-alertmanager-operator`, `openshift/pagerduty-operator`, `openshift/deadmanssnitch-operator`, `openshift/certman-operator`, `openshift/managed-upgrade-operator`, `openshift/must-gather-operator`, `openshift/managed-velero-operator`, `openshift/dedicated-admin-operator`, `openshift/rbac-permissions-operator`, `openshift/cloud-ingress-operator`, `openshift/aws-account-operator`)
+- Never modify production configs (app-interface, managed-cluster-config)
 - PRs require human `/lgtm` and `/approve` before merge (no auto-merge)
 
 ### 4. PR shepherding
@@ -162,6 +168,6 @@ If no actions were taken (all categories green, no open PRs to shepherd, no pers
 
 - All output is posted as threaded replies to the health report thread — never as top-level channel messages.
 - Maximum 5 auto-fix PRs and 4 Jira tickets per run.
-- Never modify production configs or operator code.
+- Never modify production configs (`app-interface`, `managed-cluster-config`).
 - PRs require human `/lgtm` and `/approve` before merge.
 - If the handoff artifact is missing or stale (not today), call `no_action_required()`.
