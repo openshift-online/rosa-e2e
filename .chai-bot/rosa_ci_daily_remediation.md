@@ -21,13 +21,13 @@ Read the YAML handoff artifact from the bot's fork of `openshift-online/rosa-e2e
 
 If the artifact is missing or unreadable, report the error **including the fork path you checked** so the failure is diagnosable, and call `no_action_required()`.
 
-**Schema validation:** After parsing, validate the artifact has all required fields before taking any action. Required: `thread_reference` (with `channel_id` and `thread_ts`), `report_date`, `categories` (non-empty list). For each job entry, require: `prow_job`, `pass_count`, `fail_count`, `consecutive_failures` (must be numeric). Additionally, validate that `thread_ts` is a valid Slack timestamp — it must match the numeric format `NNNNNNNNNN.NNNNNN` (e.g. `1785250120.462169`), not placeholder values like `pending`. A `thread_ts` that is missing, empty, set to `pending`, or otherwise non-numeric is treated as **invalid** (but does NOT fail the entire run — see step 2 for the fallback). If other required fields are malformed, partially populated, or missing, treat the artifact the same as missing — report the error and call `no_action_required()`.
+**Schema validation:** After parsing, validate the artifact has all required fields before taking any action. Required: `thread_reference` (with `channel_id` and `thread_ts`), `report_date`, `categories` (non-empty list). For each job entry, require: `prow_job`, `pass_count`, `fail_count`, `consecutive_failures` (must be numeric). Additionally, validate that `thread_ts` is a valid Slack timestamp — it must match the numeric format `NNNNNNNNNN.NNNNNN` (e.g. `1785250120.462169`), not placeholder values like `pending`. A `thread_ts` that is missing, empty, set to `pending`, or otherwise non-numeric is treated as **invalid** (but does NOT fail the entire run — see step 2 for the fallback). Also validate that `channel_id` is present and equals `C0ADGRNAT8U`. A missing or unexpected `channel_id` is treated the same as an invalid `thread_ts` — use the fallback path in step 2 rather than failing the run. If other required fields are malformed, partially populated, or missing, treat the artifact the same as missing — report the error and call `no_action_required()`.
 
 ### 2. Connect to health report thread
 
-All output from this task must be posted as threaded replies to the original health report message — **but only if `thread_ts` is valid**.
+All output from this task must be posted as threaded replies to the original health report message — **but only if both `thread_ts` and `channel_id` are valid**.
 
-**If `thread_ts` is valid** (numeric Slack timestamp format), use the `thread_reference` from the artifact:
+**If `thread_ts` is valid** (numeric Slack timestamp format) **and `channel_id` is `C0ADGRNAT8U`**, use the `thread_reference` from the artifact:
 
 ```
 ---REPLY_TO_THREAD:{channel_id}:{thread_ts}---
@@ -35,12 +35,12 @@ All output from this task must be posted as threaded replies to the original hea
 
 Place this directive at the very start of your response content (before any text), then compose all threaded replies using `---THREAD_BREAK---` separators.
 
-**If `thread_ts` is invalid** (`pending`, empty, missing, or not matching the numeric `NNNNNNNNNN.NNNNNN` format), do NOT emit the `---REPLY_TO_THREAD:...---` directive — it will silently fail and all output will be lost. Instead:
+**If `thread_ts` is invalid** (`pending`, empty, missing, or not matching the numeric `NNNNNNNNNN.NNNNNN` format) **or `channel_id` is missing/unexpected**, do NOT emit the `---REPLY_TO_THREAD:...---` directive — it will silently fail and all output will be lost. Instead:
 
 1. Skip the `---REPLY_TO_THREAD:...---` directive entirely.
 2. Post the remediation summary as a **new top-level message** in channel `C0ADGRNAT8U` (the ROSA CI channel).
 3. Prefix the message with a warning so it is clear why the output is not threaded:
-   `:warning: *Remediation output (unthreaded)* — the health report's `thread_ts` was invalid (`{actual_thread_ts_value}`), so this remediation summary could not be posted as a threaded reply. Investigate why the health report failed to update its thread_ts.`
+   `:warning: *Remediation output (unthreaded)* — the health report's thread reference was invalid (`thread_ts={actual_thread_ts_value}`, `channel_id={actual_channel_id_value}`), so this remediation summary could not be posted as a threaded reply. Investigate why the health report failed to update its thread_ts or produced an unexpected channel_id.`
 4. Continue with all remaining remediation steps (auto-fix PRs, shepherding, Jira tickets) normally — the only difference is that output appears as a top-level message instead of a threaded reply.
 
 ### 3. Auto-fix PRs (for pattern-matched failures)
@@ -176,7 +176,7 @@ If no actions were taken (all categories green, no open PRs to shepherd, no pers
 
 ## Constraints
 
-- All output is posted as threaded replies to the health report thread when `thread_ts` is valid. When `thread_ts` is invalid (e.g. `pending`), output falls back to a top-level message in `C0ADGRNAT8U` with a warning — never silently discard output.
+- All output is posted as threaded replies to the health report thread when both `thread_ts` and `channel_id` are valid. When either is invalid (e.g. `thread_ts` is `pending`, or `channel_id` is missing or not `C0ADGRNAT8U`), output falls back to a top-level message in `C0ADGRNAT8U` with a warning — never silently discard output.
 - Maximum 5 auto-fix PRs and 4 Jira tickets per run.
 - Never modify production configs (`app-interface`, `managed-cluster-config`).
 - PRs require human `/lgtm` and `/approve` before merge.

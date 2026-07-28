@@ -78,7 +78,7 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 - Append a small `(<prow_filter_url|jobs>)` link at the end of each category line using the `prow_filter` URL from ci-status-jobs.yaml. This lets readers click through to the Prow job-history for that category.
 - Do NOT repeat category details in a separate section below the list.
 
-**Threading gate:** Before proceeding, check: does your summary contain any :red_circle: or :large_yellow_circle: categories? If yes, step 5 is **mandatory** — do not call `send_response()` until threaded replies are composed. If all categories are :large_green_circle:, call `send_response()` then skip to step 6.
+**Threading gate:** Before proceeding, check: does your summary contain any :red_circle: or :large_yellow_circle: categories? If yes, step 5 is **mandatory** — do not call `send_response()` until threaded replies are composed. If all categories are :large_green_circle:, skip step 5 and proceed directly to step 6.
 
 ### 5. Failure analysis (threaded replies)
 
@@ -148,7 +148,7 @@ These are patterns that come up often. Use them as hints, not a rigid checklist.
 2. Set `thread_reference.thread_ts` to `"pending"` — the actual thread_ts is not available until after `send_response()` creates the top-level message. It will be updated in step 7.
 3. Compose the YAML artifact (schema below).
 4. Use a workspace to clone the fork, write the file, commit, and push to the fork's default branch.
-5. Verify the push succeeded. If cloning, committing, or pushing fails, post a warning in the thread: ":warning: Handoff artifact write failed — remediation task will not run today." Do NOT call `no_action_required()` without a successful push — the artifact is required for the remediation task.
+5. Verify the push succeeded. If cloning, committing, or pushing fails, include a warning in the top-level response delivered by step 7: ":warning: Handoff artifact write failed — remediation task will not run today." Do NOT call `no_action_required()` without a successful push — the artifact is required for the remediation task.
 
 **YAML schema:**
 
@@ -204,14 +204,13 @@ categories:
 
 ### 7. Deliver response and update thread reference
 
-1. Call `send_response()` to deliver the summary (and threaded replies if applicable). **This ends your current turn.**
-2. Before calling `send_response()`, also call `schedule_followup` with a 2-minute delay and this description:
+1. Call `schedule_followup` with a 2-minute delay and this description:
 
    > Update the handoff artifact thread_ts. Call `get_current_thread_url()` to get the real thread_ts. Then use a workspace to clone the fork at `<fork_repo>`, update `.chai-bot/reports/daily_health_latest.yaml` — replace `thread_ts: 'pending'` with the actual thread_ts value. Commit and push. If the artifact doesn't exist or thread_ts is already set, call `no_action_required()`.
 
    Replace `<fork_repo>` in the description with the actual fork repo path from step 6.1.
 
-3. Call `send_response()` last (this ends the turn). The scheduled follow-up will fire ~2 minutes later and update the artifact with the real thread_ts.
+2. Call `send_response()` to deliver the summary (and threaded replies if applicable). **This must be the last operation — it ends your current turn.** The scheduled follow-up will fire ~2 minutes later and update the artifact with the real thread_ts.
 
 ## Constraints
 
