@@ -66,7 +66,7 @@ Proceed to step 6 (write handoff artifact), then step 7 (deliver response and sc
 {emoji} *{Category}:* {rate}% ({pass}/{total}) {trend} -- {brief inline note} (<prow_filter|jobs>)
 ...
 
-_{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow>_
+_{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow> · <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|Dashboard>_
 ```
 
 **Rules:**
@@ -74,7 +74,7 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 - List categories with data, sorted by pass rate descending.
 - For yellow/red categories, add a **short** inline note after the trend emoji (e.g., `-- AMD64 & E2E at 40%`, `-- stale since Jun 17`, `-- 1 run in 30d`). Keep notes under 40 characters.
 - If any categories had zero Prow run data, mention the count in the footer line (e.g., `2 categories skipped (no runs)`). Omit this part if all categories have data.
-- Combine Sippy and Prow links on the footer line separated by ` · `.
+- Combine Sippy, Prow, and Dashboard links on the footer line separated by ` · `.
 - Append a small `(<prow_filter_url|jobs>)` link at the end of each category line using the `prow_filter` URL from ci-status-jobs.yaml. This lets readers click through to the Prow job-history for that category.
 - Do NOT repeat category details in a separate section below the list.
 
