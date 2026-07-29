@@ -267,6 +267,21 @@ categories:
       - name: GCP WIF SV
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main
 
+  - id: ocm-fvt-osdfm-stg
+    scope: component
+    components: [osd-fleet-manager]
+    name: OCM FVT OSDFM STG
+    team:
+      id: "bd8a0aae-863d-4ea3-a697-028b5043fc08"
+      name: ROSA Fleet Manager
+      slack_channel: team-rosa-fleet-manager
+      slack_alias: team-rosa-fleet-manager
+    labels: [ci-failure, ocm-fvt, osd-fleet-manager]
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm-staging*"
+    jobs:
+      - name: OSDFM Basic Periodic
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-staging-ocm-fvt-periodic-osdfm-basic-periodic-stage
+
   - id: hcp-conformance
     scope: upstream
     name: HCP Conformance
