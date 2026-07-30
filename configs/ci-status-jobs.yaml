@@ -21,6 +21,7 @@ sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
 # the Prow query URL shown when clicking the CI badge.
 component_prow_filters:
   clusters-service: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*staging*"
+  osd-fleet-manager: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm*"
   route-monitor-operator: "https://prow.ci.openshift.org/?type=periodic&job=*route-monitor-operator*e2e*promotion*"
   configure-alertmanager-operator: "https://prow.ci.openshift.org/?type=periodic&job=*configure-alertmanager-operator*e2e*promotion*"
   aws-vpce-operator: "https://prow.ci.openshift.org/?type=periodic&job=*aws-vpce-operator*e2e*promotion*"
@@ -272,6 +273,25 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-root-disk-staging-main
       - name: GCP WIF SV
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main
+
+  - id: ocm-fvt-osdfm-int
+    scope: component
+    components: [osd-fleet-manager]
+    name: OCM FVT OSDFM INT
+    team:
+      id: "bd8a0aae-863d-4ea3-a697-028b5043fc08"
+      name: ROSA Fleet Manager
+      slack_channel: team-rosa-fleet-manager
+      slack_alias: team-rosa-fleet-manager
+    labels: [ci-failure, ocm-fvt, osd-fleet-manager]
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm-integration*"
+    jobs:
+      - name: OSDFM Basic Periodic
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-integration-ocm-fvt-periodic-osdfm-basic-periodic-integration
+      - name: OSDFM MC Autoscaling
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-integration-ocm-fvt-periodic-osdfm-mc-autoscaling-integration
+      - name: OSDFM SC Autoscaling
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-integration-ocm-fvt-periodic-osdfm-sc-autoscaling-integration
 
   - id: ocm-fvt-osdfm-stg
     scope: component
