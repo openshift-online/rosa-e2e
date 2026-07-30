@@ -21,6 +21,12 @@ sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
 # the Prow query URL shown when clicking the CI badge.
 component_prow_filters:
   clusters-service: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*staging*"
+  route-monitor-operator: "https://prow.ci.openshift.org/?type=periodic&job=*route-monitor-operator*e2e*promotion*"
+  configure-alertmanager-operator: "https://prow.ci.openshift.org/?type=periodic&job=*configure-alertmanager-operator*e2e*promotion*"
+  aws-vpce-operator: "https://prow.ci.openshift.org/?type=periodic&job=*aws-vpce-operator*e2e*promotion*"
+  managed-upgrade-operator: "https://prow.ci.openshift.org/?type=periodic&job=*managed-upgrade-operator*e2e*promotion*"
+  ocm-agent-operator: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-agent-operator*e2e*promotion*"
+  splunk-forwarder-operator: "https://prow.ci.openshift.org/?type=periodic&job=*splunk-forwarder-operator*e2e*promotion*"
 
 categories:
   - id: rosa-e2e-stg
