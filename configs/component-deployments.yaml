@@ -20,7 +20,7 @@ components:
   - key: osd-fleet-manager
     saas_name: osd-fleet-manager
     strategy: ocm
-  - key: ocm-service-log
+  - key: service-log
     saas_name: saas-ocm-service-log
     strategy: ocm
   - key: hive
