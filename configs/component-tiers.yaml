@@ -12,7 +12,7 @@ tiers:
     components:
       - clusters-service
       - account-manager
-      - ocm-service-log
+      - service-log
       - hypershift
       - osd-fleet-manager
 
@@ -24,7 +24,6 @@ tiers:
       - pagerduty-operator
       - deadmanssnitch-operator
       - splunk-forwarder-operator
-      - custom-domains-operator
       - rbac-permissions-operator
       - osd-metrics-exporter
       - ocm-agent-operator
