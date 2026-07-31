@@ -57,7 +57,7 @@ components:
   - key: splunk-forwarder-operator
     saas_name: saas-sfo-pko
     strategy: hive
-    e2e_saas: saas-sfo-e2e-test
+    e2e_saas: saas-sfo-prow-e2e
   - key: custom-domains-operator
     saas_name: saas-cdo-pko
     strategy: hive
