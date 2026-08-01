@@ -200,20 +200,19 @@ categories:
 
 ### 7. Deliver response and schedule remediation follow-up
 
-1. Call `send_response()` to deliver the summary (and threaded replies if applicable). **`send_response()` ends your current turn — no tool calls after it.**
+   **All-green path** (every category >= 80%): Call `send_response()` to deliver the summary. Do **not** schedule a remediation follow-up — there is nothing to remediate. The artifact is still written so PR shepherding can happen if triggered manually.
 
-2. **After `send_response()`**, call `schedule_followup` with a 2-minute delay. The follow-up fires **in the same thread** as the health report, so threading is automatic — no thread_ts or channel_id needed.
+   **Failures present** (any category < 80%):
 
-   **All-green path** (every category >= 80%): Write the handoff artifact (step 6) and call `send_response()`. Do **not** schedule a remediation follow-up — there is nothing to remediate. The artifact is still written so PR shepherding can happen if triggered manually.
-
-   **Failures present** (any category < 80%): After `send_response()`, schedule the follow-up with this description (replace `<fork_repo>` with the actual fork repo path from step 6.1 and `<commit_sha>` with the commit SHA from step 6.5):
+   1. **First**, call `schedule_followup` with a 2-minute delay. The follow-up fires **in the same thread** as the health report, so threading is automatic — no thread_ts or channel_id needed. Use this description (replace `<fork_repo>` with the actual fork repo path from step 6.1 and `<commit_sha>` with the commit SHA from step 6.5):
+   2. **Then**, call `send_response()` to deliver the summary (and threaded replies). **`send_response()` ends your current turn — no tool calls after it.**
 
    > PR Remediation follow-up. You are continuing the daily health report thread with automated remediation.
    >
    > 1. Call `priv_scm_ensure_fork("github.com", "openshift-online/rosa-e2e")` to resolve the fork path.
    > 2. Read the handoff artifact using `github_file_content(repo="<fork_repo>", path=".chai-bot/reports/daily_health_latest.yaml", ref="<commit_sha>")`. Parse the YAML. Verify `report_date` is today — if stale, call `no_action_required()`.
    > 3. Read the remediation instructions using `github_file_content(repo="openshift-online/rosa-e2e", path=".chai-bot/rosa_ci_daily_remediation.md")`. Follow the **"## PR Remediation"** section (auto-fix PRs and PR shepherding).
-   > 4. **Action branch** (PRs were opened, shepherded, or closed): Compose a summary of all PR actions taken and post it using `send_response()`. After `send_response()`, call `schedule_followup` with a 2-minute delay for Jira remediation (use the description in step 6).
+   > 4. **Action branch** (PRs were opened, shepherded, or closed): Compose a summary of all PR actions taken. Call `schedule_followup` with a 2-minute delay for Jira remediation (use the description in step 6), then call `send_response()` to post the summary.
    > 5. **No-action branch** (no fixable failures, no open PRs to shepherd): Schedule the Jira follow-up directly (persistent failures may still need tickets even if no PRs are warranted), then call `no_action_required()`. Do NOT post an empty summary via `send_response()`.
    > 6. Jira follow-up description (used by both branches):
    >    "Jira Remediation follow-up. You are continuing the daily health report thread with Jira ticket creation for persistent failures. (1) Call priv_scm_ensure_fork to resolve the fork. (2) Read the handoff artifact from <fork_repo> at .chai-bot/reports/daily_health_latest.yaml using ref=<commit_sha>. Verify report_date is today. (3) Read the remediation instructions from openshift-online/rosa-e2e at .chai-bot/rosa_ci_daily_remediation.md. Follow the '## Jira Remediation' section. (4) Compose a summary of Jira actions taken and post it using send_response(). If no Jira actions are needed, call no_action_required()."
@@ -226,6 +225,6 @@ categories:
 - Before sending: if any category is below 80%, verify your response content contains `---THREAD_DETAILS---` followed by at least one threaded reply section. If these delimiters are missing, your threaded replies will not be posted — go back to step 5.
 - Always write the handoff artifact (step 6) before calling `send_response()`, even if all categories are green.
 - Only ONE pending follow-up per thread at a time. Do not schedule multiple follow-ups from the same turn.
-- `send_response()` ends the turn immediately — no tool calls after it except `schedule_followup`.
+- `send_response()` ends the turn immediately — no tool calls after it. Always call `schedule_followup` before `send_response()` when a follow-up is needed.
 - On the all-green path (all categories >= 80%), do NOT schedule a remediation follow-up.
 
