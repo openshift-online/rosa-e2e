@@ -4,6 +4,15 @@
 >
 > The follow-up description tells you which section to execute and how to read the handoff artifact. You do not need to resolve threading or read the artifact independently — that context is provided in the follow-up prompt.
 
+## Guiding principle: PR-first remediation
+
+**Attempt to directly fix failures via PRs whenever possible.** The fastest path to green CI is a code change, not a ticket. For every persistent failure, first ask: "Can I open a PR to fix this right now?" Only fall back to Jira when:
+- The fix requires changes to repos outside the allowed list (see constraints below)
+- The failure requires deep domain investigation or design changes that cannot be safely automated
+- The root cause is in an upstream dependency with no clear workaround
+
+This means the PR Remediation phase should be aggressive — go beyond skip-list updates to fix test bugs, adjust timeouts, update CLI flags, correct CI configs, and patch flaky assertions. A merged PR closes the loop; a Jira ticket opens one.
+
 ## PR Remediation
 
 This section covers automated PR fixes for pattern-matched failures and shepherding of existing `[ci-fix]` PRs.
@@ -27,6 +36,42 @@ If a conformance test (HCP or Classic STS) is failing persistently (3+ consecuti
 5. Scan the diff for sensitive content (credentials, IP addresses, account IDs) before pushing
 6. Open a PR with title `[ci-fix] Skip <test-name> in <workflow> (upstream OCP regression)`
 7. PR description must link to the failing Prow job run(s) and reference the upstream OCP bug if identifiable
+
+**Test code fixes in `openshift-online/rosa-e2e`:**
+
+If a rosa-e2e test is failing due to a bug in the test itself (not the product), fix it directly:
+- Timeout adjustments: increase timeouts for operations that legitimately take longer in certain environments
+- Flaky assertion fixes: stabilize assertions that race against async operations (e.g., add polling/retry, wait for conditions)
+- Test environment setup: fix incorrect assumptions about cluster state, missing skip conditions for topology/access, or stale configuration references
+- Label corrections: fix tests running on wrong topologies due to missing or incorrect platform labels
+
+**ROSA CLI test fixes in `openshift/rosa`:**
+
+If a ROSA CLI E2E test is failing due to CLI changes (not service-side issues):
+- Version gate adjustments: update version checks when minimum supported versions change
+- Flag/argument changes: update test commands when CLI flags are renamed, deprecated, or added
+- Output format changes: update assertion patterns when CLI output format changes
+
+**CI workflow/config fixes in `openshift/release`:**
+
+Beyond conformance skip lists, fix CI infrastructure issues:
+- Step registry updates: fix broken step references, update image tags, correct environment variable names
+- Resource adjustments: increase memory/CPU limits for steps that are OOM-killed or throttled
+- Timeout tuning: adjust step or overall job timeouts based on observed run durations
+- Environment variable fixes: correct or add required env vars in workflow definitions
+
+**SRE operator test/config fixes:**
+
+For SRE operator repos listed in the allowed repos (see constraints):
+- Test fixes: stabilize flaky operator tests, fix assertion logic, adjust timeouts
+- Config corrections: fix test configuration that references stale or incorrect resources
+
+**OCM FVT test fixes in `service/ocm-backend-tests` (GitLab):**
+
+If cs-telemetry data confirms the failure is test-side (assertion errors, framework issues), not CS-side (API errors, timeouts):
+- Fix test assertions that no longer match current API behavior
+- Update test data or fixtures for changed API schemas
+- Adjust test timeouts for operations that legitimately take longer
 
 **Constraints:**
 - Maximum **5** auto-fix PRs per scheduled run
@@ -100,9 +145,11 @@ After completing auto-fix PRs and PR shepherding, compose a summary of all PR ac
 
 This section covers Jira ticket creation for persistent non-fixable failures.
 
-### Jira ticket creation (for non-fixable failures)
+### Jira ticket creation (for failures not fixable via PR)
 
-For persistent failures (3+ consecutive) where auto-fix PRs were not opened (the failure requires deeper investigation or a fix outside the allowed repos), create a Jira ticket so the owning team can investigate.
+Jira tickets are the **fallback**, not the default. Only create a ticket when a PR-based fix is genuinely not feasible — the failure requires design changes, upstream fixes in repos outside the allowed list, or deep investigation by domain experts that cannot be safely automated.
+
+For persistent failures (3+ consecutive) where auto-fix PRs were not opened, create a Jira ticket so the owning team can investigate.
 
 **Skip fetch_error jobs:** Jobs with `failure_classification` of `"fetch_error"` represent data retrieval failures, not real test failures. Skip these entirely — do not create Jira tickets for them.
 
@@ -170,4 +217,4 @@ Post this summary using `send_response()`. If no Jira actions were taken (no per
 - If the handoff artifact is missing or stale (not today's date), call `no_action_required()`.
 - Each follow-up gets its own token budget (fresh context). Re-read the artifact and these instructions from the repo at the start of each follow-up.
 - Only ONE pending follow-up per thread at a time. The PR remediation follow-up schedules the Jira follow-up; do not schedule both from the same turn.
-- `send_response()` ends the turn immediately — no tool calls after it except `schedule_followup`.
+- Call `schedule_followup` BEFORE `send_response()` — `send_response()` ends the turn immediately and no tool calls can execute after it.
