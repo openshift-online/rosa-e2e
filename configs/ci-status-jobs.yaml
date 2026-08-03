@@ -100,6 +100,21 @@ categories:
       - name: STS Upgrade Y-1
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-1
 
+  - id: capa-e2e-stg
+    scope: component
+    components: [cluster-api-provider-aws]
+    name: CAPA E2E STG
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-e2e-main_capa-e2e*"
+    team:
+      id: "47afa339-b9ce-44bc-bd25-3e5b7e0808dd"
+      name: "[ROSA] CAPA"
+      slack_channel: team-rosa-capa
+      slack_alias: rosa-capa-team
+    labels: [ci-failure, capa-e2e]
+    jobs:
+      - name: CAPA E2E Smoke
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e
+
   - id: rosa-gap-analysis
     scope: platform
     name: GAP E2E

@@ -41,6 +41,7 @@ tiers:
 
   - name: Infrastructure
     components:
+      - cluster-api-provider-aws
       - aws-account-operator
       - gcp-project-operator
       - cloud-ingress-operator
