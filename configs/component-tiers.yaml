@@ -12,7 +12,7 @@ tiers:
     components:
       - clusters-service
       - account-manager
-      - service-log
+      - ocm-service-log
       - hypershift
       - osd-fleet-manager
 
@@ -24,6 +24,7 @@ tiers:
       - pagerduty-operator
       - deadmanssnitch-operator
       - splunk-forwarder-operator
+      - custom-domains-operator
       - rbac-permissions-operator
       - osd-metrics-exporter
       - ocm-agent-operator
@@ -41,7 +42,6 @@ tiers:
 
   - name: Infrastructure
     components:
-      - cluster-api-provider-aws
       - aws-account-operator
       - gcp-project-operator
       - cloud-ingress-operator

@@ -33,7 +33,7 @@ categories:
   - id: rosa-e2e-stg
     scope: platform
     name: ROSA E2E STG
-    prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-e2e-main-periodics-*"
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-e2e-main-periodics-rosa-*"
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
@@ -99,21 +99,6 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-2
       - name: STS Upgrade Y-1
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-1
-
-  - id: capa-e2e-stg
-    scope: component
-    components: [cluster-api-provider-aws]
-    name: CAPA E2E STG
-    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-e2e-main_capa-e2e*"
-    team:
-      id: "47afa339-b9ce-44bc-bd25-3e5b7e0808dd"
-      name: "[ROSA] CAPA"
-      slack_channel: team-rosa-capa
-      slack_alias: rosa-capa-team
-    labels: [ci-failure, capa-e2e]
-    jobs:
-      - name: CAPA E2E Smoke
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e
 
   - id: rosa-gap-analysis
     scope: platform
@@ -323,6 +308,23 @@ categories:
       - name: OSDFM Basic Periodic
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-staging-ocm-fvt-periodic-osdfm-basic-periodic-stage
 
+  - id: hypershift-ci
+    scope: component
+    components: [hypershift]
+    name: HyperShift CI
+    team:
+      id: "a5267ed5-eaa8-4cd6-90e3-d0ce145dbfbf"
+      name: ROSA HCP Platform
+      slack_channel: team-rosa-hcp-platform
+      slack_alias: team-rosa-hcp-platform
+    labels: [ci-failure, hypershift-ci]
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*hypershift-ci*"
+    jobs:
+      - name: INT HCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-hypershift-ci-rosa-hcp-e2e-integration-stable-4-22
+      - name: STG HCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-hypershift-ci-rosa-hcp-e2e-staging-stable-4-22
+
   - id: hcp-conformance
     scope: upstream
     name: HCP Conformance
@@ -428,7 +430,7 @@ categories:
       slack_channel: hcm-sre-team-rocket
       slack_alias: sd-srep-team-rocket
     labels: [ci-failure, sre-operator]
-    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*operator*e2e*promotion*"
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*e2e*promotion*operator*"
     jobs:
       - name: RMO Promotion INT
         prow_job: periodic-ci-openshift-route-monitor-operator-master-rosa-sts-e2e-promotion-int
