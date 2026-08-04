@@ -30,7 +30,7 @@ Check for:
 - **Developer HCPs on CI MCs**: Personal test clusters consuming capacity on CI infrastructure
 - **Certificate issues**: STS AssumeRole failures, OIDC validation failures
 
-If a MC is degraded (high error ratio, many stuck clusters), flag it immediately in `#wg-rosa-ci-enhancement`. Individual test failures on a degraded MC should be attributed to the infrastructure issue, not the tests.
+If a MC is degraded (high error ratio, many stuck clusters), flag it immediately in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U). Individual test failures on a degraded MC should be attributed to the infrastructure issue, not the tests.
 
 Related: [OCM-23872](https://redhat.atlassian.net/browse/OCM-23872) tracks making dev SCs/MCs healthy to reduce CI noise.
 
@@ -50,12 +50,12 @@ Conformance failures get a **faster response target** than other CI jobs.
 
 ### Inbound from TRT
 
-TRT reports ROSA conformance failures by pinging `@rosa-ci-watcher` in `#wg-hcm-ocp-release-enablement`. This reaches the current watcher directly, with no routing through SRE on-call.
+TRT reports ROSA conformance failures by pinging `@rosa-ci-watcher` in [#wg-hcm-ocp-release-enablement](https://redhat-internal.slack.com/archives/C07QEA1PDFX). This reaches the current watcher directly, with no routing through SRE on-call.
 
 | Channel | Priority | Notes |
 |---------|----------|-------|
-| `@rosa-ci-watcher` in `#wg-hcm-ocp-release-enablement` | Primary | Direct to the current watcher. Fastest response |
-| `@rosa-ci-watcher` in `#wg-rosa-ci-enhancement` | Secondary | If TRT is already in this channel |
+| `@rosa-ci-watcher` in [#wg-hcm-ocp-release-enablement](https://redhat-internal.slack.com/archives/C07QEA1PDFX) | Primary | Direct to the current watcher. Fastest response |
+| `@rosa-ci-watcher` in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) | Secondary | If TRT is already in this channel |
 | OHSS incident ([red.ht/ohss-incident](https://red.ht/ohss-incident)) | Fallback only | Goes to SRE on-call, not CI watcher. Use only if Slack is down or no response after 4 hours |
 
 ### Conformance Failure Routing
@@ -75,7 +75,7 @@ TRT reports ROSA conformance failures by pinging `@rosa-ci-watcher` in `#wg-hcm-
 | Situation | Action |
 |-----------|--------|
 | OCP conformance failure reported by TRT | Ack within 4 hours, classify and route within 24 hours |
-| Multiple categories failing simultaneously | Post in `#wg-rosa-ci-enhancement`, tag `@rosa-ci-architect` |
+| Multiple categories failing simultaneously | Post in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U), tag `@rosa-ci-architect` |
 | All conformance red for 48+ hours | Escalate to ROSA leadership as blocking for component readiness |
 | Persistent failure (2+ consecutive red runs) | Promote to tracked failure, file Jira with root cause analysis |
 | MC/SC degraded (high error cluster ratio) | Flag immediately, circuit-break further test triage until MC is healthy |

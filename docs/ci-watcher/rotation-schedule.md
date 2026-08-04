@@ -6,7 +6,8 @@ The rotation is weekly (Monday 00:00 UTC to Sunday 23:59 UTC), managed via Pager
 
 This is a **tracking schedule only** — there is no escalation policy and no paging.
 
-See the [PagerDuty schedule](https://redhat.pagerduty.com/schedules/PGLVMVG) for the current and upcoming rotation assignments.
+- [PagerDuty schedule](https://redhat.pagerduty.com/schedules/PGLVMVG) — current and upcoming rotation assignments
+- [PagerDuty CI Watcher team](https://redhat.pagerduty.com/teams/PTYDD6M/users) — all rotation members
 
 ## Rotation Members
 
@@ -29,6 +30,6 @@ The rotation is intentionally cross-org (SRE + OCM) and cross-timezone (NASA, EM
 ### Absent for More Than 2 Days
 
 - You **must** swap your shift with someone else in the rotation if you are not available for more than half the working days of the shift
-- Ping `@rosa-ci-team` in `#wg-rosa-ci-enhancement` to find your replacement
+- Ping `@rosa-ci-team` in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) to find your replacement
 - The shift is weekly and not follow-the-sun — people in any region can swap
 - Make sure the PagerDuty schedule override is taken in place correctly
