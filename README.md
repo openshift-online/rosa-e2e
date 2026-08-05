@@ -26,9 +26,9 @@ Three infrastructure tiers:
 
 Single-cluster topology where the control plane runs on the cluster itself. Uses STS (Security Token Service) for IAM authentication, MachinePool for worker scaling, and standard OSD upgrade policies.
 
-### OSD GCP (planned)
+### OSD GCP
 
-OSD on Google Cloud Platform, both WIF (Workload Identity Federation) and non-WIF variants. Config fields are in place but cluster creation and GCP-specific tests are not yet implemented.
+OSD on Google Cloud Platform. Cluster creation is handled externally (e.g., by Prow); the test suite validates existing OSD GCP clusters using a pre-provisioned `CLUSTER_ID`. Topology is auto-detected via the OCM API based on `Hypershift().Enabled()` and cloud provider.
 
 ## Topology Detection
 
@@ -170,7 +170,7 @@ Configuration loads from environment variables with optional YAML file overlay. 
 | `BILLING_ACCOUNT_ID` | AWS billing account ID (HCP only) | - |
 | `CREATOR_ARN` | ARN of the IAM entity creating the cluster | - |
 
-### GCP Infrastructure (for OSD GCP clusters, planned)
+### GCP Infrastructure (for OSD GCP clusters)
 
 | Variable | Description | Default |
 |----------|-------------|---------|
