@@ -66,7 +66,7 @@ For SRE operator repos listed in the allowed repos (see constraints):
 - Test fixes: stabilize flaky operator tests, fix assertion logic, adjust timeouts
 - Config corrections: fix test configuration that references stale or incorrect resources
 
-**OCM FVT test fixes in `service/ocm-backend-tests` (GitLab):**
+**OCM FVT test fixes in `openshift-online/rosa-backend-tests` (GitHub):**
 
 If cs-telemetry data confirms the failure is test-side (assertion errors, framework issues), not CS-side (API errors, timeouts):
 - Fix test assertions that no longer match current API behavior
@@ -78,7 +78,7 @@ If cs-telemetry data confirms the failure is test-side (assertion errors, framew
 - Allowed repos for fixes:
   - `openshift/release` (step registry, workflow YAMLs)
   - `openshift-online/rosa-e2e` (test code)
-  - `service/ocm-backend-tests` (FVT test code on GitLab)
+  - `openshift-online/rosa-backend-tests` (FVT test code)
   - `openshift/origin` (conformance test fixes)
   - `openshift/rosa` (ROSA CLI)
   - Any SRE operator repo referenced in the `components` field of `ci-status-jobs.yaml` (e.g., `openshift/route-monitor-operator`, `openshift/configure-alertmanager-operator`, `openshift/pagerduty-operator`, `openshift/deadmanssnitch-operator`, `openshift/certman-operator`, `openshift/managed-upgrade-operator`, `openshift/must-gather-operator`, `openshift/managed-velero-operator`, `openshift/dedicated-admin-operator`, `openshift/rbac-permissions-operator`, `openshift/cloud-ingress-operator`, `openshift/aws-account-operator`)
