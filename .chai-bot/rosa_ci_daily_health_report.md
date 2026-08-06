@@ -53,11 +53,9 @@ Post a concise summary as your channel response. This is the top-level message t
 - Per-job breakdowns or job names (those go in threaded replies)
 - Categories with no Prow run data (no white circle lines)
 
-**If all categories >= 80%**: respond with a single line like:
-`:large_green_circle: *ROSA CI Daily Health -- {DATE}:* all {N} categories passing (overall {rate}%)`
-Proceed to step 6 (write handoff artifact), then step 7 (deliver response).
+**If all categories >= 80%**: use the same per-category format below but without threaded replies. Proceed to step 6 (write handoff artifact), then step 7 (deliver response).
 
-**If any category < 80%**: use this format:
+**Format** (used for both all-green and mixed reports):
 
 ```
 *ROSA CI Daily Health -- {DATE} -- {overall_rate}%*
@@ -71,7 +69,7 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 
 **Rules:**
 - `{overall_rate}` is the weighted pass rate across all jobs with data (total passes / total builds, rounded to nearest integer).
-- List categories with data, sorted by pass rate descending.
+- List categories with data, sorted by pass rate descending. **One category per line.** Never combine multiple categories on the same line with `·` separators. Every category gets its own line with its own emoji, pass rate, trend, and (jobs) link, even green categories.
 - For yellow/red categories, add a **short** inline note after the trend emoji (e.g., `-- AMD64 & E2E at 40%`, `-- stale since Jun 17`, `-- 1 run in 30d`). Keep notes under 40 characters.
 - If any categories had zero Prow run data, mention the count in the footer line (e.g., `2 categories skipped (no runs)`). Omit this part if all categories have data.
 - Combine Sippy, Prow, and Dashboard links on the footer line separated by ` · `.
