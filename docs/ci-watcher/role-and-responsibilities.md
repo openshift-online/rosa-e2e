@@ -62,9 +62,10 @@ flowchart LR
 | 5 | Check ROSA stage environment health. If stage is unhealthy, CI will be degraded, and failures should be attributed to stage, not tests. | OCM CLI / Sippy SLO dashboard |
 | 6 | Review `/ci-triage` findings against [Sippy rosa-stage dashboard](https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage) | Sippy |
 | 7 | For any failures the AI could not classify, investigate root cause manually. For cluster provisioning failures, capture the cluster ID and pull ServiceLogs and CS event logs for agentic root cause analysis. | Prow GCS / OCM CLI |
-| 8 | Review and approve any Jira stories or fix PRs proposed by `/ci-triage` | Jira / GitHub |
-| 9 | File or update Jira for anything `/ci-triage` missed | Jira ([ROSAENG-391](https://redhat.atlassian.net/browse/ROSAENG-391)) |
-| 10 | Post daily status update as a reply to the chai-bot daily health report thread in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U). Include triage findings, PRs filed, and any failures routed to other teams. | Slack |
+| 8 | Update the **Triage** column on the [CI Health dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health) for each category you're investigating. Set "Under Investigation" as soon as you start, then update as the investigation progresses (Root Cause Identified, Fix In Progress, etc.). Skip categories already being triaged by their owning team. | rosa-eng-dashboard |
+| 9 | Review and approve any Jira stories or fix PRs proposed by `/ci-triage` | Jira / GitHub |
+| 10 | File or update Jira for anything `/ci-triage` missed | Jira ([ROSAENG-391](https://redhat.atlassian.net/browse/ROSAENG-391)) |
+| 11 | Post daily status update as a reply to the chai-bot daily health report thread in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U). Include triage findings, PRs filed, and any failures routed to other teams. | Slack |
 
 The chai-bot daily health report and [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS) notifications are the watcher's primary signal sources. Chai-bot provides both a high-level summary (per-category pass rates, trends) and detailed failure analysis in threaded replies for the worst-performing jobs (up to 5). [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS) provides real-time individual job results. The `/ci-triage` skill picks up where chai-bot leaves off: it covers all tracked jobs (not just the top 5), and goes beyond analysis to action by drafting Jira stories, proposing fix PRs, and shepherding open changes. Together, these three sources give the watcher a complete picture before manual investigation begins.
 
@@ -74,9 +75,9 @@ The watcher reviews the AI's output, approves or corrects the classifications, a
 
 | Day | Task |
 |-----|------|
-| Monday | Slack Workflow posts a shift-start message tagging the incoming watcher with links to the previous handover, PagerDuty schedule, and a startup checklist. Read the handover, run `/ci-triage` to verify continuity. |
-| Mon-Thu | Daily triage: review chai-bot report, check [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS), run `/ci-triage`, review findings, approve/correct, post status. Shepherd open PRs. |
-| Friday | Slack Workflow posts a shift-end message tagging the outgoing watcher. Fill in the free-form handover (current status, persistent failures, open PRs, Monday action items). The incoming watcher is tagged automatically. |
+| Monday | Slack Workflow tags the incoming watcher. Check the [CI Health dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health) triage states for anything in progress from last week, then start the daily triage procedure. |
+| Mon-Thu | Daily triage: review chai-bot report, check [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS), run `/ci-triage`, review findings, approve/correct, update dashboard triage states, post status. Shepherd open PRs. |
+| Friday | Slack Workflow tags the outgoing watcher. Verify all open failures have Jiras, triage states on the dashboard are current, and open PRs have reviewers. |
 
 ## Triage Before Routing
 
@@ -85,7 +86,7 @@ The watcher reviews the AI's output, approves or corrects the classifications, a
 ```mermaid
 flowchart TD
     FAIL["Job Failure\n(from #rosa-prow-info\nor chai-bot)"] --> LOGS["1. Read build logs\nIdentify failure step + error"]
-    LOGS --> KNOWN{"2. Known issue?\nSearch ROSAENG-391\n+ handover doc"}
+    LOGS --> KNOWN{"2. Known issue?\nSearch ROSAENG-391\n+ dashboard triage states"}
     KNOWN -->|Yes| UPDATE["Update existing Jira\nwith new occurrence"]
     KNOWN -->|No| MC{"3. MC/SC healthy?\nError ratio, stuck\ndeletions, capacity"}
     MC -->|Degraded| INFRA["Attribute to infra\nFlag in Slack"]
@@ -98,7 +99,7 @@ flowchart TD
 Before assigning any failure to another team, the watcher must:
 
 1. **Read the build logs.** Open the Prow log link from [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS) or the chai-bot report and identify the failure point (which step failed, what error message appeared).
-2. **Check if it's a known issue.** Search existing Jira ([ROSAENG-391](https://redhat.atlassian.net/browse/ROSAENG-391) children) and the handover document for the same failure pattern.
+2. **Check if it's a known issue.** Search existing Jira ([ROSAENG-391](https://redhat.atlassian.net/browse/ROSAENG-391) children) and check the CI Health dashboard triage states for the same failure pattern.
 3. **Verify MC/SC health.** A degraded management cluster produces cascading failures that look like individual test bugs. Check error cluster ratio, stuck deletions, and capacity before blaming a test.
 4. **Confirm reproducibility.** Check at least 2-3 recent runs. A single failure may be genuine infrastructure noise; 2+ consecutive failures indicate a real issue.
 5. **Document findings in the Jira ticket.** When routing, the ticket must include: failure logs link, failure classification, what the watcher checked, and what they ruled out.
@@ -115,7 +116,7 @@ Before assigning any failure to another team, the watcher must:
 - Monitor [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS) for real-time failure notifications
 - Escalate critical/blocking issues in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U)
 - Use `@rosa-ci-watcher` Slack alias for cross-team coordination
-- Before EOB Friday: post weekly CI status summary and handover notes
+- Before EOB Friday: verify triage states and Jiras are current for shift transition
 
 ## Anti-Patterns
 
