@@ -23,7 +23,7 @@ The rotation is intentionally cross-org (SRE + OCM) and cross-timezone (NASA, EM
 ### Absent for 1 or 2 Days
 
 - It is ok to skip the day(s) when you are not available
-- Make sure the handover notes are ready if you are not available at the end of your shift
+- Make sure triage states on the CI Health dashboard are current before you leave
 - Review the results when you are back if you are away at the beginning or middle of your shift
 - If there are any AI Agents running, do not let them run in the background when you are not around
 

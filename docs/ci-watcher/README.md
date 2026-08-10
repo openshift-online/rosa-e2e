@@ -7,7 +7,7 @@ The CI Watcher is a weekly rotating role where one person monitors ROSA CI job h
 1. Join Slack: [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U), [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS), and [#wg-hcm-ocp-release-enablement](https://redhat-internal.slack.com/archives/C07QEA1PDFX)
 2. Verify you appear on the [PagerDuty schedule](https://redhat.pagerduty.com/schedules/PGLVMVG) and the [CI Watcher team](https://redhat.pagerduty.com/teams/PTYDD6M/users), and that `@rosa-ci-watcher` resolves to you during your week
 3. Set up the `/ci-triage` skill in Claude Code — see the [rosa-claude-plugins](https://github.com/bmeng/rosa-claude-plugins) repo
-4. Read the previous handover in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U)
+4. Check the [CI Health dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health) triage states for any in-progress investigations from the previous watcher
 
 ## Key Tools
 
@@ -31,6 +31,6 @@ The CI Watcher is a weekly rotating role where one person monitors ROSA CI job h
 ## Documentation
 
 - [Role and Responsibilities](role-and-responsibilities.md) — what the watcher does (and doesn't do), key principles, anti-patterns
-- [Runbook](runbook.md) — step-by-step daily triage procedure, full job list, handover template, common scenarios
+- [Runbook](runbook.md) — step-by-step daily triage procedure, full job list, shift transitions, common scenarios
 - [Escalation Paths](escalation-paths.md) — failure classification matrix, conformance SLAs, TRT interface, routing tables
 - [Rotation Schedule](rotation-schedule.md) — PagerDuty schedule, rotation members, PTO/swap process
