@@ -3,6 +3,7 @@ module github.com/openshift-online/rosa-e2e
 go 1.26.0
 
 require (
+	github.com/aws/aws-sdk-go-v2 v1.43.4
 	github.com/aws/aws-sdk-go-v2/config v1.32.35
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.58.4
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.321.0
@@ -18,7 +19,6 @@ require (
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.43.4 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.34 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.35 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.35 // indirect
