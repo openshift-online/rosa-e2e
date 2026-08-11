@@ -2,21 +2,28 @@
 
 ## Schedule
 
-The rotation is weekly (Monday 00:00 UTC to Sunday 23:59 UTC), managed via PagerDuty schedule **ROSA CI Watcher**.
+The rotation is weekly (Monday 09:00 UTC to Monday 09:00 UTC), managed via a YAML schedule in app-interface following the same pattern as `ocm-rosa-ic`.
 
-This is a **tracking schedule only** — there is no escalation policy and no paging.
+- Schedule file: `data/teams/sd-sre/schedules/rosa-ci-watcher.yml` in app-interface
+- Generated quarterly by a Claude Code cron, submitted as a GitLab MR
+- No PagerDuty schedule is needed
 
-- [PagerDuty schedule](https://redhat.pagerduty.com/schedules/PGLVMVG) — current and upcoming rotation assignments
-- [PagerDuty CI Watcher team](https://redhat.pagerduty.com/teams/PTYDD6M/users) — all rotation members
+## Rotation Structure
 
-## Rotation Members
+Each week has **3 ICs**, one drawn from each Service Engineering sub-pillar:
 
-The rotation is intentionally cross-org (SRE + OCM) and cross-timezone (NASA, EMEA, APAC) to build shared understanding of the full CI surface.
+| Sub-Pillar | Pool |
+|------------|------|
+| Trust Engineering | Trust Engineering ICs |
+| Production Engineering | Production Engineering ICs |
+| Service Engineering | Service Engineering ICs |
+
+The schedule is generated quarterly using FIFO priority rules (same logic as `ocm-rosa-ic`): people who haven't appeared recently go first, geographic diversity is considered, and new members are paired with experienced ones.
 
 ## Slack
 
-- **`@rosa-ci-watcher`**: Slack alias pointing to the current watcher, auto-synced from the PagerDuty schedule via app-interface. Anyone can `@rosa-ci-watcher` in Slack to reach the current watcher
-- **`@rosa-ci-team`**: Slack handler that includes all rotation members
+- **`@rosa-ci-watcher`**: Slack alias pointing to the current 3 ICs, auto-synced from the app-interface schedule. Anyone can `@rosa-ci-watcher` in Slack to reach the current shift
+- **`@rosa-ci-team`**: Slack handle that includes all rotation members
 
 ## When You Are Not Available
 
@@ -29,7 +36,6 @@ The rotation is intentionally cross-org (SRE + OCM) and cross-timezone (NASA, EM
 
 ### Absent for More Than 2 Days
 
-- You **must** swap your shift with someone else in the rotation if you are not available for more than half the working days of the shift
+- You **must** swap your shift with someone else **in your sub-pillar**
 - Ping `@rosa-ci-team` in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) to find your replacement
-- The shift is weekly and not follow-the-sun — people in any region can swap
-- Make sure the PagerDuty schedule override is taken in place correctly
+- Submit an app-interface MR to update the schedule YAML with the swap
