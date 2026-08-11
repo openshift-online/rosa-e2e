@@ -1,0 +1,30 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "schedule": ["before 6am on Monday"],
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "groupName": "go dependencies",
+      "groupSlug": "go-deps"
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["dockerfile"],
+      "groupName": "dockerfile dependencies",
+      "groupSlug": "dockerfile-deps"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "groupSlug": "github-actions"
+    },
+    {
+      "matchUpdateTypes": ["digest", "pin", "pinDigest"],
+      "automerge": true
+    }
+  ]
+}
