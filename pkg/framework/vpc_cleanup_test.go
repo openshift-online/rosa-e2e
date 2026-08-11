@@ -120,7 +120,6 @@ func TestCleanupVPCResources(t *testing.T) {
 			setupMock: func() *mockEC2Client {
 				return &mockEC2Client{
 					describeNetworkInterfacesFn: func(_ context.Context, params *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error) {
-						// Listing by VPC filter
 						if len(params.Filters) > 0 {
 							return &ec2.DescribeNetworkInterfacesOutput{
 								NetworkInterfaces: []types.NetworkInterface{
@@ -138,7 +137,6 @@ func TestCleanupVPCResources(t *testing.T) {
 								},
 							}, nil
 						}
-						// Polling by ID (wait for detach)
 						return &ec2.DescribeNetworkInterfacesOutput{
 							NetworkInterfaces: []types.NetworkInterface{
 								{
@@ -222,6 +220,10 @@ func TestCleanupVPCResources(t *testing.T) {
 			},
 			wantErr:     true,
 			errContains: "detaching ENI eni-stuck",
+			logContains: []string{
+				"Found 1 ENIs",
+				"Detaching ENI eni-stuck",
+			},
 		},
 		{
 			name: "SG DependencyViolation",
@@ -244,6 +246,9 @@ func TestCleanupVPCResources(t *testing.T) {
 			},
 			wantErr:     true,
 			errContains: "sg-blocked",
+			logContains: []string{
+				"Found 1 non-default security groups",
+			},
 		},
 		{
 			name: "partial subnet cleanup reporting",
@@ -268,6 +273,10 @@ func TestCleanupVPCResources(t *testing.T) {
 			},
 			wantErr:     true,
 			errContains: "failed to delete 2 subnets",
+			logContains: []string{
+				"Found 3 subnets",
+				"Deleted subnet subnet-ok",
+			},
 		},
 		{
 			name: "mixed ENI states",
@@ -386,7 +395,7 @@ func TestCleanupVPCResources(t *testing.T) {
 					},
 				}
 			},
-			logContains: []string{"Deleted ENI eni-vanish"},
+			logContains: []string{"ENI eni-vanish already gone"},
 		},
 		{
 			name: "default security group is skipped",
@@ -475,6 +484,113 @@ func TestCleanupVPCResources(t *testing.T) {
 				"Deleted security group sg-b",
 			},
 		},
+		{
+			name: "paginated ENI, SG, and subnet listing",
+			setupMock: func() *mockEC2Client {
+				return &mockEC2Client{
+					describeNetworkInterfacesFn: func(_ context.Context, params *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error) {
+						if len(params.Filters) > 0 {
+							if params.NextToken == nil {
+								return &ec2.DescribeNetworkInterfacesOutput{
+									NetworkInterfaces: []types.NetworkInterface{
+										{NetworkInterfaceId: aws.String("eni-page1"), Status: types.NetworkInterfaceStatusAvailable},
+									},
+									NextToken: aws.String("page2"),
+								}, nil
+							}
+							return &ec2.DescribeNetworkInterfacesOutput{
+								NetworkInterfaces: []types.NetworkInterface{
+									{NetworkInterfaceId: aws.String("eni-page2"), Status: types.NetworkInterfaceStatusAvailable},
+								},
+							}, nil
+						}
+						return &ec2.DescribeNetworkInterfacesOutput{}, nil
+					},
+					describeSecurityGroupsFn: func(_ context.Context, params *ec2.DescribeSecurityGroupsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error) {
+						if params.NextToken == nil {
+							return &ec2.DescribeSecurityGroupsOutput{
+								SecurityGroups: []types.SecurityGroup{
+									{GroupId: aws.String("sg-default"), GroupName: aws.String("default")},
+									{GroupId: aws.String("sg-p1"), GroupName: aws.String("sg-page1")},
+								},
+								NextToken: aws.String("page2"),
+							}, nil
+						}
+						return &ec2.DescribeSecurityGroupsOutput{
+							SecurityGroups: []types.SecurityGroup{
+								{GroupId: aws.String("sg-p2"), GroupName: aws.String("sg-page2")},
+							},
+						}, nil
+					},
+					describeSubnetsFn: func(_ context.Context, params *ec2.DescribeSubnetsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
+						if params.NextToken == nil {
+							return &ec2.DescribeSubnetsOutput{
+								Subnets: []types.Subnet{
+									{SubnetId: aws.String("subnet-p1")},
+								},
+								NextToken: aws.String("page2"),
+							}, nil
+						}
+						return &ec2.DescribeSubnetsOutput{
+							Subnets: []types.Subnet{
+								{SubnetId: aws.String("subnet-p2")},
+							},
+						}, nil
+					},
+				}
+			},
+			logContains: []string{
+				"Found 2 ENIs",
+				"Deleted ENI eni-page1",
+				"Deleted ENI eni-page2",
+				"Found 2 non-default security groups",
+				"Deleted security group sg-p1",
+				"Deleted security group sg-p2",
+				"Found 2 subnets",
+				"Deleted subnet subnet-p1",
+				"Deleted subnet subnet-p2",
+				"cleanup complete",
+			},
+		},
+		{
+			name: "SG revoke failure continues to delete pass",
+			setupMock: func() *mockEC2Client {
+				return &mockEC2Client{
+					describeSecurityGroupsFn: func(_ context.Context, _ *ec2.DescribeSecurityGroupsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error) {
+						return &ec2.DescribeSecurityGroupsOutput{
+							SecurityGroups: []types.SecurityGroup{
+								{
+									GroupId:   aws.String("sg-fail-revoke"),
+									GroupName: aws.String("fail-revoke"),
+									IpPermissions: []types.IpPermission{
+										{IpProtocol: aws.String("-1")},
+									},
+								},
+								{
+									GroupId:   aws.String("sg-ok"),
+									GroupName: aws.String("ok-sg"),
+								},
+							},
+						}, nil
+					},
+					revokeSecurityGroupIngressFn: func(_ context.Context, _ *ec2.RevokeSecurityGroupIngressInput, _ ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupIngressOutput, error) {
+						return nil, fmt.Errorf("access denied")
+					},
+					deleteSecurityGroupFn: func(_ context.Context, params *ec2.DeleteSecurityGroupInput, _ ...func(*ec2.Options)) (*ec2.DeleteSecurityGroupOutput, error) {
+						if aws.ToString(params.GroupId) == "sg-fail-revoke" {
+							return nil, fmt.Errorf("DependencyViolation: rules not revoked")
+						}
+						return &ec2.DeleteSecurityGroupOutput{}, nil
+					},
+				}
+			},
+			wantErr:     true,
+			errContains: "sg-fail-revoke",
+			logContains: []string{
+				"Found 2 non-default security groups",
+				"Deleted security group sg-ok",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -493,10 +609,7 @@ func TestCleanupVPCResources(t *testing.T) {
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("error %q does not contain %q", err.Error(), tt.errContains)
 				}
-				return
-			}
-
-			if err != nil {
+			} else if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 

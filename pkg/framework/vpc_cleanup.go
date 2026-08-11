@@ -34,6 +34,10 @@ var (
 	eniDeleteRetryDelay   = 3 * time.Second
 )
 
+func logf(w io.Writer, format string, args ...any) {
+	_, _ = fmt.Fprintf(w, format, args...)
+}
+
 // CleanupVPCResources cascade-deletes dependent AWS resources in a VPC so it
 // can be reused or recreated cleanly. Deletion order: ENIs → security groups → subnets.
 // Returns a hard error identifying blocking resources if any step fails.
@@ -50,31 +54,37 @@ func CleanupVPCResources(ctx context.Context, client EC2VPCClient, vpcID string,
 		return fmt.Errorf("cleaning up subnets in VPC %s: %w", vpcID, err)
 	}
 
-	fmt.Fprintf(log, "VPC %s resource cleanup complete\n", vpcID)
+	logf(log, "VPC %s resource cleanup complete\n", vpcID)
 	return nil
 }
 
 func cleanupENIs(ctx context.Context, client EC2VPCClient, vpcID string, log io.Writer) error {
-	resp, err := client.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{
+	paginator := ec2.NewDescribeNetworkInterfacesPaginator(client, &ec2.DescribeNetworkInterfacesInput{
 		Filters: []types.Filter{
 			{Name: aws.String("vpc-id"), Values: []string{vpcID}},
 		},
 	})
-	if err != nil {
-		return fmt.Errorf("describing network interfaces: %w", err)
+
+	var enis []types.NetworkInterface
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("describing network interfaces: %w", err)
+		}
+		enis = append(enis, page.NetworkInterfaces...)
 	}
 
-	if len(resp.NetworkInterfaces) == 0 {
+	if len(enis) == 0 {
 		return nil
 	}
 
-	fmt.Fprintf(log, "Found %d ENIs in VPC %s\n", len(resp.NetworkInterfaces), vpcID)
+	logf(log, "Found %d ENIs in VPC %s\n", len(enis), vpcID)
 
-	for _, eni := range resp.NetworkInterfaces {
+	for _, eni := range enis {
 		eniID := aws.ToString(eni.NetworkInterfaceId)
 
 		if eni.Attachment != nil && eni.Attachment.AttachmentId != nil {
-			fmt.Fprintf(log, "Detaching ENI %s (attachment: %s)\n", eniID, aws.ToString(eni.Attachment.AttachmentId))
+			logf(log, "Detaching ENI %s (attachment: %s)\n", eniID, aws.ToString(eni.Attachment.AttachmentId))
 			_, err := client.DetachNetworkInterface(ctx, &ec2.DetachNetworkInterfaceInput{
 				AttachmentId: eni.Attachment.AttachmentId,
 				Force:        aws.Bool(true),
@@ -89,11 +99,16 @@ func cleanupENIs(ctx context.Context, client EC2VPCClient, vpcID string, log io.
 			}
 		}
 
-		if err := deleteENIWithRetry(ctx, client, eniID); err != nil {
+		alreadyGone, err := deleteENIWithRetry(ctx, client, eniID)
+		if err != nil {
 			return fmt.Errorf("deleting ENI %s: %w", eniID, err)
 		}
 
-		fmt.Fprintf(log, "Deleted ENI %s\n", eniID)
+		if alreadyGone {
+			logf(log, "ENI %s already gone\n", eniID)
+		} else {
+			logf(log, "Deleted ENI %s\n", eniID)
+		}
 	}
 
 	return nil
@@ -134,45 +149,48 @@ func waitForENIAvailable(ctx context.Context, client EC2VPCClient, eniID string)
 	}
 }
 
-func deleteENIWithRetry(ctx context.Context, client EC2VPCClient, eniID string) error {
+func deleteENIWithRetry(ctx context.Context, client EC2VPCClient, eniID string) (alreadyGone bool, err error) {
 	var lastErr error
 	for attempt := range eniDeleteMaxRetries {
 		_, err := client.DeleteNetworkInterface(ctx, &ec2.DeleteNetworkInterfaceInput{
 			NetworkInterfaceId: aws.String(eniID),
 		})
 		if err == nil {
-			return nil
+			return false, nil
 		}
 		if strings.Contains(err.Error(), "InvalidNetworkInterfaceID") {
-			return nil
+			return true, nil
 		}
 		lastErr = err
 
 		if attempt < eniDeleteMaxRetries-1 {
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
+				return false, ctx.Err()
 			case <-time.After(eniDeleteRetryDelay):
 			}
 		}
 	}
-	return fmt.Errorf("after %d attempts: %w", eniDeleteMaxRetries, lastErr)
+	return false, fmt.Errorf("after %d attempts: %w", eniDeleteMaxRetries, lastErr)
 }
 
 func cleanupSecurityGroups(ctx context.Context, client EC2VPCClient, vpcID string, log io.Writer) error {
-	resp, err := client.DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
+	paginator := ec2.NewDescribeSecurityGroupsPaginator(client, &ec2.DescribeSecurityGroupsInput{
 		Filters: []types.Filter{
 			{Name: aws.String("vpc-id"), Values: []string{vpcID}},
 		},
 	})
-	if err != nil {
-		return fmt.Errorf("describing security groups: %w", err)
-	}
 
 	var sgs []types.SecurityGroup
-	for _, sg := range resp.SecurityGroups {
-		if aws.ToString(sg.GroupName) != "default" {
-			sgs = append(sgs, sg)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("describing security groups: %w", err)
+		}
+		for _, sg := range page.SecurityGroups {
+			if aws.ToString(sg.GroupName) != "default" {
+				sgs = append(sgs, sg)
+			}
 		}
 	}
 
@@ -180,9 +198,10 @@ func cleanupSecurityGroups(ctx context.Context, client EC2VPCClient, vpcID strin
 		return nil
 	}
 
-	fmt.Fprintf(log, "Found %d non-default security groups in VPC %s\n", len(sgs), vpcID)
+	logf(log, "Found %d non-default security groups in VPC %s\n", len(sgs), vpcID)
 
 	// Revoke all rules first to break cross-SG reference cycles
+	var revokeErrors []string
 	for _, sg := range sgs {
 		sgID := aws.ToString(sg.GroupId)
 
@@ -192,7 +211,7 @@ func cleanupSecurityGroups(ctx context.Context, client EC2VPCClient, vpcID strin
 				IpPermissions: sg.IpPermissions,
 			})
 			if err != nil {
-				return fmt.Errorf("revoking ingress rules for SG %s: %w", sgID, err)
+				revokeErrors = append(revokeErrors, fmt.Sprintf("ingress for SG %s: %v", sgID, err))
 			}
 		}
 
@@ -202,7 +221,7 @@ func cleanupSecurityGroups(ctx context.Context, client EC2VPCClient, vpcID strin
 				IpPermissions: sg.IpPermissionsEgress,
 			})
 			if err != nil {
-				return fmt.Errorf("revoking egress rules for SG %s: %w", sgID, err)
+				revokeErrors = append(revokeErrors, fmt.Sprintf("egress for SG %s: %v", sgID, err))
 			}
 		}
 	}
@@ -218,34 +237,43 @@ func cleanupSecurityGroups(ctx context.Context, client EC2VPCClient, vpcID strin
 			deleteErrors = append(deleteErrors, fmt.Sprintf("SG %s (%s): %v", sgID, sgName, err))
 			continue
 		}
-		fmt.Fprintf(log, "Deleted security group %s (%s)\n", sgID, sgName)
+		logf(log, "Deleted security group %s (%s)\n", sgID, sgName)
 	}
 
-	if len(deleteErrors) > 0 {
-		return fmt.Errorf("failed to delete %d security groups:\n%s", len(deleteErrors), strings.Join(deleteErrors, "\n"))
+	var allErrors []string
+	allErrors = append(allErrors, revokeErrors...)
+	allErrors = append(allErrors, deleteErrors...)
+	if len(allErrors) > 0 {
+		return fmt.Errorf("failed to clean up %d security group issues:\n%s", len(allErrors), strings.Join(allErrors, "\n"))
 	}
 
 	return nil
 }
 
 func cleanupSubnets(ctx context.Context, client EC2VPCClient, vpcID string, log io.Writer) error {
-	resp, err := client.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+	paginator := ec2.NewDescribeSubnetsPaginator(client, &ec2.DescribeSubnetsInput{
 		Filters: []types.Filter{
 			{Name: aws.String("vpc-id"), Values: []string{vpcID}},
 		},
 	})
-	if err != nil {
-		return fmt.Errorf("describing subnets: %w", err)
+
+	var subnets []types.Subnet
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("describing subnets: %w", err)
+		}
+		subnets = append(subnets, page.Subnets...)
 	}
 
-	if len(resp.Subnets) == 0 {
+	if len(subnets) == 0 {
 		return nil
 	}
 
-	fmt.Fprintf(log, "Found %d subnets in VPC %s\n", len(resp.Subnets), vpcID)
+	logf(log, "Found %d subnets in VPC %s\n", len(subnets), vpcID)
 
 	var deleteErrors []string
-	for _, subnet := range resp.Subnets {
+	for _, subnet := range subnets {
 		subnetID := aws.ToString(subnet.SubnetId)
 		_, err := client.DeleteSubnet(ctx, &ec2.DeleteSubnetInput{
 			SubnetId: subnet.SubnetId,
@@ -254,7 +282,7 @@ func cleanupSubnets(ctx context.Context, client EC2VPCClient, vpcID string, log 
 			deleteErrors = append(deleteErrors, fmt.Sprintf("subnet %s: %v", subnetID, err))
 			continue
 		}
-		fmt.Fprintf(log, "Deleted subnet %s\n", subnetID)
+		logf(log, "Deleted subnet %s\n", subnetID)
 	}
 
 	if len(deleteErrors) > 0 {
