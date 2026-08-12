@@ -113,21 +113,21 @@ Available triage states:
 
 Set the triage state as early as possible ("Under Investigation" as soon as you start looking). Update it as the investigation progresses. Clear it back to "--" once the category is healthy again.
 
-**Not all categories are the watcher's responsibility.** Some categories have dedicated owners who triage their own failures. If a category already shows a triage state set by another team, skip it unless they ask for help.
+**Category ownership determines who triages.** The three on-shift ICs each own specific categories based on their sub-pillar. Categories outside the watcher rotation are owned by other teams and should be skipped unless they're unattended.
 
-| Category | Primary Owner | Watcher Role |
-|----------|--------------|--------------|
-| ROSA E2E STG | CI Watcher | Triage directly |
-| OCM FVT HCP/Classic/GCP STG | Jeff Frazier (OCM QE) | Triage directly, coordinate with Jeff |
-| HCP Conformance | CI Watcher | Triage directly (TRT-facing, fastest response) |
-| Classic STS Conformance | CI Watcher | Triage directly (TRT-facing, fastest response) |
-| SRE Operator E2E | CI Watcher | Triage directly |
-| GAP E2E | Rohit Bhilare | Skip if triage state already set, otherwise flag |
-| ROSA CLI E2E | Amanda Katz (ROSA CLI team) | Skip if triage state already set, otherwise flag |
-| ROSA TF E2E | Amanda Katz (TF team) | Skip if triage state already set, otherwise flag |
-| CAPA E2E | Mohamed ElSerngawy | Skip if triage state already set, otherwise flag |
+| Category | Owned By | On-Shift IC Action |
+|----------|----------|-------------------|
+| ROSA E2E STG | Any on-shift IC | Triage directly |
+| SRE Operator E2E | Any on-shift IC | Triage directly |
+| HCP Conformance | Trust Engineering IC | Trust IC triages (TRT-facing, fastest response) |
+| Classic STS Conformance | Trust Engineering IC | Trust IC triages (TRT-facing, fastest response) |
+| OCM FVT HCP/Classic/GCP STG | Service Engineering IC | Service Engineering IC triages |
+| GAP E2E | Production Engineering IC | Production IC triages |
+| ROSA CLI E2E | Service Engineering (ROSA CLI) | Skip if triage state already set, otherwise flag in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) |
+| ROSA TF E2E | Service Engineering (TF) | Skip if triage state already set, otherwise flag |
+| CAPA E2E | Service Engineering (CAPA) | Skip if triage state already set, otherwise flag |
 
-For categories owned by other teams: if the triage state is "--" and the pass rate is below threshold, ping the owning team in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) to ask if they're aware. Do not set the triage state for their category unless they ask you to.
+For categories outside the watcher rotation (ROSA CLI, ROSA TF, CAPA): if the triage state is "--" and the pass rate is below threshold, ping the owning team in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) to ask if they're aware. Do not set the triage state for their category unless they ask you to.
 
 ### Step 8: Take Action
 
@@ -158,7 +158,7 @@ flowchart LR
 
 **Monday (Shift Start):** A Slack Workflow message tags the incoming watcher in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) with:
 
-- Links to: [CI Health dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health), [Delivery dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/delivery), [PagerDuty schedule](https://redhat.pagerduty.com/schedules/PGLVMVG)
+- Links to: [CI Health dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health), [Delivery dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/delivery)
 - Checklist:
   - [ ] Check CI Health dashboard triage states for anything in progress from last week
   - [ ] Check [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS) for any weekend failures
