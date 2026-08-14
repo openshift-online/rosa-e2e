@@ -451,21 +451,31 @@ func VerifyProbeSuccessMetrics(ctx context.Context, clusterID string, cfg *RHOBS
 }
 
 // probeSuccessDataExists checks whether underlying probe_success metrics exist for the cluster.
-// Returns true if probe data is available, false otherwise.
-func probeSuccessDataExists(ctx context.Context, clusterID string, cfg *RHOBSConfig) bool {
+// Returns (true, nil) if probe data is available, (false, nil) if the query succeeded but no
+// data exists yet, or (false, error) if the query itself failed.
+func probeSuccessDataExists(ctx context.Context, clusterID string, cfg *RHOBSConfig) (bool, error) {
 	query := fmt.Sprintf(`probe_success{_id="%s"}`, clusterID)
 	result, err := queryRHOBSMetrics(ctx, cfg, query)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("querying probe_success metrics: %w", err)
+	}
+
+	status, ok := result["status"].(string)
+	if !ok || status != "success" {
+		return false, fmt.Errorf("probe_success query returned non-success status: %v", result["status"])
 	}
 
 	data, ok := result["data"].(map[string]interface{})
 	if !ok {
-		return false
+		return false, nil
 	}
 
 	resultData, ok := data["result"].([]interface{})
-	return ok && len(resultData) > 0
+	if !ok || len(resultData) == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // VerifyRecordingRules verifies that RHOBS recording rules are evaluating for the cluster.
@@ -474,7 +484,7 @@ func VerifyRecordingRules(ctx context.Context, clusterID string, cfg *RHOBSConfi
 	// (which use max_over_time(probe_success{...}[1h])) cannot evaluate
 	// without it. This diagnostic helps distinguish "probe data not yet
 	// ingested" from "recording rule misconfigured".
-	hasProbeData := probeSuccessDataExists(ctx, clusterID, cfg)
+	hasProbeData, probeErr := probeSuccessDataExists(ctx, clusterID, cfg)
 
 	// Check for sre:hcp:probe_active recording rule
 	probeActiveQuery := fmt.Sprintf(`sre:hcp:probe_active{_id="%s"}`, clusterID)
@@ -495,7 +505,7 @@ func VerifyRecordingRules(ctx context.Context, clusterID string, cfg *RHOBSConfi
 
 	resultData, ok := data["result"].([]interface{})
 	if !ok || len(resultData) == 0 {
-		if !hasProbeData {
+		if probeErr == nil && !hasProbeData {
 			return fmt.Errorf("probe_success metrics not yet available for cluster %s — recording rule sre:hcp:probe_active cannot evaluate without underlying probe data", clusterID)
 		}
 		return fmt.Errorf("sre:hcp:probe_active recording rule not evaluating for cluster %s", clusterID)
@@ -520,7 +530,7 @@ func VerifyRecordingRules(ctx context.Context, clusterID string, cfg *RHOBSConfi
 
 	resultData, ok = data["result"].([]interface{})
 	if !ok || len(resultData) == 0 {
-		if !hasProbeData {
+		if probeErr == nil && !hasProbeData {
 			return fmt.Errorf("probe_success metrics not yet available for cluster %s — recording rule sre:hcp:blackbox_probe_active cannot evaluate without underlying probe data", clusterID)
 		}
 		return fmt.Errorf("sre:hcp:blackbox_probe_active recording rule not evaluating for cluster %s", clusterID)
