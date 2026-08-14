@@ -79,10 +79,10 @@ var _ = Describe("RHOBS Synthetic Monitoring", labels.High, labels.Positive, lab
 	})
 
 	It("should have recording rules evaluating", func(ctx context.Context) {
-		By("Waiting for sre:hcp:probe_active and sre:hcp:blackbox_probe_active recording rules (up to 5 minutes)")
+		By("Waiting for sre:hcp:probe_active and sre:hcp:blackbox_probe_active recording rules (up to 10 minutes)")
 		Eventually(func() error {
 			return verifiers.VerifyRecordingRules(ctx, clusterExternalID, rhobsConfig)
-		}).WithContext(ctx).WithTimeout(5*time.Minute).WithPolling(30*time.Second).Should(Succeed(),
+		}).WithContext(ctx).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(),
 			"recording rules should be evaluating for cluster %s", clusterExternalID)
 	})
 
