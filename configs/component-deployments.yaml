@@ -92,9 +92,17 @@ components:
   - key: managed-velero-operator
     saas_name: saas-mvo
     strategy: hive
+  - key: managed-cluster-validating-webhooks
+    saas_name: saas-mc-validating-webhooks
+    strategy: hive
   - key: managed-node-metadata-operator
     saas_name: saas-mnmo
     strategy: hive
+
+  # Operational Tooling (dedicated clusters)
+  - key: configuration-anomaly-detection
+    saas_name: saas-configuration-anomaly-detection
+    strategy: ocm
 
   # Observability (hive cluster pattern)
   - key: rhobs-synthetics-agent
