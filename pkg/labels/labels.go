@@ -36,6 +36,11 @@ var (
 	MCAccess = ginkgo.Label("Access:MC")
 )
 
+// Lifecycle labels
+var (
+	Informing = ginkgo.Label("Lifecycle:informing")
+)
+
 // Test area categories
 var (
 	ClusterLifecycle = ginkgo.Label("Area:ClusterLifecycle")
