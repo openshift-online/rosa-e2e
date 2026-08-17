@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	ote "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
 	"github.com/openshift-online/rosa-e2e/pkg/framework"
 	"github.com/openshift-online/rosa-e2e/pkg/labels"
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
@@ -78,7 +79,7 @@ var _ = Describe("RHOBS Synthetic Monitoring", labels.High, labels.Positive, lab
 			"probe_success metrics should exist for cluster %s", clusterExternalID)
 	})
 
-	It("should have recording rules evaluating", func(ctx context.Context) {
+	It("should have recording rules evaluating", labels.Informing, ote.Informing(), func(ctx context.Context) {
 		By("Waiting for sre:hcp:probe_active and sre:hcp:blackbox_probe_active recording rules (up to 10 minutes)")
 		Eventually(func() error {
 			return verifiers.VerifyRecordingRules(ctx, clusterExternalID, rhobsConfig)
