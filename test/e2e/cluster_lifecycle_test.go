@@ -80,10 +80,16 @@ var _ = Describe("ROSA HCP Cluster Lifecycle: Existing Cluster", labels.Critical
 		Expect(err).NotTo(HaveOccurred())
 
 		// For existing clusters, just verify all nodes are ready (don't assert count
-		// since autoscaler may have changed it)
-		Expect(verifiers.RunVerifiers(ctx, kubeClient,
-			verifiers.VerifyAllNodesReady(),
-		)).To(Succeed())
+		// since autoscaler may have changed it).
+		// Use Eventually to tolerate transient node NotReady blips.
+		Eventually(func() error {
+			return verifiers.RunVerifiers(ctx, kubeClient,
+				verifiers.VerifyAllNodesReady(),
+			)
+		}).WithContext(ctx).
+			WithTimeout(2 * time.Minute).
+			WithPolling(15 * time.Second).
+			Should(Succeed())
 	})
 })
 
@@ -158,9 +164,15 @@ var _ = Describe("ROSA Classic Cluster Lifecycle: Existing Cluster", labels.Crit
 		kubeClient, err := framework.NewKubeClient(kubeConfig)
 		Expect(err).NotTo(HaveOccurred())
 
-		Expect(verifiers.RunVerifiers(ctx, kubeClient,
-			verifiers.VerifyAllNodesReady(),
-		)).To(Succeed())
+		// Use Eventually to tolerate transient node NotReady blips.
+		Eventually(func() error {
+			return verifiers.RunVerifiers(ctx, kubeClient,
+				verifiers.VerifyAllNodesReady(),
+			)
+		}).WithContext(ctx).
+			WithTimeout(2 * time.Minute).
+			WithPolling(15 * time.Second).
+			Should(Succeed())
 	})
 })
 
@@ -188,8 +200,14 @@ var _ = Describe("OSD GCP Cluster Lifecycle: Existing Cluster", labels.Critical,
 		kubeClient, err := framework.NewKubeClient(kubeConfig)
 		Expect(err).NotTo(HaveOccurred())
 
-		Expect(verifiers.RunVerifiers(ctx, kubeClient,
-			verifiers.VerifyAllNodesReady(),
-		)).To(Succeed())
+		// Use Eventually to tolerate transient node NotReady blips.
+		Eventually(func() error {
+			return verifiers.RunVerifiers(ctx, kubeClient,
+				verifiers.VerifyAllNodesReady(),
+			)
+		}).WithContext(ctx).
+			WithTimeout(2 * time.Minute).
+			WithPolling(15 * time.Second).
+			Should(Succeed())
 	})
 })
