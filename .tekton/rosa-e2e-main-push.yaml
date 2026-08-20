@@ -24,6 +24,9 @@ spec:
     value: '{{revision}}'
   - name: output-image
     value: quay.io/redhat-user-workloads/rosa-tenant/rosa-e2e-main/rosa-e2e-main:{{revision}}
+  - name: additional-tags
+    value:
+      - latest
   - name: dockerfile
     value: Containerfile
   - name: path-context
