@@ -8,9 +8,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/openshift-online/rosa-e2e/pkg/framework"
 	"github.com/openshift-online/rosa-e2e/pkg/labels"
 	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
@@ -30,14 +27,9 @@ var _ = Describe("Data Plane: Storage", labels.High, labels.Positive, labels.HCP
 		namespace := "e2e-storage-test"
 
 		By("Creating test namespace")
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: namespace},
-		}
-		_, err := tc.HCKubeClient().CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+		cleanup, err := framework.CreateTestNamespace(ctx, tc.HCKubeClient(), namespace)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			_ = tc.HCKubeClient().CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
-		})
+		DeferCleanup(cleanup)
 
 		storageClass := "gp3-csi"
 		if tc.IsOSDGCP() {

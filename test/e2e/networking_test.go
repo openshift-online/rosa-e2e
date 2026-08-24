@@ -47,14 +47,9 @@ var _ = Describe("Data Plane: Networking", labels.High, labels.Positive, labels.
 		namespace := "e2e-dns-test"
 
 		By("Creating test namespace")
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: namespace},
-		}
-		_, err := tc.HCKubeClient().CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+		cleanup, err := framework.CreateTestNamespace(ctx, tc.HCKubeClient(), namespace)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			_ = tc.HCKubeClient().CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
-		})
+		DeferCleanup(cleanup)
 
 		By("Creating DNS test pod")
 		podName := "dns-test-pod"
