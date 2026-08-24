@@ -50,7 +50,7 @@ components:
   - key: rbac-permissions-operator
     saas_name: saas-rbac-p-operator
     strategy: hive
-    e2e_saas: saas-rbac-p-operator-e2e
+    e2e_saas: saas-rpo-prow-e2e
   - key: deadmanssnitch-operator
     saas_name: saas-dms-pko
     strategy: hive
@@ -78,11 +78,11 @@ components:
   - key: certman-operator
     saas_name: saas-certman-operator
     strategy: hive
-    e2e_saas: saas-certman-operator-e2e-test
+    e2e_saas: saas-certman-operator-prow-e2e
   - key: cloud-ingress-operator
     saas_name: saas-cloud-ingress-operator-pko
     strategy: hive
-    e2e_saas: saas-cio-e2e-test
+    e2e_saas: saas-cio-prow-e2e
   - key: gcp-project-operator
     saas_name: saas-gcp-project-operator-pko
     strategy: hive
