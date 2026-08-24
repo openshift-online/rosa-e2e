@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +26,7 @@ func isNonTransientError(err error) bool {
 // timeouts in CI). It polls for up to 2 minutes with 10-second intervals and treats
 // AlreadyExists as success. Non-transient errors (Forbidden, Invalid, Unauthorized) cause an
 // immediate failure without retry. Returns a cleanup function that deletes the namespace.
-func CreateTestNamespace(ctx context.Context, client kubernetes.Interface, name string) (cleanup func(), err error) {
+func CreateTestNamespace(ctx context.Context, client kubernetes.Interface, name string) (cleanup func() error, err error) {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -53,10 +51,11 @@ func CreateTestNamespace(ctx context.Context, client kubernetes.Interface, name 
 		return nil, fmt.Errorf("creating namespace %s: %w", name, err)
 	}
 
-	cleanup = func() {
+	cleanup = func() error {
 		if deleteErr := client.CoreV1().Namespaces().Delete(context.Background(), name, metav1.DeleteOptions{}); deleteErr != nil && !errors.IsNotFound(deleteErr) {
-			ginkgo.GinkgoWriter.Printf("Warning: failed to delete test namespace %s: %v\n", name, deleteErr)
+			return fmt.Errorf("deleting test namespace %s: %w", name, deleteErr)
 		}
+		return nil
 	}
 
 	return cleanup, nil
