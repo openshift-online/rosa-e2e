@@ -22,6 +22,9 @@ sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
 component_prow_filters:
   clusters-service: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*staging*"
   osd-fleet-manager: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm*"
+  certman-operator: "https://prow.ci.openshift.org/?type=periodic&job=*certman-operator*e2e*promotion*"
+  cloud-ingress-operator: "https://prow.ci.openshift.org/?type=periodic&job=*cloud-ingress-operator*e2e*promotion*"
+  rbac-permissions-operator: "https://prow.ci.openshift.org/?type=periodic&job=*rbac-permissions-operator*e2e*promotion*"
   route-monitor-operator: "https://prow.ci.openshift.org/?type=periodic&job=*route-monitor-operator*e2e*promotion*"
   configure-alertmanager-operator: "https://prow.ci.openshift.org/?type=periodic&job=*configure-alertmanager-operator*e2e*promotion*"
   aws-vpce-operator: "https://prow.ci.openshift.org/?type=periodic&job=*aws-vpce-operator*e2e*promotion*"
@@ -426,7 +429,7 @@ categories:
 
   - id: sre-operator-e2e
     scope: component
-    components: [route-monitor-operator, configure-alertmanager-operator, aws-vpce-operator, managed-upgrade-operator, ocm-agent-operator, splunk-forwarder-operator]
+    components: [certman-operator, cloud-ingress-operator, rbac-permissions-operator, route-monitor-operator, configure-alertmanager-operator, aws-vpce-operator, managed-upgrade-operator, ocm-agent-operator, splunk-forwarder-operator]
     name: SRE Operator E2E
     team:
       id: "a0f44498-f22b-4cd4-a98f-f298cc375a94"
@@ -472,6 +475,24 @@ categories:
       - name: SFO Promotion STG
         prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-rosa-sts-e2e-promotion-stage
         labels: [splunk-forwarder-operator]
+      - name: Certman Promotion INT
+        prow_job: periodic-ci-openshift-certman-operator-master-hive-e2e-promotion-int
+        labels: [certman-operator]
+      - name: Certman Promotion STG
+        prow_job: periodic-ci-openshift-certman-operator-master-hive-e2e-promotion-stage
+        labels: [certman-operator]
+      - name: CIO Promotion INT
+        prow_job: periodic-ci-openshift-cloud-ingress-operator-master-rosa-osd-aws-e2e-promotion-int
+        labels: [cloud-ingress-operator]
+      - name: CIO Promotion STG
+        prow_job: periodic-ci-openshift-cloud-ingress-operator-master-rosa-osd-aws-e2e-promotion-stage
+        labels: [cloud-ingress-operator]
+      - name: RPO Promotion INT
+        prow_job: periodic-ci-openshift-rbac-permissions-operator-master-rosa-sts-e2e-promotion-int
+        labels: [rbac-permissions-operator]
+      - name: RPO Promotion STG
+        prow_job: periodic-ci-openshift-rbac-permissions-operator-master-rosa-sts-e2e-promotion-stage
+        labels: [rbac-permissions-operator]
       # OSD GCP
       - name: RMO GCP INT
         prow_job: periodic-ci-openshift-route-monitor-operator-master-osd-gcp-e2e-promotion-int
