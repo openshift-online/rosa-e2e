@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/aws/aws-sdk-go-v2 v1.43.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.38
-	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.58.6
+	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.58.7
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.322.0
 	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.42.1
