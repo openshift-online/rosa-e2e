@@ -144,8 +144,8 @@ Post one Slack message to the `#wg-rosa-cicd` channel. Use Slack `mrkdwn` format
 *Before you start:*
 - <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|CI Health dashboard> -- check triage states for in-progress items from last week
 - <https://redhat-internal.slack.com/archives/C0AT31ERJLS|#rosa-prow-info> -- weekend/overnight failure notifications
-- <https://redhat.atlassian.net/browse/ROSAENG-391|ROSAENG-391> -- open CI investigations
-- Run `/ci-triage` in Claude Code to get current status
+- <https://redhat.atlassian.net/issues?filter=116619|Active CI investigations> -- open ROSA CI issues
+- Run `/ci-triage` in Claude Code to get current status (requires <https://github.com/openshift-online/rosa-claude-plugins|rosa-claude-plugins> plugin)
 
 *Role reminders:*
 :white_check_mark: Every failure thread in <https://redhat-internal.slack.com/archives/C0AT31ERJLS|#rosa-prow-info> must be run to resolution (root cause identified, fix merged or skip-listed, thread updated)
@@ -153,7 +153,7 @@ Post one Slack message to the `#wg-rosa-cicd` channel. Use Slack `mrkdwn` format
 :white_check_mark: Read the logs before routing -- classify every failure first (<https://github.com/openshift-online/rosa-e2e/blob/main/docs/ci-watcher/role-and-responsibilities.md#triage-before-routing|triage checklist>)
 :white_check_mark: Post daily status as a reply to the chai-bot thread in <https://redhat-internal.slack.com/archives/C0ADGRNAT8U|#wg-rosa-cicd>
 :white_check_mark: Update triage state on the <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|CI Health dashboard> as you investigate
-:white_check_mark: File Jiras under <https://redhat.atlassian.net/browse/ROSAENG-391|ROSAENG-391> for persistent failures (2+ consecutive)
+:white_check_mark: File Jiras in the ROSAENG project with the `ci-watcher` label and assign to the ROSA CI team for persistent failures (2+ consecutive)
 :white_check_mark: Do not page on-call for a red nightly
 
 *Docs:* <https://github.com/openshift-online/rosa-e2e/tree/main/docs/ci-watcher|CI Watcher docs> · <https://github.com/openshift-online/rosa-e2e/blob/main/docs/ci-watcher/runbook.md|Runbook> · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy>
