@@ -71,6 +71,7 @@ components:
   - key: aws-account-operator
     saas_name: saas-aws-account-operator-pko
     strategy: hive
+    e2e_saas: saas-aao-prow-e2e
   - key: aws-vpce-operator
     saas_name: saas-avo-pko
     strategy: hive
