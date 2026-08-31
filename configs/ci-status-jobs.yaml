@@ -31,6 +31,7 @@ component_prow_filters:
   managed-upgrade-operator: "https://prow.ci.openshift.org/?type=periodic&job=*managed-upgrade-operator*e2e*promotion*"
   ocm-agent-operator: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-agent-operator*e2e*promotion*"
   splunk-forwarder-operator: "https://prow.ci.openshift.org/?type=periodic&job=*splunk-forwarder-operator*e2e*promotion*"
+  aws-account-operator: "https://prow.ci.openshift.org/?type=periodic&job=*aws-account-operator*hive-e2e*promotion*"
 
 categories:
   - id: rosa-e2e-stg
@@ -429,7 +430,7 @@ categories:
 
   - id: sre-operator-e2e
     scope: component
-    components: [certman-operator, cloud-ingress-operator, rbac-permissions-operator, route-monitor-operator, configure-alertmanager-operator, aws-vpce-operator, managed-upgrade-operator, ocm-agent-operator, splunk-forwarder-operator]
+    components: [certman-operator, cloud-ingress-operator, rbac-permissions-operator, route-monitor-operator, configure-alertmanager-operator, aws-vpce-operator, managed-upgrade-operator, ocm-agent-operator, splunk-forwarder-operator, aws-account-operator]
     name: SRE Operator E2E
     team:
       id: "a0f44498-f22b-4cd4-a98f-f298cc375a94"
@@ -493,6 +494,12 @@ categories:
       - name: RPO Promotion STG
         prow_job: periodic-ci-openshift-rbac-permissions-operator-master-rosa-sts-e2e-promotion-stage
         labels: [rbac-permissions-operator]
+      - name: AAO Promotion INT
+        prow_job: periodic-ci-openshift-aws-account-operator-master-hive-e2e-promotion-int
+        labels: [aws-account-operator]
+      - name: AAO Promotion STG
+        prow_job: periodic-ci-openshift-aws-account-operator-master-hive-e2e-promotion-stage
+        labels: [aws-account-operator]
       # OSD GCP
       - name: RMO GCP INT
         prow_job: periodic-ci-openshift-route-monitor-operator-master-osd-gcp-e2e-promotion-int
