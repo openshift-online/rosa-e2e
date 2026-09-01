@@ -71,7 +71,7 @@ func (tc *TestContext) Connection() *sdk.Connection {
 
 // InitHCClients initializes kube and dynamic clients for the hosted cluster.
 func (tc *TestContext) InitHCClients() error {
-	restCfg, err := GetClusterCredentials(tc.conn, tc.cfg.ClusterID)
+	restCfg, err := resolveKubeconfig("KUBECONFIG", tc.conn, tc.cfg.ClusterID)
 	if err != nil {
 		return fmt.Errorf("getting HC credentials: %w", err)
 	}

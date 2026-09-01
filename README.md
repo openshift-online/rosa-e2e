@@ -142,7 +142,9 @@ Configuration loads from environment variables with optional YAML file overlay. 
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OCM_TOKEN` | OCM offline token (required) | - |
+| `OCM_TOKEN` | OCM offline or access token; required unless client credentials are set | - |
+| `OCM_CLIENT_ID` | OCM service-account client ID; enables automatic token renewal with `OCM_CLIENT_SECRET` | - |
+| `OCM_CLIENT_SECRET` | OCM service-account client secret | - |
 | `OCM_ENV` | OCM environment: integration, staging, production | integration |
 | `OCM_BASE_URL` | Override OCM API URL | - |
 
@@ -151,6 +153,7 @@ Configuration loads from environment variables with optional YAML file overlay. 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `CLUSTER_ID` | Existing cluster ID (skips create/delete when set) | - |
+| `KUBECONFIG` | Path to hosted-cluster kubeconfig (for example, from backplane); falls back to OCM credentials when unset | - |
 | `CLUSTER_TOPOLOGY` | Override topology detection: `hcp`, `classic`, `osd-gcp` (auto-detected if empty) | - |
 | `MANAGEMENT_CLUSTER_ID` | Management cluster ID for HCP namespace checks (HCP only) | - |
 | `MC_KUBECONFIG` | Path to MC kubeconfig file (from backplane, HCP only) | - |

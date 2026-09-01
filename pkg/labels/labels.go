@@ -31,9 +31,10 @@ var (
 	OSDGCP  = ginkgo.Label("Platform:OSD-GCP")
 )
 
-// Infrastructure access labels (tests requiring direct cluster access beyond the API)
+// Infrastructure access labels
 var (
-	MCAccess = ginkgo.Label("Access:MC")
+	MCAccess        = ginkgo.Label("Access:MC")
+	PublicAPIAccess = ginkgo.Label("Access:PublicAPI")
 )
 
 // Lifecycle labels
