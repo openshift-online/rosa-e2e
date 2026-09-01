@@ -29,9 +29,16 @@ const (
 func NewOCMConnection(cfg *config.Config) (*sdk.Connection, error) {
 	builder := sdk.NewConnectionBuilder().
 		URL(cfg.OCMBaseURL()).
-		TokenURL(tokenURL).
-		Client(clientID, clientSecret).
-		Tokens(cfg.OCMToken)
+		TokenURL(tokenURL)
+
+	if cfg.OCMClientID != "" && cfg.OCMClientSecret != "" {
+		builder.Client(cfg.OCMClientID, cfg.OCMClientSecret)
+	} else {
+		builder.Client(clientID, clientSecret)
+	}
+	if cfg.OCMToken != "" {
+		builder.Tokens(cfg.OCMToken)
+	}
 
 	conn, err := builder.Build()
 	if err != nil {
