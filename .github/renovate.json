@@ -3,6 +3,11 @@
   "schedule": ["before 6am on Monday"],
   "packageRules": [
     {
+      "description": "Run CI for Renovate dependency updates",
+      "matchManagers": ["gomod", "dockerfile", "github-actions", "pre-commit", "tekton"],
+      "addLabels": ["ok-to-test"]
+    },
+    {
       "matchManagers": ["gomod"],
       "groupName": "go dependencies",
       "groupSlug": "go-deps"
@@ -23,8 +28,21 @@
       "groupSlug": "github-actions"
     },
     {
-      "matchUpdateTypes": ["digest", "pin", "pinDigest"],
-      "automerge": true
+      "description": "Safe Go dependency updates through Prow and Tide",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["require"],
+      "matchUpdateTypes": ["patch", "pin", "pinDigest"],
+      "groupName": "safe go dependency updates",
+      "groupSlug": "safe-go-deps",
+      "automerge": false,
+      "platformAutomerge": false,
+      "addLabels": ["lgtm", "approved"]
+    },
+    {
+      "description": "Fork replacements require manual updates",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["replace"],
+      "enabled": false
     }
   ]
 }
