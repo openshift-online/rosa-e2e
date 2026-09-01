@@ -354,6 +354,8 @@ categories:
         prow_job: periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-hcp-ovn
       - name: HCP 5.0
         prow_job: periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn
+      - name: HCP 5.1
+        prow_job: periodic-ci-openshift-release-main-nightly-5.1-e2e-rosa-hcp-ovn
 
   - id: classic-conformance
     scope: upstream
