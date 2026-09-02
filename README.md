@@ -147,6 +147,7 @@ Configuration loads from environment variables with optional YAML file overlay. 
 | `OCM_CLIENT_SECRET` | OCM service-account client secret | - |
 | `OCM_ENV` | OCM environment: integration, staging, production | integration |
 | `OCM_BASE_URL` | Override OCM API URL | - |
+| `OCM_TOKEN_URL` | Override OAuth token endpoint | Red Hat SSO |
 
 ### Cluster Selection
 
