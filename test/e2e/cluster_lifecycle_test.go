@@ -73,11 +73,9 @@ var _ = Describe("ROSA HCP Cluster Lifecycle: Existing Cluster", labels.Critical
 		Expect(verifiers.VerifyClusterReady(tc.Connection(), cfg.ClusterID)).To(Succeed())
 
 		By("Verifying cluster health via Kubernetes API")
-		kubeConfig, err := framework.GetClusterCredentials(tc.Connection(), cfg.ClusterID)
-		Expect(err).NotTo(HaveOccurred())
-
-		kubeClient, err := framework.NewKubeClient(kubeConfig)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(tc.InitHCClients()).To(Succeed())
+		kubeClient := tc.HCKubeClient()
+		Expect(kubeClient).NotTo(BeNil())
 
 		// For existing clusters, just verify all nodes are ready (don't assert count
 		// since autoscaler may have changed it).
@@ -158,11 +156,9 @@ var _ = Describe("ROSA Classic Cluster Lifecycle: Existing Cluster", labels.Crit
 		Expect(verifiers.VerifyMachinePoolsExist(tc.Connection(), cfg.ClusterID)).To(Succeed())
 
 		By("Verifying cluster health via Kubernetes API")
-		kubeConfig, err := framework.GetClusterCredentials(tc.Connection(), cfg.ClusterID)
-		Expect(err).NotTo(HaveOccurred())
-
-		kubeClient, err := framework.NewKubeClient(kubeConfig)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(tc.InitHCClients()).To(Succeed())
+		kubeClient := tc.HCKubeClient()
+		Expect(kubeClient).NotTo(BeNil())
 
 		// Use Eventually to tolerate transient node NotReady blips.
 		Eventually(func() error {
@@ -194,11 +190,9 @@ var _ = Describe("OSD GCP Cluster Lifecycle: Existing Cluster", labels.Critical,
 		Expect(verifiers.VerifyMachinePoolsExist(tc.Connection(), cfg.ClusterID)).To(Succeed())
 
 		By("Verifying cluster health via Kubernetes API")
-		kubeConfig, err := framework.GetClusterCredentials(tc.Connection(), cfg.ClusterID)
-		Expect(err).NotTo(HaveOccurred())
-
-		kubeClient, err := framework.NewKubeClient(kubeConfig)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(tc.InitHCClients()).To(Succeed())
+		kubeClient := tc.HCKubeClient()
+		Expect(kubeClient).NotTo(BeNil())
 
 		// Use Eventually to tolerate transient node NotReady blips.
 		Eventually(func() error {
