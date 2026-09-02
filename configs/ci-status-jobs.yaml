@@ -333,6 +333,23 @@ categories:
       - name: OSDFM Basic Periodic
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-staging-ocm-fvt-periodic-osdfm-basic-periodic-stage
 
+  - id: hypershift-ci
+    scope: component
+    components: [hypershift]
+    name: HyperShift CI
+    team:
+      id: "a5267ed5-eaa8-4cd6-90e3-d0ce145dbfbf"
+      name: ROSA HCP Platform
+      slack_channel: team-rosa-hcp-platform
+      slack_alias: team-rosa-hcp-platform
+    labels: [ci-failure, hypershift-ci]
+    prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*hypershift-ci*"
+    jobs:
+      - name: INT HCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-hypershift-ci-rosa-hcp-e2e-integration-stable-4-22
+      - name: STG HCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-hypershift-ci-rosa-hcp-e2e-staging-stable-4-22
+
   - id: hcp-conformance
     scope: upstream
     name: HCP Conformance
