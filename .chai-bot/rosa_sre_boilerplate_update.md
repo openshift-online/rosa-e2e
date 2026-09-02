@@ -19,24 +19,25 @@ The following operator repos have `boilerplate/` directories and are in scope fo
 
 | Operator | GitHub Repo |
 |---|---|
-| route-monitor-operator | openshift/route-monitor-operator |
-| pagerduty-operator | openshift/pagerduty-operator |
-| configure-alertmanager-operator | openshift/configure-alertmanager-operator |
-| ocm-agent-operator | openshift/ocm-agent-operator |
-| managed-upgrade-operator | openshift/managed-upgrade-operator |
-| rbac-permissions-operator | openshift/rbac-permissions-operator |
-| deadmanssnitch-operator | openshift/deadmanssnitch-operator |
-| splunk-forwarder-operator | openshift/splunk-forwarder-operator |
-| custom-domains-operator | openshift/custom-domains-operator |
-| osd-metrics-exporter | openshift/osd-metrics-exporter |
 | aws-account-operator | openshift/aws-account-operator |
 | aws-vpce-operator | openshift/aws-vpce-operator |
 | certman-operator | openshift/certman-operator |
 | cloud-ingress-operator | openshift/cloud-ingress-operator |
+| configuration-anomaly-detection | openshift/configuration-anomaly-detection |
+| configure-alertmanager-operator | openshift/configure-alertmanager-operator |
+| deadmanssnitch-operator | openshift/deadmanssnitch-operator |
 | gcp-project-operator | openshift/gcp-project-operator |
-| managed-velero-operator | openshift/managed-velero-operator |
 | managed-cluster-validating-webhooks | openshift/managed-cluster-validating-webhooks |
 | managed-node-metadata-operator | openshift/managed-node-metadata-operator |
+| managed-upgrade-operator | openshift/managed-upgrade-operator |
+| managed-velero-operator | openshift/managed-velero-operator |
+| ocm-agent | openshift/ocm-agent |
+| ocm-agent-operator | openshift/ocm-agent-operator |
+| osd-metrics-exporter | openshift/osd-metrics-exporter |
+| pagerduty-operator | openshift/pagerduty-operator |
+| rbac-permissions-operator | openshift/rbac-permissions-operator |
+| route-monitor-operator | openshift/route-monitor-operator |
+| splunk-forwarder-operator | openshift/splunk-forwarder-operator |
 
 Process each repo in the list above. All repos have been verified to contain `boilerplate/update.cfg`.
 
