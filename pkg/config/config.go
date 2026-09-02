@@ -17,6 +17,9 @@ type Config struct {
 	OCMClientID     string `yaml:"-"` // never serialize client credentials
 	OCMClientSecret string `yaml:"-"` // never serialize client credentials
 
+	// OAuth token endpoint (defaults to commercial Red Hat SSO).
+	OCMTokenURL string `yaml:"ocm_token_url"`
+
 	// Cluster topology: "hcp", "classic", or "osd-gcp" (auto-detected from OCM if empty)
 	ClusterTopology string `yaml:"cluster_topology"`
 
@@ -88,6 +91,7 @@ func (c *Config) OCMBaseURL() string {
 func Load() (*Config, error) {
 	cfg := &Config{
 		OCMEnv:             "staging",
+		OCMTokenURL:        "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
 		AWSRegion:          "us-east-2",
 		ClusterNamePrefix:  "rosa-e2e",
 		ComputeMachineType: "m5.xlarge",
@@ -111,6 +115,9 @@ func Load() (*Config, error) {
 	}
 	if v := os.Getenv("OCM_TOKEN"); v != "" {
 		cfg.OCMToken = v
+	}
+	if v := os.Getenv("OCM_TOKEN_URL"); v != "" {
+		cfg.OCMTokenURL = v
 	}
 	if v := os.Getenv("OCM_CLIENT_ID"); v != "" {
 		cfg.OCMClientID = v

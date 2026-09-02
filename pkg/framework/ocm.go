@@ -17,7 +17,9 @@ import (
 )
 
 const (
-	tokenURL     = "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+	// Default OAuth client used when no OCM_CLIENT_ID is supplied. clientSecret stays empty so
+	// the SDK uses the token/refresh grant rather than the client-credentials grant (which would
+	// ignore the offline token entirely).
 	clientID     = "cloud-services"
 	clientSecret = ""
 
@@ -29,10 +31,14 @@ const (
 func NewOCMConnection(cfg *config.Config) (*sdk.Connection, error) {
 	builder := sdk.NewConnectionBuilder().
 		URL(cfg.OCMBaseURL()).
-		TokenURL(tokenURL)
+		TokenURL(cfg.OCMTokenURL)
 
 	if cfg.OCMClientID != "" && cfg.OCMClientSecret != "" {
 		builder.Client(cfg.OCMClientID, cfg.OCMClientSecret)
+	} else if cfg.OCMClientID != "" {
+		// Client ID without a secret: a public OAuth client used for the token/refresh grant
+		// (for example, an offline token issued against a non-default token endpoint).
+		builder.Client(cfg.OCMClientID, clientSecret)
 	} else {
 		builder.Client(clientID, clientSecret)
 	}
