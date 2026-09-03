@@ -27,6 +27,8 @@ If Prow tools don't return historical build data directly, use `fetch_web_conten
 
 **Important: fetch ALL categories.** There are 13+ categories with ~139 total jobs. Process every category completely. If a fetch fails or times out for a specific job, mark that job as "fetch error" (not "no runs") and continue with the next job. Do not skip entire categories due to fetch issues. A category should only show "no runs" if every job in it genuinely returned zero completed builds in the data, not because the fetch failed.
 
+**Sippy release coverage:** The ROSA CI registry spans multiple Sippy synthetic releases — `rosa-stage`, `rosa-integration`, and `rosa-production`. When using Prow CI tools that filter by Sippy release, query all three releases and merge results, deduplicating by `prow_job` name. Do not limit queries to `rosa-stage` alone — integration and production environment jobs will be missed.
+
 ### 3. Compute pass rates and trends
 
 **Per-category pass rate**: aggregate pass/fail across all jobs in each category.
@@ -106,8 +108,10 @@ For each selected failing job in the category (up to the scope cap):
 6. Note how frequently the job has failed recently (e.g., "3 of 7 runs failed this week")
 7. Link to the failing Prow job run(s)
 
-For deeper pass rate analysis, query the Sippy API:
-`https://sippy.dptools.openshift.org/api/jobs?release=rosa-stage&limit=100`
+For deeper pass rate analysis, query the Sippy API across all ROSA synthetic releases and merge results:
+- `https://sippy.dptools.openshift.org/api/jobs?release=rosa-stage&limit=200`
+- `https://sippy.dptools.openshift.org/api/jobs?release=rosa-integration&limit=200`
+- `https://sippy.dptools.openshift.org/api/jobs?release=rosa-production&limit=200`
 
 Format each threaded reply like:
 
