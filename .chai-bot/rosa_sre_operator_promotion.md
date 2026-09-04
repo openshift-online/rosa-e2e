@@ -22,6 +22,7 @@ The stage target's `ref` represents the latest sha that has passed through the e
 ## Important Rules
 
 - **ALWAYS produce a Slack report** — even if no operators need promotion, post a summary message.
+- **One threaded reply per operator** — each operator's details MUST be posted as its own separate threaded reply to the parent message. NEVER batch multiple operators into the parent message or into a single reply. The parent message contains ONLY the header and summary statistics.
 - **One MR per operator** — each operator gets its own MR (not batched). This allows independent review and rollback.
 - **Only modify the `ref` field** in prod-canary targets. Never change namespace refs, parameters, promotion subscriptions, or any other field.
 - **Only promote a sha that has progressed through all pipeline stages** (integration → stage). The stage target ref in the saas file represents the latest validated sha.
@@ -64,17 +65,35 @@ All saas files are under `data/services/osd-operators/cicd/saas/` in `gitlab.cee
 
 ## Procedure
 
-### 1. Post initial Slack message
+### 1. Process all operators, then post to Slack
 
-Post a parent message to `#sre-operators`:
+Complete ALL operator processing (steps 2–4) first, collecting results for every operator before posting anything to Slack. Once all results are collected, post to Slack following the Delivery Order below.
+
+### Delivery Order
+
+After all operators are processed (steps 2–4), post to Slack in this exact sequence:
+
+**A. Post the parent message** to `#sre-operators` via `send_response(mode="report")`. The parent message contains ONLY the header and summary statistics — no individual operator details:
 
 > 🚀 **Weekly SRE Operator Promotion — <today's date>**
 > cc @osd-operators-saas-approver
-> Checking <N> operators for prod-canary promotion…
+>
+> **Summary:**
+> - ✅ Promoted: <N> operators
+> - ⚠️ Promoted with flags: <N> operators
+> - 🔍 Pipeline anomalies: <N> operators
+> - ⏭️ Skipped (no changes): <N> operators
+> - Total MRs created: <N>
 
 Use `<!subteam^S0BLN6AN7EK>` to mention the @osd-operators-saas-approver group.
 
-All subsequent operator-specific updates go as **threaded replies** to this parent message.
+**B. Post each operator as a separate threaded reply** to the parent message. Every operator gets its own individual reply — one reply per operator (see Section 5 for format templates). Post in this priority order:
+1. Promoted with flags (⚠️) — most attention needed
+2. Promoted low risk (✅)
+3. Pipeline anomalies (🔍)
+4. Skipped / no changes (⏭️)
+
+> **Critical**: Never put operator details in the parent message. Never batch multiple operators into a single threaded reply. One reply = one operator.
 
 ### 2. For each operator — Check for pipeline-validated changes
 
@@ -184,11 +203,10 @@ Use these emoji-prefixed formats for the threaded replies:
 **No changes:**
 > ⏭️ **<operator-name>** — No new pipeline-validated changes. Skipping.
 
-### 6. Post summary
+### 6. Summary statistics
 
-After processing all operators, edit the parent message or post a final threaded reply with a summary:
+The summary statistics are included directly in the parent message (see Delivery Order, Step A). There is no separate summary threaded reply. Compute the counts from collected results before posting the parent message:
 
-> **Summary:**
 > - ✅ Promoted: <N> operators
 > - ⚠️ Promoted with flags: <N> operators
 > - 🔍 Pipeline anomalies: <N> operators
