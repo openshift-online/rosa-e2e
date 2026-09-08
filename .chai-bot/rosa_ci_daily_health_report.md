@@ -44,6 +44,8 @@ If Prow tools don't return historical build data directly, use `fetch_web_conten
 - :chart_with_downwards_trend: degrading (10+ percentage points lower)
 - :left_right_arrow: stable
 
+**Consecutive failures**: For each job, examine the build history in reverse chronological order (most recent first). Count how many builds failed consecutively from the most recent build backward until a passing build is found. This count is `consecutive_failures`. If the most recent build passed, `consecutive_failures` is 0. If all builds in the window failed, `consecutive_failures` equals the total number of builds. Example: builds [FAIL, FAIL, FAIL, PASS, FAIL, PASS, PASS] → consecutive_failures = 3 (the three most recent are failures).
+
 ### 4. Channel response (top-level summary)
 
 Post a concise summary as your channel response. This is the top-level message that everyone sees. **Brevity is critical** -- this message posts daily to a busy channel.
@@ -126,7 +128,7 @@ Failing since {date}. {Root cause analysis.}
 {Short summary and analysis}
 ```
 
-**Scope cap:** Analyze the 5 worst categories first (lowest pass rate). For each, analyze at most 5 failing jobs (worst pass rate first). This keeps the report actionable without requiring excessive tool calls. If more categories are failing, note the count in the last threaded reply (e.g., "2 additional categories below 80% — see Prow dashboard for details").
+**Scope cap:** Analyze the 5 worst categories first (lowest pass rate). For each, analyze at most 5 failing jobs (worst pass rate first). This keeps the report actionable without requiring excessive tool calls. If more categories are failing, note the count in the last threaded reply (e.g., "2 additional categories below 80% — see Prow dashboard for details"). Jobs analyzed here that have `consecutive_failures >= 3` will have their `failure_classification`, `failing_tests`, `failure_summary`, and `diagnosis` populated in the artifact automatically. Step 5a handles any remaining remediation-eligible jobs not covered by this scope cap.
 
 ### Reference: common failure patterns
 
@@ -138,6 +140,22 @@ These are patterns that come up often. Use them as hints, not a rigid checklist.
 - OCM login: `Cannot login` or `401 Unauthorized`, expired SSO credentials
 - Boskos lease timeout: `failed to acquire lease`, all quota slices in use
 - Prometheus alert flakes: transient alerts firing on fresh clusters
+
+### 5a. Artifact enrichment for remediation
+
+After composing threaded replies (step 5), do a **lightweight classification pass** for remediation-eligible jobs that were NOT already analyzed in step 5.
+
+**Scope:** All jobs where `consecutive_failures >= 3` AND `failure_classification` is still empty after step 5. These are the jobs the remediation follow-up will attempt to auto-fix or file Jira tickets for.
+
+**For each such job:**
+1. Fetch the build log from the most recent failure (same as step 5.1)
+2. Extract the specific failing test names or step names → populate `failing_tests`
+3. Assign a `failure_classification` label based on log patterns (e.g., "conformance skip list", "STS account-roles crash", "cluster creation timeout", "Boskos lease timeout", "test code bug", "infra flake")
+4. Write a one-line `failure_summary`
+
+**Do NOT** create threaded replies for these jobs — the output is artifact-only. This step ensures the remediation follow-up has the data it needs to pattern-match and open auto-fix PRs.
+
+**Budget:** This step should process at most 15 additional jobs beyond what step 5 already analyzed. If more than 15 jobs qualify, prioritize by highest `consecutive_failures` count.
 
 ### 6. Write handoff artifact
 
