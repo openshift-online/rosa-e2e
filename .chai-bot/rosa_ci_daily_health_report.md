@@ -4,7 +4,7 @@ You are running a **cron** scheduled task that produces a daily CI health report
 
 ## Goal
 
-Check the pass/fail history (last completed builds over 7 days per job) for all ROSA CI periodic jobs across all categories defined in the job registry. Report per-category pass rates, 7-day trends, and failure classifications. If all categories are >= 80%, respond with a brief summary and `no_action_required()`. After reporting, write a YAML handoff artifact to the bot's fork. When failures are present (any category < 80%), chain remediation follow-ups in the same thread; on all-green reports, the artifact is written but no remediation follow-up is scheduled.
+Check the pass/fail history (last completed builds over 7 days per job) for all ROSA CI periodic jobs across all categories defined in the job registry. Report per-category pass rates, 7-day trends, and failure classifications. If all categories are >= 80%, respond with a brief summary and `no_action_required()`. After reporting, write a YAML handoff artifact to the bot's fork. When failures are present (any category < 80%), attempt one auto-fix PR for the highest-priority fixable failure and shepherd existing `[rosa-ci-fix]` PRs — all inline, no follow-up chaining. On all-green reports, the artifact is written but no remediation action is taken.
 
 ## Procedure
 
@@ -106,9 +106,17 @@ For each selected failing job in the category (up to the scope cap):
 2. Identify the specific failure: key error messages, failing test names, failing step
 3. For OCM FVT jobs, also check the `cs-telemetry` logs in the Prow artifacts. These contain Clusters Service-side request/response data that can reveal CS errors, timeouts, or API failures that caused the test to fail. Look in the artifacts directory for files matching `cs-telemetry*` or `cs_telemetry*`.
 4. Perform root cause analysis using Sippy, Prow CI tools, or other available tools
-5. Classify the failure based on what you find in the logs
+5. Classify the failure using the buckets below
 6. Note how frequently the job has failed recently (e.g., "3 of 7 runs failed this week")
 7. Link to the failing Prow job run(s)
+
+**Classification buckets:** Classify each analyzed failure into one of four categories:
+- **Product bug** — a real defect in OCP or ROSA shipped code → track as OCPBUGS or ROSAENG Jira
+- **Env/config issue** — staging environment is flaky, under-provisioned, or misconfigured → config change PR
+- **Test bug** — test logic error: bad assertion, race condition, hardcoded value that drifted → test code PR (primary auto-fix target)
+- **Resilience / de-flake** — underlying behavior is correct but test is brittle against timing or environment variance → hardening PR (Eventually, retries, timeouts)
+
+Use these exact labels in the `failure_classification` artifact field.
 
 For deeper pass rate analysis, query the Sippy API across all ROSA synthetic releases and merge results:
 - `https://sippy.dptools.openshift.org/api/jobs?release=rosa-stage&limit=200`
@@ -128,7 +136,7 @@ Failing since {date}. {Root cause analysis.}
 {Short summary and analysis}
 ```
 
-**Scope cap:** Analyze the 5 worst categories first (lowest pass rate). For each, analyze at most 5 failing jobs (worst pass rate first). This keeps the report actionable without requiring excessive tool calls. If more categories are failing, note the count in the last threaded reply (e.g., "2 additional categories below 80% — see Prow dashboard for details"). Jobs analyzed here that have `consecutive_failures >= 3` will have their `failure_classification`, `failing_tests`, `failure_summary`, and `diagnosis` populated in the artifact automatically. Step 5a handles any remaining remediation-eligible jobs not covered by this scope cap.
+**Scope cap:** Analyze the 5 worst categories first (lowest pass rate). For each, analyze at most 5 failing jobs (worst pass rate first). This keeps the report actionable without requiring excessive tool calls. If more categories are failing, note the count in the last threaded reply (e.g., "2 additional categories below 80% — see Prow dashboard for details").
 
 ### Reference: common failure patterns
 
@@ -140,22 +148,6 @@ These are patterns that come up often. Use them as hints, not a rigid checklist.
 - OCM login: `Cannot login` or `401 Unauthorized`, expired SSO credentials
 - Boskos lease timeout: `failed to acquire lease`, all quota slices in use
 - Prometheus alert flakes: transient alerts firing on fresh clusters
-
-### 5a. Artifact enrichment for remediation
-
-After composing threaded replies (step 5), do a **lightweight classification pass** for remediation-eligible jobs that were NOT already analyzed in step 5.
-
-**Scope:** All jobs where `consecutive_failures >= 3` AND `failure_classification` is still empty after step 5. These are the jobs the remediation follow-up will attempt to auto-fix or file Jira tickets for.
-
-**For each such job:**
-1. Fetch the build log from the most recent failure (same as step 5.1)
-2. Extract the specific failing test names or step names → populate `failing_tests`
-3. Assign a `failure_classification` label based on log patterns (e.g., "conformance skip list", "STS account-roles crash", "cluster creation timeout", "Boskos lease timeout", "test code bug", "infra flake")
-4. Write a one-line `failure_summary`
-
-**Do NOT** create threaded replies for these jobs — the output is artifact-only. This step ensures the remediation follow-up has the data it needs to pattern-match and open auto-fix PRs.
-
-**Budget:** This step should process at most 15 additional jobs beyond what step 5 already analyzed. If more than 15 jobs qualify, prioritize by highest `consecutive_failures` count.
 
 ### 6. Write handoff artifact
 
@@ -218,24 +210,58 @@ categories:
 - `team` and `labels`: from the job registry (`ci-status-jobs.yaml`). Include them verbatim. If a job overrides the category-level team/labels, use the job-level values.
 - If a job had a fetch error in step 2, set `pass_count` and `fail_count` to -1, `total` to 0, `pass_rate` to -1, `consecutive_failures` to 0, and `failure_classification` to "fetch_error". This signals that no valid data was retrieved — remediation follow-ups must skip these jobs entirely (they are not real failures).
 
-### 7. Deliver response and schedule remediation follow-up
+### 7. Remediation — one auto-fix PR
 
-   **All-green path** (every category >= 80%): Call `send_response()` to deliver the summary. Do **not** schedule a remediation follow-up — there is nothing to remediate. The artifact is still written so PR shepherding can happen if triggered manually.
+After posting the health report and writing the artifact, attempt **one** auto-fix PR for the highest-priority fixable failure.
 
-   **Failures present** (any category < 80%):
+**Scope:** From the jobs analyzed in step 5, pick the single failure with the highest `consecutive_failures` that matches an auto-fixable pattern. Skip jobs that already have an open `[rosa-ci-fix]` PR.
 
-   1. **First**, call `schedule_followup` with a 2-minute delay. The follow-up fires **in the same thread** as the health report, so threading is automatic — no thread_ts or channel_id needed. Use this description (replace `<fork_repo>` with the actual fork repo path from step 6.1 and `<commit_sha>` with the commit SHA from step 6.5):
-   2. **Then**, call `send_response()` to deliver the summary (and threaded replies). **`send_response()` ends your current turn — no tool calls after it.**
+**Auto-fixable patterns** (in priority order):
+1. **Conformance skip list** — failing OCP conformance tests → add to skip list in `openshift-online/rosa-e2e`
+2. **Test code bug** — test assertion or setup error → fix in the test repo
+3. **CI config / step registry** — workflow or step misconfiguration → fix in `openshift/release`
+4. **ROSA CLI test fix** — CLI test failure due to changed behavior → fix in `openshift/rosa`
+5. **SRE operator fix** — operator test/config issue → fix in the relevant SRE operator repo
+6. **Log / artifact improvement** — failure analysis couldn't reach root cause without inference → PR to add missing gather step, `oc describe`/`logs`/`get events`, or CR status dump to the step-registry ref or test harness
 
-   > PR Remediation follow-up. You are continuing the daily health report thread with automated remediation.
-   >
-   > 1. Call `priv_scm_ensure_fork("github.com", "openshift-online/rosa-e2e")` to resolve the fork path.
-   > 2. Read the handoff artifact using `github_file_content(repo="<fork_repo>", path=".chai-bot/reports/daily_health_latest.yaml", ref="<commit_sha>")`. Parse the YAML. Verify `report_date` is today — if stale, call `no_action_required()`.
-   > 3. Read the remediation instructions using `github_file_content(repo="openshift-online/rosa-e2e", path=".chai-bot/rosa_ci_daily_remediation.md")`. Follow the **"## PR Remediation"** section (auto-fix PRs and PR shepherding).
-   > 4. **Action branch** (PRs were opened, shepherded, or closed): Compose a summary of all PR actions taken. Call `schedule_followup` with a 2-minute delay for Jira remediation (use the description in step 6), then call `send_response()` to post the summary.
-   > 5. **No-action branch** (no fixable failures, no open PRs to shepherd): Schedule the Jira follow-up directly (persistent failures may still need tickets even if no PRs are warranted), then call `no_action_required()`. Do NOT post an empty summary via `send_response()`.
-   > 6. Jira follow-up description (used by both branches):
-   >    "Jira Remediation follow-up. You are continuing the daily health report thread with Jira ticket creation for persistent failures. (1) Call priv_scm_ensure_fork to resolve the fork. (2) Read the handoff artifact from <fork_repo> at .chai-bot/reports/daily_health_latest.yaml using ref=<commit_sha>. Verify report_date is today. (3) Read the remediation instructions from openshift-online/rosa-e2e at .chai-bot/rosa_ci_daily_remediation.md. Follow the '## Jira Remediation' section. (4) Compose a summary of Jira actions taken and post it using send_response(). If no Jira actions are needed, call no_action_required()."
+**Allowed target repos** (repos with `scm_create_change_request` grants on this persona):
+
+*github.com — openshift/*:*
+`aws-account-operator`, `aws-vpce-operator`, `boilerplate`, `certman-operator`, `cloud-ingress-operator`, `configure-alertmanager-operator`, `custom-domains-operator`, `deadmanssnitch-operator`, `dedicated-admin-operator`, `gcp-project-operator`, `hypershift-dataplane-metrics-forwarder`, `hypershift-logging-operator`, `managed-cluster-validating-webhooks`, `managed-node-metadata-operator`, `managed-upgrade-operator`, `managed-velero-operator`, `must-gather-operator`, `ocm-agent`, `ocm-agent-operator`, `origin`, `pagerduty-operator`, `rbac-permissions-operator`, `release` _(step registry and CI config only)_, `rosa`, `route-monitor-operator`
+
+*github.com — openshift-online/*:*
+`rosa-account-manager-service`, `rosa-backend-tests`, `rosa-clusters-service`, `rosa-e2e`, `rosa-eng-dashboard`, `rosa-external-tests`, `rosa-gap-analysis`, `rosa-service-log`
+
+*gitlab.cee.redhat.com:*
+`service/app-interface`, `service/backplane-api`, `service/osd-rhobs-rules-and-dashboards`, `service/uhc-clusters-service`, `releng/konflux-release-data`
+
+**Process:**
+1. Fetch the build log for the selected failure
+2. Diagnose the root cause
+2b. **Check for existing Jira** — before filing a new ticket or opening a fix PR, search ROSAENG for an existing open issue covering this failure (by job name or error signature). If found, link to it and skip creating a duplicate.
+3. If fixable: spin up a workspace, write the fix, push, open a PR with `[rosa-ci-fix]` in the title
+4. If NOT fixable after diagnosis: note it in the report as "investigated, not auto-fixable — [reason]"
+
+**Constraints:**
+- Maximum **1 PR per run** — if multiple failures are fixable, pick only the highest priority one
+- Never modify production configs (`app-interface`)
+- PRs require human `/lgtm` and `/approve` before merge
+- PR title must start with `[rosa-ci-fix]` for tracking
+- Before proposing a new Jira ticket, search for existing open ROSAENG issues for the same job or error pattern — skip duplicates
+
+**Shepherd existing `[rosa-ci-fix]` PRs:**
+After the auto-fix attempt, check for any open PRs with `[rosa-ci-fix]` in the title across the allowed repos (authored by `redhat-chai-bot`). For each:
+- If CI passed and no blocking review comments: note "ready for /lgtm + /approve" in the report
+- If CI failed on a check relevant to the change: `/retest` once
+- If PR is older than 7 days with no review activity: close with a comment "stale — closing, will re-evaluate in next daily run"
+- Process at most 5 existing PRs per run
+
+**Report remediation results** in a threaded reply (using `---THREAD_BREAK---`):
+```
+:wrench: *Remediation*
+• Auto-fix: [opened PR #N in repo / or "no fixable failures found"]
+• Shepherded: N existing [rosa-ci-fix] PRs (N ready, N retested, N closed stale)
+```
 
 ## Constraints
 
@@ -244,7 +270,6 @@ categories:
 - If more than half the jobs return no data, warn about possible Prow/GCS issues at the top.
 - Before sending: if any category is below 80%, verify your response content contains `---THREAD_DETAILS---` followed by at least one threaded reply section. If these delimiters are missing, your threaded replies will not be posted — go back to step 5.
 - Always write the handoff artifact (step 6) before calling `send_response()`, even if all categories are green.
-- Only ONE pending follow-up per thread at a time. Do not schedule multiple follow-ups from the same turn.
-- `send_response()` ends the turn immediately — no tool calls after it. Always call `schedule_followup` before `send_response()` when a follow-up is needed.
-- On the all-green path (all categories >= 80%), do NOT schedule a remediation follow-up.
+- `send_response()` ends the turn immediately — no tool calls after it.
+- On the all-green path (all categories >= 80%), skip step 7 (remediation) entirely.
 
