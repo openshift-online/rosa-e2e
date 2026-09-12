@@ -216,7 +216,7 @@ After posting the health report and writing the artifact, attempt **one** auto-f
 
 **Scope:** From the jobs analyzed in step 5, pick the single failure with the highest `consecutive_failures` that matches an auto-fixable pattern. Skip jobs that already have an open `[rosa-ci-fix]` PR.
 
-**Fallback for unanalyzed categories:** If no auto-fixable failure is found from the step 5 analysis, fetch the build log for the single highest `consecutive_failures` unanalyzed job (from the categories not covered in step 5), classify it using the 4-bucket system, and attempt a fix if it matches any auto-fixable pattern. This is one extra log fetch, not a full sweep.
+**Mandatory fallback (always runs if no PR was opened above):** Regardless of whether step 5 classified any failures, if no `[rosa-ci-fix]` PR was opened in the steps above, fetch the build log for the single highest `consecutive_failures` job that has an empty `failure_classification` in the artifact. Classify it using the 4-bucket system (product bug / env-config / test bug / resilience). If it matches any auto-fix pattern (1-8), open a `[rosa-ci-fix]` PR. Do NOT skip this step because classified failures exist — the point is to look beyond what step 5 analyzed.
 
 **Auto-fixable patterns** (in priority order — all four classification buckets are fixable):
 1. **Conformance skip list** — failing OCP conformance tests → add to skip list in `openshift-online/rosa-e2e`
