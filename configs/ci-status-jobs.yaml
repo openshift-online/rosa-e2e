@@ -22,6 +22,7 @@ sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
 component_prow_filters:
   clusters-service: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*staging*"
   osd-fleet-manager: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm*"
+  osd-metrics-exporter: "https://prow.ci.openshift.org/?type=periodic&job=*osd-metrics-exporter*e2e*promotion*"
   certman-operator: "https://prow.ci.openshift.org/?type=periodic&job=*certman-operator*e2e*promotion*"
   cloud-ingress-operator: "https://prow.ci.openshift.org/?type=periodic&job=*cloud-ingress-operator*e2e*promotion*"
   rbac-permissions-operator: "https://prow.ci.openshift.org/?type=periodic&job=*rbac-permissions-operator*e2e*promotion*"
@@ -450,7 +451,7 @@ categories:
 
   - id: sre-operator-e2e
     scope: component
-    components: [certman-operator, cloud-ingress-operator, rbac-permissions-operator, route-monitor-operator, configure-alertmanager-operator, aws-vpce-operator, managed-upgrade-operator, ocm-agent-operator, splunk-forwarder-operator, aws-account-operator, managed-cluster-validating-webhooks]
+    components: [certman-operator, cloud-ingress-operator, rbac-permissions-operator, route-monitor-operator, configure-alertmanager-operator, aws-vpce-operator, managed-upgrade-operator, ocm-agent-operator, osd-metrics-exporter, splunk-forwarder-operator, aws-account-operator, managed-cluster-validating-webhooks]
     name: SRE Operator E2E
     team:
       id: "a0f44498-f22b-4cd4-a98f-f298cc375a94"
@@ -490,6 +491,14 @@ categories:
       - name: OAO Promotion STG
         prow_job: periodic-ci-openshift-ocm-agent-operator-master-rosa-sts-e2e-promotion-stage
         labels: [ocm-agent-operator]
+      - name: OME Promotion INT
+        prow_job: periodic-ci-openshift-osd-metrics-exporter-main-rosa-sts-e2e-promotion-int
+        labels:
+          - osd-metrics-exporter
+      - name: OME Promotion STG
+        prow_job: periodic-ci-openshift-osd-metrics-exporter-main-rosa-sts-e2e-promotion-stage
+        labels:
+          - osd-metrics-exporter
       - name: SFO Promotion INT
         prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-rosa-sts-e2e-promotion-int
         labels: [splunk-forwarder-operator]
