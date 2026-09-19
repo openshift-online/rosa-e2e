@@ -48,30 +48,61 @@ human only when genuinely blocked. Terminal outcomes are:
 "Flake, no action" is not a terminal outcome. It is a placeholder until you
 pick a bucket below.
 
-## Step 1: Dedup before doing anything
+## Step 1: Dedup and check for an active platform incident
 
-Before analyzing, check whether this failure is already handled:
+Before analyzing, check whether this failure is already handled or is
+collateral from a known outage:
 
-- Search open issues in BOTH `ROSAENG` and `OCPBUGS` (Step 2 can file into
-  either), and ALL open `[rosa-ci-fix]` PRs (not just recent ones -- an
-  older open fix PR still counts), for the same test id / root cause. If a
-  ticket or PR already tracks it, link it in the thread and skip straight to
-  shepherding (Step 5) rather than filing a duplicate.
+- Search open issues across the relevant Jira projects (not just one), and
+  ALL open `[rosa-ci-fix]` PRs (not just recent ones -- an older open fix PR
+  still counts), for the same test id / root cause. Which project depends on
+  the owning component:
+  - `ROSAENG` -- ROSA-specific bugs and CI issues.
+  - `OCPBUGS` -- OpenShift product bugs (OCP components).
+  - `DPTP` -- Test Platform / build-farm / Prow infra.
+  - any other project that owns the failing component (e.g. the
+    clusters-service / OCM backend project for `ocm-fvt` failures).
+  If a ticket or PR already tracks it, link it in the thread and skip
+  straight to shepherding (Step 5) rather than filing a duplicate.
 - If a fix PR for this exact test merged recently but this run still
   failed, suspect rebuild/promotion lag: check whether the test
   image/binary actually picked up the fix before treating it as a fresh
   failure.
+- **Check for an ongoing CI infra / Prow incident before bucketing.** A
+  platform-wide outage reclassifies the failure as env/infra (bucket 2), not
+  a product or test bug -- filing a per-job product/test ticket during an
+  outage just spams duplicates of one root cause. Signals to weigh:
+  - A burst of failures across many unrelated jobs in `#rosa-prow-info`
+    within the same short window (the strongest signal -- unrelated tests
+    don't break together by chance).
+  - Errors that point at build/test infra rather than the product: image
+    pull/registry failures, build cluster (`build0N`) unreachable or DNS
+    timeouts, lease/boskos acquisition failures, step-registry or
+    ci-operator errors before the test even runs.
+  - A known DPTP / Test Platform incident: an open Test Platform issue, or
+    a recent outage announcement in `#announce-testplatform` (`CFUGK0K9R`)
+    or `#forum-ocp-testplatform` (`CBN38N3MW`).
+  If an incident is active: bucket as env/infra, link the incident / DPTP
+  ticket (have chai-bot find or open one per the build-farm-infra
+  convention) instead of a new product/test ticket, hold retests until it
+  clears, and note in the thread that this is collateral from the incident,
+  not a job-specific defect. Only reopen normal triage once the platform is
+  healthy and the failure still reproduces.
 
 ## Step 2: Classify into exactly one bucket
 
 Read your own failure analysis and place the failure in one of four
 buckets. Every failure lands in exactly one:
 
-1. **Product bug (OCP or ROSA)** -- a real defect in shipped code. Track as
-   `OCPBUGS-XXXXX` (upstream OCP) or `ROSAENG-XXXXX` (ROSA-specific).
+1. **Product bug (OCP or ROSA)** -- a real defect in shipped code. Track in
+   the project that owns the component: `OCPBUGS` (upstream OCP), `ROSAENG`
+   (ROSA-specific), or whatever project owns the failing component (e.g. the
+   clusters-service / OCM backend project).
 2. **Env/config or stability** -- not a code defect; the staging/integration
-   environment is flaky, under-provisioned, or misconfigured. Resolution is
-   a config or infra change.
+   environment is flaky, under-provisioned, or misconfigured, or the CI/build
+   platform itself is degraded. Resolution is a config or infra change; track
+   it where the owner lives (`ROSAENG`, `DPTP` for Test Platform/build-farm
+   infra, etc.).
 3. **Test bug** -- the test logic is wrong (bad assertion, race against an
    async resource, drifted hardcoded value, wrong expected string).
    Resolution is a PR against the test repo.
@@ -127,7 +158,8 @@ message ts (the Prow `:red_jenkins_circle:` message), never a reply ts.
 Asking the questions starts the thread; it does not end it. Push toward the
 concrete outcome for the bucket:
 
-- **Product bug**: confirm it's filed as `OCPBUGS`/`ROSAENG` with an owning
+- **Product bug**: confirm it's filed in the owning project (`OCPBUGS`,
+  `ROSAENG`, or whatever project owns the component) with an owning
   team/component and is not a silent duplicate. The fix belongs to that
   team, so a filed+owned ticket reaches `Tracked` -- no PR of yours is
   required; note that in the thread.
