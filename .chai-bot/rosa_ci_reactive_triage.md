@@ -100,6 +100,20 @@ before filing or linking:
   module path `gitlab.cee.redhat.com/service/ocm-backend-tests` appears
   in imports but is NOT the repo location.
 
+### Known expected states
+
+Some infrastructure states that appear abnormal are actually expected for
+certain topologies. Do not mis-classify these as environment defects:
+
+- **Provision shard `status=maintenance` on `dedicated-v2` topology shards.**
+  Dedicated shards (topology `dedicated-v2`) normally operate in
+  `maintenance` status -- this is the mechanism that enables dedicated shard
+  functionality. When a CI failure reports
+  `provision_shard.status=maintenance (expected active)` for a shard whose
+  topology is `dedicated-v2`, do NOT classify as env/config (bucket 2).
+  The shard is working as designed. Instead, classify as test bug (bucket 3)
+  if the test does not correctly handle this legitimate state.
+
 ## Step 2: Classify into exactly one bucket
 
 Read your own failure analysis and place the failure in one of four
