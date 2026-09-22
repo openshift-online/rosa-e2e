@@ -89,6 +89,17 @@ collateral from a known outage:
   not a job-specific defect. Only reopen normal triage once the platform is
   healthy and the failure still reproduces.
 
+### Known repo mappings (test source vs. import paths)
+
+Some test repos use Go module paths that differ from their actual repo
+location. When tracing a failure to source code, verify the actual repo
+before filing or linking:
+
+- **OCM FVT backend tests** (`cases/cms/...`, `cases/...`): source lives
+  in `github.com/openshift-online/rosa-backend-tests` (private). The Go
+  module path `gitlab.cee.redhat.com/service/ocm-backend-tests` appears
+  in imports but is NOT the repo location.
+
 ## Step 2: Classify into exactly one bucket
 
 Read your own failure analysis and place the failure in one of four
