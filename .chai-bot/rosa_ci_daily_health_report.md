@@ -37,7 +37,6 @@ After loading the job registry, check for drift between `ci-status-jobs.yaml` an
 4. Report drift:
    - **Missing coverage:** jobs defined in `openshift/release` but not listed in `ci-status-jobs.yaml` (new jobs that need to be registered).
    - **Stale entries:** jobs listed in `ci-status-jobs.yaml` but not found in `openshift/release` (removed or renamed jobs that should be cleaned up).
-   Exclude jobs with `cron: "0 0 31 2 *"` (Feb 31 = effectively disabled) from the missing-coverage check — these are intentionally disabled and do not need registry entries unless they already have one.
 
 5. If drift is found, include a `:mag: *Registry Drift*` section in the top-level summary (after the category list, before the footer) listing the specific missing or stale jobs. If no drift is found, omit this section entirely.
 
