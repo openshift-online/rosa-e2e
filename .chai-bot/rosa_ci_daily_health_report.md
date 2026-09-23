@@ -17,7 +17,29 @@ Use `fetch_web_content` to retrieve this YAML file. It defines all jobs organize
 
 If the fetch fails, report the error and skip the health check. Do not use a hardcoded fallback (it goes stale and causes incorrect "no runs" reports).
 
-**Procedure adherence:** Follow steps 1→2→3→4→5→6 sequentially. Do not use broad CI analysis tools as a shortcut for steps 1-3. The job registry is the authoritative source for which jobs to check and how to categorize them.
+**Procedure adherence:** Follow steps 1→1b→2→3→4→5→6 sequentially. Do not use broad CI analysis tools as a shortcut for steps 1-3. The job registry is the authoritative source for which jobs to check and how to categorize them.
+
+### 1b. Registry drift detection
+
+After loading the job registry, check for drift between `ci-status-jobs.yaml` and the actual periodic test definitions in `openshift/release`.
+
+1. Fetch the ci-operator config files from `openshift/release` for each OCM FVT variant:
+   - `https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/openshift-online/rosa-e2e/openshift-online-rosa-e2e-main__ocm-fvt-rosa-hcp-staging.yaml` (→ category `ocm-fvt-hcp-stg`)
+   - `https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/openshift-online/rosa-e2e/openshift-online-rosa-e2e-main__ocm-fvt-rosa-hcp-integration.yaml` (→ category `ocm-fvt-hcp-int`)
+   - `https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/openshift-online/rosa-e2e/openshift-online-rosa-e2e-main__ocm-fvt-rosa-hcp-production.yaml` (→ category `ocm-fvt-hcp-prd`)
+
+2. From each config, extract all `- as: ocm-fvt-periodic-*` test names under the `tests:` key. Convert each to a full Prow job name using the pattern:
+   `periodic-ci-openshift-online-rosa-e2e-main-{variant}-{test_as_name}`
+   where `{variant}` is the ci-operator variant (e.g. `ocm-fvt-rosa-hcp-staging`) and `{test_as_name}` is the `as:` value.
+
+3. Compare the derived Prow job names against the `prow_job` values listed in `ci-status-jobs.yaml` under each matching category.
+
+4. Report drift:
+   - **Missing coverage:** jobs defined in `openshift/release` but not listed in `ci-status-jobs.yaml` (new jobs that need to be registered).
+   - **Stale entries:** jobs listed in `ci-status-jobs.yaml` but not found in `openshift/release` (removed or renamed jobs that should be cleaned up).
+   Exclude jobs with `cron: "0 0 31 2 *"` (Feb 31 = effectively disabled) from the missing-coverage check — these are intentionally disabled and do not need registry entries unless they already have one.
+
+5. If drift is found, include a `:mag: *Registry Drift*` section in the top-level summary (after the category list, before the footer) listing the specific missing or stale jobs. If no drift is found, omit this section entirely.
 
 ### 2. Collect build history
 
