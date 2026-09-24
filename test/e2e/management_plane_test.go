@@ -202,7 +202,7 @@ var _ = Describe("Management Plane: Cluster Health Indicators", labels.High, lab
 		GinkgoWriter.Printf("Cluster console URL: %s\n", consoleURL)
 	})
 
-	It("should have API URL responding", func(ctx context.Context) {
+	It("should have API URL responding", labels.PublicAPIAccess, func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
 		}

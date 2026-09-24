@@ -2,8 +2,8 @@ package config
 
 type CIStatusConfig struct {
 	SippyURL             string            `yaml:"sippy_url"`
-	ComponentProwFilters map[string]string  `yaml:"component_prow_filters,omitempty"`
-	Categories           []StatusCategory   `yaml:"categories"`
+	ComponentProwFilters map[string]string `yaml:"component_prow_filters,omitempty"`
+	Categories           []StatusCategory  `yaml:"categories"`
 }
 
 type StatusCategory struct {
@@ -12,6 +12,7 @@ type StatusCategory struct {
 	Scope      string      `yaml:"scope,omitempty"`
 	Components []string    `yaml:"components,omitempty"`
 	ProwFilter string      `yaml:"prow_filter"`
+	Gating     bool        `yaml:"gating,omitempty"`
 	Team       *JiraTeam   `yaml:"team,omitempty"`
 	Labels     []string    `yaml:"labels,omitempty"`
 	Jobs       []StatusJob `yaml:"jobs"`
@@ -20,6 +21,7 @@ type StatusCategory struct {
 type StatusJob struct {
 	Name    string    `yaml:"name"`
 	ProwJob string    `yaml:"prow_job"`
+	Gating  *bool     `yaml:"gating,omitempty"`
 	Team    *JiraTeam `yaml:"team,omitempty"`
 	Labels  []string  `yaml:"labels,omitempty"`
 }

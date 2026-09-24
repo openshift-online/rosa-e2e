@@ -1,3 +1,7 @@
+> **⚠️ DEPRECATED (Sep 2026):** This task has been merged into the daily health report (`rosa_ci_daily_health_report.md`). The health report now handles analysis + one auto-fix PR per run inline. This file is kept for reference only and should not be scheduled.
+
+---
+
 # ROSA CI daily remediation — reference instructions
 
 > **This file is NOT a standalone cron task.** It is triggered via `schedule_followup` chaining from the daily health report (`rosa_ci_daily_health_report.md`). The health report posts its summary, then schedules a PR remediation follow-up, which in turn schedules a Jira remediation follow-up. All follow-ups fire in the same thread as the health report — threading is automatic.

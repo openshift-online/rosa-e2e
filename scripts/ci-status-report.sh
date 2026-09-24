@@ -22,7 +22,8 @@ if [[ ! -f "${JOBS_CONFIG}" ]]; then
 fi
 
 # Parse the YAML config into shell-friendly format using python3.
-# Outputs lines: category_id|category_name|prow_filter|job_display_name|prow_job_name
+# Outputs lines: category_id|category_name|prow_filter|job_display_name|prow_job_name|gating
+# (gating is "true" when the job's category gates or the job sets gating: true)
 # followed by a metadata line: META|sippy_url|<url>
 parse_config() {
   python3 -c "
@@ -52,7 +53,7 @@ for line in config_text.split('\n'):
     # Category-level fields (indented under categories list)
     m = re.match(r'-\s+id:\s*(.+)', stripped)
     if m:
-        current_cat = {'id': m.group(1).strip(), 'name': '', 'prow_filter': '', 'jobs': []}
+        current_cat = {'id': m.group(1).strip(), 'name': '', 'prow_filter': '', 'gating': False, 'jobs': []}
         categories.append(current_cat)
         current_job = None
         continue
@@ -71,10 +72,21 @@ for line in config_text.split('\n'):
         if stripped == 'jobs:':
             continue
 
+        # gating flag (category- or job-level); a job gates if its category
+        # gates or the job itself sets gating: true
+        m = re.match(r'gating:\s*(.+)', stripped)
+        if m:
+            val = m.group(1).strip().lower() in ('true', 'yes', '1')
+            if current_job is not None:
+                current_job['gating'] = val
+            else:
+                current_cat['gating'] = val
+            continue
+
         # Job-level fields
         m = re.match(r'-\s+name:\s*(.+)', stripped)
         if m:
-            current_job = {'name': m.group(1).strip(), 'prow_job': ''}
+            current_job = {'name': m.group(1).strip(), 'prow_job': '', 'gating': None}
             current_cat['jobs'].append(current_job)
             continue
 
@@ -85,8 +97,12 @@ for line in config_text.split('\n'):
                 continue
 
 for cat in categories:
+    cat_g = cat.get('gating', False)
     for job in cat['jobs']:
-        print(f\"{cat['id']}|{cat['name']}|{cat['prow_filter']}|{job['name']}|{job['prow_job']}\")
+        jg = job.get('gating')
+        eff = cat_g if jg is None else jg
+        g = 'true' if eff else 'false'
+        print(f\"{cat['id']}|{cat['name']}|{cat['prow_filter']}|{job['name']}|{job['prow_job']}|{g}\")
 
 print(f'META|sippy_url|{sippy_url}')
 " < "${JOBS_CONFIG}"
@@ -133,7 +149,7 @@ else:
 }
 
 check_job() {
-  local category="$1" display_name="$2" job_name="$3"
+  local category="$1" display_name="$2" job_name="$3" gating="$4"
   local status_line build_id result
 
   status_line=$(get_job_status "${job_name}")
@@ -141,14 +157,14 @@ check_job() {
   result="${status_line##*|}"
 
   if [[ "${result}" == "NO_DATA" ]] || [[ -z "${result}" ]]; then
-    echo "${category}|${display_name}|NO_DATA||"
+    echo "${category}|${display_name}|NO_DATA|||${gating}"
     return
   fi
 
   if [[ -n "${build_id}" ]]; then
-    echo "${category}|${display_name}|${result}|${PROW_BASE}/logs/${job_name}/${build_id}|${job_name}"
+    echo "${category}|${display_name}|${result}|${PROW_BASE}/logs/${job_name}/${build_id}|${job_name}|${gating}"
   else
-    echo "${category}|${display_name}|${result}||${job_name}"
+    echo "${category}|${display_name}|${result}||${job_name}|${gating}"
   fi
 }
 
@@ -183,7 +199,7 @@ main() {
   local -a category_order=()
   local -A category_names=()
   local -A category_prow_links=()
-  while IFS='|' read -r cat_id cat_name prow_filter _ _; do
+  while IFS='|' read -r cat_id cat_name prow_filter _ _ _; do
     if [[ "${cat_id}" == "META" ]]; then continue; fi
     if [[ -z "${category_names[${cat_id}]+x}" ]]; then
       category_order+=("${cat_id}")
@@ -198,15 +214,16 @@ main() {
   trap "rm -rf '${tmpdir}'" EXIT
 
   local idx=0
-  while IFS='|' read -r cat_id _ _ display_name prow_job; do
+  while IFS='|' read -r cat_id _ _ display_name prow_job gating; do
     if [[ "${cat_id}" == "META" ]]; then continue; fi
-    (check_job "${cat_id}" "${display_name}" "${prow_job}" > "${tmpdir}/${idx}.txt" 2>"${tmpdir}/${idx}.err") &
+    (check_job "${cat_id}" "${display_name}" "${prow_job}" "${gating}" > "${tmpdir}/${idx}.txt" 2>"${tmpdir}/${idx}.err") &
     idx=$((idx + 1))
   done <<< "${config_lines}"
   wait
 
   # Collect results and per-category stats
   local fail_count=0 pass_count=0 other_count=0
+  local g_pass=0 g_fail=0 g_other=0 ng_pass=0 ng_fail=0 ng_other=0
   local -A cat_pass cat_fail cat_other cat_fail_names
   for cat in "${category_order[@]}"; do
     cat_pass[${cat}]=0
@@ -219,26 +236,30 @@ main() {
 
   for i in $(seq 0 $((idx - 1))); do
     if [[ -f "${tmpdir}/${i}.txt" ]]; then
-      local line category name result url
+      local line category name result url gating
       line=$(cat "${tmpdir}/${i}.txt")
       category=$(echo "${line}" | cut -d'|' -f1)
       name=$(echo "${line}" | cut -d'|' -f2)
       result=$(echo "${line}" | cut -d'|' -f3)
       url=$(echo "${line}" | cut -d'|' -f4)
+      gating=$(echo "${line}" | cut -d'|' -f6)
 
       case "${result}" in
         SUCCESS)
           pass_count=$((pass_count + 1))
           cat_pass[${category}]=$(( ${cat_pass[${category}]} + 1 ))
+          if [[ "${gating}" == "true" ]]; then g_pass=$((g_pass + 1)); else ng_pass=$((ng_pass + 1)); fi
           ;;
         FAILURE|ABORTED)
           fail_count=$((fail_count + 1))
           cat_fail[${category}]=$(( ${cat_fail[${category}]} + 1 ))
           cat_fail_names[${category}]+="${name}, "
+          if [[ "${gating}" == "true" ]]; then g_fail=$((g_fail + 1)); else ng_fail=$((ng_fail + 1)); fi
           ;;
         *)
           other_count=$((other_count + 1))
           cat_other[${category}]=$(( ${cat_other[${category}]} + 1 ))
+          if [[ "${gating}" == "true" ]]; then g_other=$((g_other + 1)); else ng_other=$((ng_other + 1)); fi
           ;;
       esac
 
@@ -316,6 +337,25 @@ main() {
   if [[ "${other_count}" -gt 0 ]]; then
     echo "  Other:   ${other_count}/${total} (running/no data)"
   fi
+
+  # Gating (production release gate) vs non-gating pass rates. Pass rate is
+  # computed over definitive results (pass + fail); no-data/running are shown
+  # separately so they don't skew the gate signal. Target: 95% (ROSAENG-62472).
+  echo ""
+  echo "--- Gating vs Non-Gating (production release gate) ---"
+  echo ""
+  local g_def=$((g_pass + g_fail))
+  local ng_def=$((ng_pass + ng_fail))
+  local g_pct ng_pct
+  if [[ "${g_def}" -gt 0 ]]; then g_pct="$(( (g_pass * 100) / g_def ))%"; else g_pct="N/A"; fi
+  if [[ "${ng_def}" -gt 0 ]]; then ng_pct="$(( (ng_pass * 100) / ng_def ))%"; else ng_pct="N/A"; fi
+  printf "  %s %-12s %d/%d passing (%s)" "$(log_indicator "${g_pass}" "${g_def}")" "Gating:" "${g_pass}" "${g_def}" "${g_pct}"
+  if [[ "${g_other}" -gt 0 ]]; then printf "  [%d no-data/running]" "${g_other}"; fi
+  echo ""
+  printf "  %s %-12s %d/%d passing (%s)" "$(log_indicator "${ng_pass}" "${ng_def}")" "Non-gating:" "${ng_pass}" "${ng_def}" "${ng_pct}"
+  if [[ "${ng_other}" -gt 0 ]]; then printf "  [%d no-data/running]" "${ng_other}"; fi
+  echo ""
+  echo "  (Gating target: 95% -- tracked in ROSAENG-62472)"
 
   echo ""
   echo "========================================="

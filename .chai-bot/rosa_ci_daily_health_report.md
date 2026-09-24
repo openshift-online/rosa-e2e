@@ -4,7 +4,7 @@ You are running a **cron** scheduled task that produces a daily CI health report
 
 ## Goal
 
-Check the pass/fail history (last completed builds over 7 days per job) for all ROSA CI periodic jobs across all categories defined in the job registry. Report per-category pass rates, 7-day trends, and failure classifications. If all categories are >= 80%, respond with a brief summary and `no_action_required()`. After reporting, write a YAML handoff artifact to the bot's fork. When failures are present (any category < 80%), chain remediation follow-ups in the same thread; on all-green reports, the artifact is written but no remediation follow-up is scheduled.
+Check the pass/fail history (last completed builds over 7 days per job) for all ROSA CI periodic jobs across all categories defined in the job registry. Report per-category pass rates, 7-day trends, and failure classifications. If all categories are >= 80%, respond with a brief summary and `no_action_required()`. After reporting, write a YAML handoff artifact to the bot's fork. When failures are present (any category < 80%), attempt one auto-fix PR for the highest-priority fixable failure and shepherd existing `[rosa-ci-fix]` PRs — all inline, no follow-up chaining. On all-green reports, the artifact is written but no remediation action is taken.
 
 ## Procedure
 
@@ -17,7 +17,28 @@ Use `fetch_web_content` to retrieve this YAML file. It defines all jobs organize
 
 If the fetch fails, report the error and skip the health check. Do not use a hardcoded fallback (it goes stale and causes incorrect "no runs" reports).
 
-**Procedure adherence:** Follow steps 1→2→3→4→5→6 sequentially. Do not use broad CI analysis tools as a shortcut for steps 1-3. The job registry is the authoritative source for which jobs to check and how to categorize them.
+**Procedure adherence:** Follow steps 1→1b→2→3→4→5→6 sequentially. Do not use broad CI analysis tools as a shortcut for steps 1-3. The job registry is the authoritative source for which jobs to check and how to categorize them.
+
+### 1b. Registry drift detection
+
+After loading the job registry, check for drift between `ci-status-jobs.yaml` and the actual periodic test definitions in `openshift/release`.
+
+1. Fetch the ci-operator config files from `openshift/release` for each OCM FVT variant:
+   - `https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/openshift-online/rosa-e2e/openshift-online-rosa-e2e-main__ocm-fvt-rosa-hcp-staging.yaml` (→ category `ocm-fvt-hcp-stg`)
+   - `https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/openshift-online/rosa-e2e/openshift-online-rosa-e2e-main__ocm-fvt-rosa-hcp-integration.yaml` (→ category `ocm-fvt-hcp-int`)
+   - `https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/openshift-online/rosa-e2e/openshift-online-rosa-e2e-main__ocm-fvt-rosa-hcp-production.yaml` (→ category `ocm-fvt-hcp-prd`)
+
+2. From each config, extract all `- as: ocm-fvt-periodic-*` test names under the `tests:` key. Convert each to a full Prow job name using the pattern:
+   `periodic-ci-openshift-online-rosa-e2e-main-{variant}-{test_as_name}`
+   where `{variant}` is the ci-operator variant (e.g. `ocm-fvt-rosa-hcp-staging`) and `{test_as_name}` is the `as:` value.
+
+3. Compare the derived Prow job names against the `prow_job` values listed in `ci-status-jobs.yaml` under each matching category.
+
+4. Report drift:
+   - **Missing coverage:** jobs defined in `openshift/release` but not listed in `ci-status-jobs.yaml` (new jobs that need to be registered).
+   - **Stale entries:** jobs listed in `ci-status-jobs.yaml` but not found in `openshift/release` (removed or renamed jobs that should be cleaned up).
+
+5. If drift is found, include a `:mag: *Registry Drift*` section in the top-level summary (after the category list, before the footer) listing the specific missing or stale jobs. If no drift is found, omit this section entirely.
 
 ### 2. Collect build history
 
@@ -26,6 +47,8 @@ For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prow
 If Prow tools don't return historical build data directly, use `fetch_web_content` to retrieve the job-history page at `https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{JOB_NAME}`. The HTML contains `var allBuilds = [{ID, Result, Started, Duration}];`.
 
 **Important: fetch ALL categories.** There are 13+ categories with ~139 total jobs. Process every category completely. If a fetch fails or times out for a specific job, mark that job as "fetch error" (not "no runs") and continue with the next job. Do not skip entire categories due to fetch issues. A category should only show "no runs" if every job in it genuinely returned zero completed builds in the data, not because the fetch failed.
+
+**Sippy release coverage:** The ROSA CI registry spans multiple Sippy synthetic releases — `rosa-stage`, `rosa-integration`, and `rosa-production`. When using Prow CI tools that filter by Sippy release, query all three releases and merge results, deduplicating by `prow_job` name. Do not limit queries to `rosa-stage` alone — integration and production environment jobs will be missed.
 
 ### 3. Compute pass rates and trends
 
@@ -41,6 +64,10 @@ If Prow tools don't return historical build data directly, use `fetch_web_conten
 - :chart_with_upwards_trend: improving (10+ percentage points higher)
 - :chart_with_downwards_trend: degrading (10+ percentage points lower)
 - :left_right_arrow: stable
+
+**Consecutive failures**: For each job, examine the build history in reverse chronological order (most recent first). Count how many builds failed consecutively from the most recent build backward until a passing build is found. This count is `consecutive_failures`. If the most recent build passed, `consecutive_failures` is 0. If all builds in the window failed, `consecutive_failures` equals the total number of builds. Example: builds [FAIL, FAIL, FAIL, PASS, FAIL, PASS, PASS] → consecutive_failures = 3 (the three most recent are failures).
+
+**Gating vs non-gating pass rate**: The registry marks production release-gating jobs with a `gating` field (see the header doc in `ci-status-jobs.yaml`). A job gates if its category sets `gating: true`, unless the job sets its own `gating` value, which overrides the category default (so a job-level `gating: false` opts that single job out of a gating category). Aggregate two separate weighted pass rates across all jobs with data: one for gating jobs, one for non-gating jobs (total passes / total builds each, rounded to nearest integer). Jobs with no data are excluded from both, same as the overall rate.
 
 ### 4. Channel response (top-level summary)
 
@@ -59,6 +86,8 @@ Post a concise summary as your channel response. This is the top-level message t
 
 ```
 *ROSA CI Daily Health -- {DATE} -- {overall_rate}%*
+*Gating:* {gating_rate}% ({gating_pass}/{gating_total}) -- {gating_trend}
+*Non-gating:* {non_gating_rate}% ({non_gating_pass}/{non_gating_total}) -- {non_gating_trend}
 
 {emoji} *{Category}:* {rate}% ({pass}/{total}) {trend} (<prow_filter|jobs>)
 {emoji} *{Category}:* {rate}% ({pass}/{total}) {trend} -- {brief inline note} (<prow_filter|jobs>)
@@ -69,6 +98,7 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 
 **Rules:**
 - `{overall_rate}` is the weighted pass rate across all jobs with data (total passes / total builds, rounded to nearest integer).
+- The two-line gating rollup goes directly under the header, before the per-category list. `{gating_rate}` is the weighted pass rate across gating jobs with data; `{non_gating_rate}` across non-gating jobs with data (see "Gating vs non-gating pass rate" in step 3). Always include both lines. Add the same 7-day trend emoji used for categories.
 - List categories with data, sorted by pass rate descending. **One category per line.** Never combine multiple categories on the same line with `·` separators. Every category gets its own line with its own emoji, pass rate, trend, and (jobs) link, even green categories.
 - For yellow/red categories, add a **short** inline note after the trend emoji (e.g., `-- AMD64 & E2E at 40%`, `-- stale since Jun 17`, `-- 1 run in 30d`). Keep notes under 40 characters.
 - If any categories had zero Prow run data, mention the count in the footer line (e.g., `2 categories skipped (no runs)`). Omit this part if all categories have data.
@@ -102,12 +132,22 @@ For each selected failing job in the category (up to the scope cap):
 2. Identify the specific failure: key error messages, failing test names, failing step
 3. For OCM FVT jobs, also check the `cs-telemetry` logs in the Prow artifacts. These contain Clusters Service-side request/response data that can reveal CS errors, timeouts, or API failures that caused the test to fail. Look in the artifacts directory for files matching `cs-telemetry*` or `cs_telemetry*`.
 4. Perform root cause analysis using Sippy, Prow CI tools, or other available tools
-5. Classify the failure based on what you find in the logs
+5. Classify the failure using the buckets below
 6. Note how frequently the job has failed recently (e.g., "3 of 7 runs failed this week")
 7. Link to the failing Prow job run(s)
 
-For deeper pass rate analysis, query the Sippy API:
-`https://sippy.dptools.openshift.org/api/jobs?release=rosa-stage&limit=100`
+**Classification buckets:** Classify each analyzed failure into one of four categories:
+- **Product bug** — a real defect in OCP or ROSA shipped code → track as OCPBUGS or ROSAENG Jira
+- **Env/config issue** — staging environment is flaky, under-provisioned, or misconfigured → config change PR
+- **Test bug** — test logic error: bad assertion, race condition, hardcoded value that drifted → test code PR (primary auto-fix target)
+- **Resilience / de-flake** — underlying behavior is correct but test is brittle against timing or environment variance → hardening PR (Eventually, retries, timeouts)
+
+Use these exact labels in the `failure_classification` artifact field.
+
+For deeper pass rate analysis, query the Sippy API across all ROSA synthetic releases and merge results:
+- `https://sippy.dptools.openshift.org/api/jobs?release=rosa-stage&limit=200`
+- `https://sippy.dptools.openshift.org/api/jobs?release=rosa-integration&limit=200`
+- `https://sippy.dptools.openshift.org/api/jobs?release=rosa-production&limit=200`
 
 Format each threaded reply like:
 
@@ -154,6 +194,8 @@ These are patterns that come up often. Use them as hints, not a rigid checklist.
 report_date: "2026-07-25"
 generated_at: "2026-07-25T14:45:00Z"
 overall_pass_rate: 66
+gating_pass_rate: 90
+non_gating_pass_rate: 72
 job_registry_url: "https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/ci-status-jobs.yaml"
 categories:
   - id: "rosa-hcp-e2e"
@@ -164,6 +206,7 @@ categories:
     jobs:
       - name: "HCP Day1 Validation"
         prow_job: "periodic-ci-openshift-online-rosa-e2e-master-..."
+        gating: true
         pass_count: 6
         fail_count: 1
         total: 7
@@ -188,6 +231,8 @@ categories:
 
 **Field notes:**
 - Include **ALL** categories and **ALL** jobs, not just failing ones. The remediation follow-ups need the full picture.
+- `gating_pass_rate` / `non_gating_pass_rate`: the two weighted pass rates from step 3. The target gating rate is 95%.
+- `gating`: per-job effective gating value (job-level `gating` overrides the category default). Remediation should prioritize gate failures (`gating: true`) when picking auto-fix targets.
 - `consecutive_failures`: count of consecutive recent failed builds (0 if the latest passed).
 - `failure_classification`: short label from your analysis (e.g., "conformance skip list", "STS account-roles crash", "Boskos lease timeout"). Empty string if the job is passing.
 - `failing_tests`: list of specific test names or step names that are failing. Empty list if the job is passing. The remediation follow-up uses these to create skip-list PRs and accurate Jira ticket descriptions.
@@ -196,24 +241,64 @@ categories:
 - `team` and `labels`: from the job registry (`ci-status-jobs.yaml`). Include them verbatim. If a job overrides the category-level team/labels, use the job-level values.
 - If a job had a fetch error in step 2, set `pass_count` and `fail_count` to -1, `total` to 0, `pass_rate` to -1, `consecutive_failures` to 0, and `failure_classification` to "fetch_error". This signals that no valid data was retrieved — remediation follow-ups must skip these jobs entirely (they are not real failures).
 
-### 7. Deliver response and schedule remediation follow-up
+### 7. Remediation — auto-fix PRs
 
-   **All-green path** (every category >= 80%): Call `send_response()` to deliver the summary. Do **not** schedule a remediation follow-up — there is nothing to remediate. The artifact is still written so PR shepherding can happen if triggered manually.
+After posting the health report and writing the artifact, attempt a maximum 5 of auto-fix PRs for the highest-priority fixable failures.
 
-   **Failures present** (any category < 80%):
+**Scope:** From the jobs analyzed in step 5, pick the top failures with the highest `consecutive_failures` that matches an auto-fixable pattern. Prioritize gating jobs (`gating: true`) when failures are otherwise comparable — a failing gate blocks production release. Skip jobs that already have an open `[rosa-ci-fix]` PR.
 
-   1. **First**, call `schedule_followup` with a 2-minute delay. The follow-up fires **in the same thread** as the health report, so threading is automatic — no thread_ts or channel_id needed. Use this description (replace `<fork_repo>` with the actual fork repo path from step 6.1 and `<commit_sha>` with the commit SHA from step 6.5):
-   2. **Then**, call `send_response()` to deliver the summary (and threaded replies). **`send_response()` ends your current turn — no tool calls after it.**
+**Mandatory fallback (always runs if no PR was opened above):** Regardless of whether step 5 classified any failures, if no `[rosa-ci-fix]` PR was opened in the steps above, fetch the build log for the single highest `consecutive_failures` job that has an empty `failure_classification` in the artifact. Classify it using the 4-bucket system (product bug / env-config / test bug / resilience). If it matches any auto-fix pattern (1-8), open a `[rosa-ci-fix]` PR. Do NOT skip this step because classified failures exist — the point is to look beyond what step 5 analyzed.
 
-   > PR Remediation follow-up. You are continuing the daily health report thread with automated remediation.
-   >
-   > 1. Call `priv_scm_ensure_fork("github.com", "openshift-online/rosa-e2e")` to resolve the fork path.
-   > 2. Read the handoff artifact using `github_file_content(repo="<fork_repo>", path=".chai-bot/reports/daily_health_latest.yaml", ref="<commit_sha>")`. Parse the YAML. Verify `report_date` is today — if stale, call `no_action_required()`.
-   > 3. Read the remediation instructions using `github_file_content(repo="openshift-online/rosa-e2e", path=".chai-bot/rosa_ci_daily_remediation.md")`. Follow the **"## PR Remediation"** section (auto-fix PRs and PR shepherding).
-   > 4. **Action branch** (PRs were opened, shepherded, or closed): Compose a summary of all PR actions taken. Call `schedule_followup` with a 2-minute delay for Jira remediation (use the description in step 6), then call `send_response()` to post the summary.
-   > 5. **No-action branch** (no fixable failures, no open PRs to shepherd): Schedule the Jira follow-up directly (persistent failures may still need tickets even if no PRs are warranted), then call `no_action_required()`. Do NOT post an empty summary via `send_response()`.
-   > 6. Jira follow-up description (used by both branches):
-   >    "Jira Remediation follow-up. You are continuing the daily health report thread with Jira ticket creation for persistent failures. (1) Call priv_scm_ensure_fork to resolve the fork. (2) Read the handoff artifact from <fork_repo> at .chai-bot/reports/daily_health_latest.yaml using ref=<commit_sha>. Verify report_date is today. (3) Read the remediation instructions from openshift-online/rosa-e2e at .chai-bot/rosa_ci_daily_remediation.md. Follow the '## Jira Remediation' section. (4) Compose a summary of Jira actions taken and post it using send_response(). If no Jira actions are needed, call no_action_required()."
+**Auto-fixable patterns** (in priority order — all four classification buckets are fixable):
+1. **Conformance skip list** — failing OCP conformance tests → add to skip list in `openshift-online/rosa-e2e`
+2. **Test code bug** — test assertion or setup error → fix in the test repo
+3. **CI infra / config** — step-registry ref changes, ci-operator config fixes, cluster profile updates, image reference fixes, workflow YAML corrections → fix in `openshift/release`; test framework configuration, test harness setup, helper scripts → fix in `openshift-online/rosa-e2e`, `openshift-online/rosa-backend-tests`, or `openshift-online/rosa-gap-analysis`
+4. **ROSA CLI test fix** — CLI test failure due to changed behavior → fix in `openshift/rosa`
+5. **SRE operator fix** — operator test/config issue → fix in the relevant SRE operator repo
+6. **Log / artifact improvement** — failure analysis couldn't reach root cause without inference → PR to add missing gather step, `oc describe`/`logs`/`get events`, or CR status dump to the step-registry ref or test harness
+7. **Env/config fix** — expired tokens → config rotation or credential refresh PR; VPC quota exhaustion → cleanup step or resource limit PR; staging connectivity → endpoint config or retry logic PR; version enablement gap → version gate update or skip list PR
+8. **Product bug fix** — product bugs are auto-fixable when the fix is low-hanging fruit (e.g., simple code change, obvious nil check, missing error handling, straightforward logic fix). If the product repo is in the allowed list, open the fix PR directly and link the upstream Jira. If the fix is test-side (skip, conditional assertion, version gate), open the workaround PR and link the Jira. Only escalate to Jira-only when the fix requires deep domain expertise, architectural changes, or cross-component coordination that the bot can't safely attempt
+
+**Allowed target repos** (repos with `scm_create_change_request` grants on this persona):
+
+*github.com — openshift/*:*
+`aws-account-operator`, `aws-vpce-operator`, `boilerplate`, `certman-operator`, `cloud-ingress-operator`, `configure-alertmanager-operator`, `custom-domains-operator`, `deadmanssnitch-operator`, `dedicated-admin-operator`, `gcp-project-operator`, `hypershift-dataplane-metrics-forwarder`, `hypershift-logging-operator`, `managed-cluster-validating-webhooks`, `managed-node-metadata-operator`, `managed-upgrade-operator`, `managed-velero-operator`, `must-gather-operator`, `ocm-agent`, `ocm-agent-operator`, `origin`, `pagerduty-operator`, `rbac-permissions-operator`, `release` _(step registry and CI config only)_, `rosa`, `route-monitor-operator`
+
+*github.com — openshift-online/*:*
+`rosa-account-manager-service`, `rosa-backend-tests`, `rosa-clusters-service`, `rosa-e2e`, `rosa-eng-dashboard`, `rosa-external-tests`, `rosa-gap-analysis`, `rosa-service-log`
+
+*gitlab.cee.redhat.com:*
+`service/app-interface`, `service/backplane-api`, `service/clusterimagesets`, `service/osd-rhobs-rules-and-dashboards`, `service/uhc-clusters-service`, `releng/konflux-release-data`
+
+**Process:**
+1. Fetch the build log for the selected failure
+2. Diagnose the root cause
+2b. **Check for existing Jira** — before filing a new ticket or opening a fix PR, search ROSAENG for an existing open issue covering this failure (by job name or error signature). If found, link to it and skip creating a duplicate.
+3. If fixable: spin up a workspace, write the fix, push, open a PR with `[rosa-ci-fix]` in the title
+4. If NOT fixable after diagnosis: note it in the report as "investigated, not auto-fixable — [reason]"
+
+**Bias to action:** Always attempt the fix. If the change is complex, open a smaller-scoped PR addressing the specific failure (a skip-list entry, a version gate, a timeout increase). Let PR reviewers judge safety — do not self-censor based on perceived risk or complexity. The PR review process (CodeRabbit + human `/approve`) is the safety net, not your judgment about whether a fix is "too risky."
+
+**Constraints:**
+- Maximum **5 PRs per run** — if multiple failures are fixable, pick only the 5 highest priority ones
+- Never modify production configs (`app-interface`)
+- PRs require human `/lgtm` and `/approve` before merge
+- PR title must start with `[rosa-ci-fix]` for tracking
+- Before proposing a new Jira ticket, search for existing open ROSAENG issues for the same job or error pattern — skip duplicates
+
+**Shepherd existing `[rosa-ci-fix]` PRs:**
+After the auto-fix attempt, check for any open PRs with `[rosa-ci-fix]` in the title across the allowed repos (authored by `redhat-chai-bot`). For each:
+- If CI passed and no blocking review comments: note "ready for /lgtm + /approve" in the report
+- If CI failed on a check relevant to the change: `/retest` once
+- If PR is older than 7 days with no review activity: close with a comment "stale — closing, will re-evaluate in next daily run"
+- Process at most 5 existing PRs per run
+
+**Report remediation results** in a threaded reply (using `---THREAD_BREAK---`):
+```
+:wrench: *Remediation*
+• Auto-fix: [opened PR #N in repo / or "no fixable failures found"]
+• Shepherded: N existing [rosa-ci-fix] PRs (N ready, N retested, N closed stale)
+```
 
 ## Constraints
 
@@ -222,7 +307,6 @@ categories:
 - If more than half the jobs return no data, warn about possible Prow/GCS issues at the top.
 - Before sending: if any category is below 80%, verify your response content contains `---THREAD_DETAILS---` followed by at least one threaded reply section. If these delimiters are missing, your threaded replies will not be posted — go back to step 5.
 - Always write the handoff artifact (step 6) before calling `send_response()`, even if all categories are green.
-- Only ONE pending follow-up per thread at a time. Do not schedule multiple follow-ups from the same turn.
-- `send_response()` ends the turn immediately — no tool calls after it. Always call `schedule_followup` before `send_response()` when a follow-up is needed.
-- On the all-green path (all categories >= 80%), do NOT schedule a remediation follow-up.
+- `send_response()` ends the turn immediately — no tool calls after it.
+- On the all-green path (all categories >= 80%), skip step 7 (remediation) entirely.
 

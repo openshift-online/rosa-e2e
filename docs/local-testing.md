@@ -42,6 +42,51 @@ Customize with environment variables:
 CLUSTER_NAME=my-test REGION=us-west-2 COMPUTE_NODES=3 ./scripts/provision-e2e-cluster.sh
 ```
 
+## Provision a Cluster with External Authentication
+
+External authentication (external OIDC / BYO identity provider) is a **day-1, immutable** HCP
+feature — it can only be enabled at cluster creation, not added later. To exercise the External Auth
+Provider tests you need a cluster created with `--external-auth-providers-enabled`.
+
+```bash
+# Step 1: AWS credentials (same as above)
+eval $(echo "y" | osdctl account cli -i <ACCOUNT_ID> -p osd-staging-2 -r us-east-2 -oenv 2>/dev/null | tr '\n' ' ' | sed 's/.*AWS_ACCESS/AWS_ACCESS/')
+
+# Step 2: Provision WITH external auth enabled
+EXTERNAL_AUTH_ENABLED=true ./scripts/provision-e2e-cluster.sh
+
+# Step 3: Wait for the cluster to be ready (~15 min)
+rosa logs install -c rosa-e2e-$(date +%m%d) --watch
+
+# Step 4: Add an external auth provider
+source /tmp/rosa-e2e-cluster.env
+./scripts/create-external-auth-provider.sh
+
+# Step 5: Run the external auth tests
+OCM_TOKEN=$(ocm token) LABEL_FILTER="Area:CustomerFeatures" make test
+```
+
+By default `create-external-auth-provider.sh` points the provider at the cluster's ROSA/AWS STS OIDC
+issuer (derived from `OIDC_CONFIG_ID`). That issuer publishes a valid discovery document + JWKS, so
+it satisfies the config-level (`VerifyExternalAuthProviders`) and reachability
+(`VerifyExternalAuthIssuerReachable`) checks with no extra IdP infrastructure. It has **no login/token
+endpoint and no human users**, so it cannot be used for an interactive end-to-end login.
+
+For a real, login-capable identity provider (Keycloak, Microsoft Entra ID, etc.), override the
+issuer and client parameters:
+```bash
+source /tmp/rosa-e2e-cluster.env
+ISSUER_URL=https://keycloak.example.com/realms/rosa \
+ISSUER_AUDIENCES=rosa-hcp \
+USERNAME_CLAIM=email \
+CONSOLE_CLIENT_ID=<client-id> \
+CONSOLE_CLIENT_SECRET=<client-secret> \
+  ./scripts/create-external-auth-provider.sh
+```
+
+Without external auth enabled at creation, the External Auth Provider spec skips gracefully, and
+`rosa create external-auth-provider` fails with "External authentication configuration is not enabled".
+
 ## Quick Start: Test Against Any Existing Cluster
 
 The simplest path. The framework auto-detects whether the cluster is HCP or Classic.
@@ -232,6 +277,7 @@ make build
 | OSDFM Health | OCM_TOKEN with OSDFM access | 403 Forbidden |
 | NodePool Upgrade | CLUSTER_ID, UPGRADE_TARGET_VERSION | Version not set |
 | HCP Lifecycle (Full) | Full AWS infra + OIDC config | CLUSTER_ID (uses existing) |
+| External Auth Provider | CLUSTER_ID with external auth enabled | External auth not enabled |
 
 ### Classic-only tests
 
@@ -245,7 +291,8 @@ make build
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/provision-e2e-cluster.sh` | Create VPC, account roles, OIDC config, and ROSA HCP cluster |
+| `scripts/provision-e2e-cluster.sh` | Create VPC, account roles, OIDC config, and ROSA HCP cluster (`EXTERNAL_AUTH_ENABLED=true` for external auth) |
+| `scripts/create-external-auth-provider.sh` | Add an external auth provider to an external-auth-enabled cluster |
 | `scripts/deprovision-e2e-cluster.sh` | Delete cluster, operator roles, OIDC provider, and VPC |
 | `scripts/run-e2e.sh` | Run tests (works both locally and in Prow CI) |
 

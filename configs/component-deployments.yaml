@@ -50,7 +50,7 @@ components:
   - key: rbac-permissions-operator
     saas_name: saas-rbac-p-operator
     strategy: hive
-    e2e_saas: saas-rbac-p-operator-e2e
+    e2e_saas: saas-rpo-prow-e2e
   - key: deadmanssnitch-operator
     saas_name: saas-dms-pko
     strategy: hive
@@ -58,6 +58,9 @@ components:
     saas_name: saas-sfo-pko
     strategy: hive
     e2e_saas: saas-sfo-prow-e2e
+    canary_targets:
+      - sfo-hivep03uw1
+      - sfo-hivep04ew2
   - key: custom-domains-operator
     saas_name: saas-cdo-pko
     strategy: hive
@@ -71,6 +74,7 @@ components:
   - key: aws-account-operator
     saas_name: saas-aws-account-operator-pko
     strategy: hive
+    e2e_saas: saas-aao-prow-e2e
   - key: aws-vpce-operator
     saas_name: saas-avo-pko
     strategy: hive
@@ -78,11 +82,11 @@ components:
   - key: certman-operator
     saas_name: saas-certman-operator
     strategy: hive
-    e2e_saas: saas-certman-operator-e2e-test
+    e2e_saas: saas-certman-operator-prow-e2e
   - key: cloud-ingress-operator
     saas_name: saas-cloud-ingress-operator-pko
     strategy: hive
-    e2e_saas: saas-cio-e2e-test
+    e2e_saas: saas-cio-prow-e2e
   - key: gcp-project-operator
     saas_name: saas-gcp-project-operator-pko
     strategy: hive
@@ -92,17 +96,33 @@ components:
   - key: managed-velero-operator
     saas_name: saas-mvo
     strategy: hive
+  - key: managed-cluster-validating-webhooks
+    saas_name: saas-mc-validating-webhooks
+    strategy: hive
   - key: managed-node-metadata-operator
     saas_name: saas-mnmo
     strategy: hive
+
+  # Operational Tooling (dedicated clusters)
+  - key: configuration-anomaly-detection
+    saas_name: saas-configuration-anomaly-detection
+    strategy: ocm
 
   # Observability (hive cluster pattern)
   - key: rhobs-synthetics-agent
     saas_name: rhobs-synthetics-agent
     strategy: hive
+    saas_dir: data/services/rhobs/rhobs/cicd
+    canary_namespaces:
+      - rhobsp01ue1
+      - backplanep05ue1
   - key: rhobs-synthetics-api
     saas_name: rhobs-synthetics-api
     strategy: hive
+    saas_dir: data/services/rhobs/rhobs/cicd
+    canary_namespaces:
+      - rhobsp01ue1
+      - backplanep05ue1
   - key: osd-rhobs-rules-and-dashboards
     saas_name: saas-osd-rhobs-rules-and-dashboards
     strategy: hive

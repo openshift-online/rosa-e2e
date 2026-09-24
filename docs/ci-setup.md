@@ -214,6 +214,7 @@ In CI, secrets are mounted as files and loaded via environment variables in the 
 
 **Secret mounting**:
 - `/secrets/ocm/token` -> `OCM_TOKEN` env var
+- OCM service-account credentials -> `OCM_CLIENT_ID` and `OCM_CLIENT_SECRET`
 - `/secrets/aws/aws_access_key_id` -> `AWS_ACCESS_KEY_ID` env var
 - `/secrets/cluster/cluster_id` -> `CLUSTER_ID` env var
 

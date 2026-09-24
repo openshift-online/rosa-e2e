@@ -29,6 +29,10 @@ COMPUTE_MACHINE_TYPE="${COMPUTE_MACHINE_TYPE:-m5.xlarge}"
 OIDC_CONFIG_ID="${OIDC_CONFIG_ID:-}"
 CLUSTER_SECTOR="${CLUSTER_SECTOR:-}"
 ENABLE_ZERO_EGRESS="${ENABLE_ZERO_EGRESS:-false}"
+# External authentication (external OIDC / BYO identity provider) is a day-1, immutable HCP feature:
+# it can only be enabled at cluster creation. Set EXTERNAL_AUTH_ENABLED=true to create a cluster that
+# can later host external auth providers via ./scripts/create-external-auth-provider.sh.
+EXTERNAL_AUTH_ENABLED="${EXTERNAL_AUTH_ENABLED:-false}"
 
 case "${ENABLE_ZERO_EGRESS}" in
   true|TRUE|True|1|yes|YES|Yes) ENABLE_ZERO_EGRESS=true ;;
@@ -60,6 +64,7 @@ echo "Cluster name: ${CLUSTER_NAME}"
 echo "Region: ${REGION}"
 echo "Compute: ${COMPUTE_NODES}x ${COMPUTE_MACHINE_TYPE}"
 echo "Zero egress: ${ENABLE_ZERO_EGRESS}"
+echo "External auth: ${EXTERNAL_AUTH_ENABLED}"
 echo ""
 
 # Verify prerequisites
@@ -130,11 +135,12 @@ if [[ -n "${OIDC_CONFIG_ID}" ]] && ! jq -e --arg id "${OIDC_CONFIG_ID}" 'any(.[]
   OIDC_CONFIG_ID=""
 fi
 if [[ -z "${OIDC_CONFIG_ID}" ]]; then
-  OIDC_CONFIG_ID=$(jq -r '.[0].id // empty' <<< "${OIDC_CONFIGS}")
+  # Unmanaged configs can reference an inaccessible Secrets Manager key, so
+  # prefer a managed config when the caller did not request a specific ID.
+  OIDC_CONFIG_ID=$(jq -r '[.[] | select(.managed==true)][0].id // empty' <<< "${OIDC_CONFIGS}")
   if [[ -z "${OIDC_CONFIG_ID}" ]]; then
-    echo "Creating OIDC config..."
-    rosa create oidc-config --mode auto --yes
-    OIDC_CONFIG_ID=$(rosa list oidc-config -o json | jq -r '.[0].id')
+    echo "Creating managed OIDC config..."
+    OIDC_CONFIG_ID=$(rosa create oidc-config --managed --mode auto --yes -o json | jq -r '.id')
   fi
 fi
 echo "OIDC Config: ${OIDC_CONFIG_ID}"
@@ -205,6 +211,14 @@ fi
 if [[ "${ENABLE_ZERO_EGRESS}" == "true" ]]; then
   CREATE_CLUSTER_ARGS+=(--private --default-ingress-private --properties zero_egress:true)
 fi
+
+# Step 4b: Enable external authentication if requested (day-1, immutable)
+if [[ "${EXTERNAL_AUTH_ENABLED}" == "true" ]]; then
+  echo ""
+  echo "--- External authentication enabled (providers configured post-install) ---"
+  CREATE_CLUSTER_ARGS+=(--external-auth-providers-enabled)
+fi
+
 CREATE_CLUSTER_ARGS+=(--yes)
 
 # Step 5: Create cluster
@@ -229,6 +243,7 @@ export BILLING_ACCOUNT=${BILLING_ACCOUNT}
 export CLUSTER_SECTOR=${CLUSTER_SECTOR}
 export ZERO_EGRESS=${ENABLE_ZERO_EGRESS}
 export ENABLE_ZERO_EGRESS=${ENABLE_ZERO_EGRESS}
+export EXTERNAL_AUTH_ENABLED=${EXTERNAL_AUTH_ENABLED}
 EOF
 
 echo ""
@@ -238,6 +253,12 @@ echo "Env file: ${SHARED_DIR:-/tmp}/rosa-e2e-cluster.env"
 echo ""
 echo "Monitor: rosa logs install -c ${CLUSTER_NAME} --watch"
 echo ""
+if [[ "${EXTERNAL_AUTH_ENABLED}" == "true" ]]; then
+  echo "Add an external auth provider after ready:"
+  echo "  source /tmp/rosa-e2e-cluster.env"
+  echo "  ./scripts/create-external-auth-provider.sh"
+  echo ""
+fi
 echo "Run tests after ready:"
 echo "  source /tmp/rosa-e2e-cluster.env"
 echo "  OCM_TOKEN=\$(ocm token) make test"

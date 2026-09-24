@@ -80,7 +80,7 @@ func (tc *TestContext) InitHCClients() error {
 	if zeroEgress {
 		restCfg, err = GetBackplaneClusterConfig(context.Background(), tc.cfg)
 	} else {
-		restCfg, err = GetClusterCredentials(tc.conn, tc.cfg.ClusterID)
+		restCfg, err = resolveKubeconfig("KUBECONFIG", tc.conn, tc.cfg.ClusterID)
 	}
 	if err != nil {
 		return fmt.Errorf("getting HC credentials: %w", err)

@@ -12,8 +12,13 @@ import (
 // Config holds all configuration for the e2e test suite.
 type Config struct {
 	// OCM connection settings
-	OCMEnv   string `yaml:"ocm_env"`
-	OCMToken string `yaml:"-"` // never serialize tokens
+	OCMEnv          string `yaml:"ocm_env"`
+	OCMToken        string `yaml:"-"` // never serialize tokens
+	OCMClientID     string `yaml:"-"` // never serialize client credentials
+	OCMClientSecret string `yaml:"-"` // never serialize client credentials
+
+	// OAuth token endpoint (defaults to commercial Red Hat SSO).
+	OCMTokenURL string `yaml:"ocm_token_url"`
 
 	// Cluster topology: "hcp", "classic", or "osd-gcp" (auto-detected from OCM if empty)
 	ClusterTopology string `yaml:"cluster_topology"`
@@ -87,6 +92,7 @@ func (c *Config) OCMBaseURL() string {
 func Load() (*Config, error) {
 	cfg := &Config{
 		OCMEnv:             "staging",
+		OCMTokenURL:        "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
 		AWSRegion:          "us-east-2",
 		ClusterNamePrefix:  "rosa-e2e",
 		ComputeMachineType: "m5.xlarge",
@@ -110,6 +116,15 @@ func Load() (*Config, error) {
 	}
 	if v := os.Getenv("OCM_TOKEN"); v != "" {
 		cfg.OCMToken = v
+	}
+	if v := os.Getenv("OCM_TOKEN_URL"); v != "" {
+		cfg.OCMTokenURL = v
+	}
+	if v := os.Getenv("OCM_CLIENT_ID"); v != "" {
+		cfg.OCMClientID = v
+	}
+	if v := os.Getenv("OCM_CLIENT_SECRET"); v != "" {
+		cfg.OCMClientSecret = v
 	}
 	if v := os.Getenv("CLUSTER_TOPOLOGY"); v != "" {
 		cfg.ClusterTopology = strings.ToLower(strings.TrimSpace(v))
@@ -213,8 +228,8 @@ func Load() (*Config, error) {
 		cfg.RHOBSMetricsAPIURL = strings.TrimSuffix(cfg.RHOBSProbeAPIURL, "/probes")
 	}
 
-	if cfg.OCMToken == "" {
-		return nil, fmt.Errorf("OCM_TOKEN environment variable is required")
+	if cfg.OCMToken == "" && (cfg.OCMClientID == "" || cfg.OCMClientSecret == "") {
+		return nil, fmt.Errorf("OCM_TOKEN or OCM_CLIENT_ID and OCM_CLIENT_SECRET environment variables are required")
 	}
 
 	return cfg, nil

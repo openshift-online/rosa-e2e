@@ -20,8 +20,8 @@ flowchart TD
     HEALTH --> TRIAGE["Step 4: Run /ci-triage"]
     TRIAGE --> SIPPY["Step 5: Review against\nSippy rosa-stage"]
     SIPPY --> MANUAL["Step 6: Investigate\nunclassified failures"]
-    MANUAL --> ACTION["Step 7: Take action\n(approve Jiras, merge PRs)"]
-    ACTION --> POST["Step 8: Post status\nin chai-bot thread"]
+    MANUAL --> DASHBOARD["Step 7: Update triage state\non CI Health dashboard"]
+    DASHBOARD --> ACTION["Step 8: Take action\n(approve Jiras, merge PRs)"]
 ```
 
 ### Step 1: Review Chai-Bot Daily Health Report
@@ -96,63 +96,85 @@ For any failures `/ci-triage` could not classify:
 4. For cluster provisioning failures, capture the cluster ID and pull ServiceLogs and CS event logs for root cause analysis
 5. Classify the failure using the [classification matrix](escalation-paths.md#classification-matrix)
 
-### Step 7: Take Action
+### Step 7: Update Triage State on CI Health Dashboard
+
+As you investigate failures, update the **Triage** column on the [CI Health dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health) for each affected category. This gives the whole team real-time visibility into what the watcher is actively working on.
+
+Available triage states:
+
+| State | When to set |
+|-------|-------------|
+| Under Investigation | You've started looking at failures in this category |
+| Root Cause Identified | You know why it's failing but haven't fixed it yet |
+| Infra Flake | Failures are caused by CI infrastructure issues, not test or code bugs |
+| Upstream Bug | Failures caused by an OCP regression, tracked via OCPBUGS-* |
+| Fix In Progress | A fix PR is open and being shepherded |
+| Fix Merged | The fix has merged and you're waiting for the next run to confirm |
+
+Set the triage state as early as possible ("Under Investigation" as soon as you start looking). Update it as the investigation progresses. Clear it back to "--" once the category is healthy again.
+
+**Category ownership determines who triages.** The three on-shift ICs each own specific categories based on their sub-pillar. Categories outside the watcher rotation are owned by other teams and should be skipped unless they're unattended.
+
+| Category | Owned By | On-Shift IC Action |
+|----------|----------|-------------------|
+| ROSA E2E STG | Any on-shift IC | Triage directly |
+| SRE Operator E2E | Any on-shift IC | Triage directly |
+| HCP Conformance | Trust Engineering IC | Trust IC triages (TRT-facing, fastest response) |
+| Classic STS Conformance | Trust Engineering IC | Trust IC triages (TRT-facing, fastest response) |
+| OCM FVT HCP/Classic/GCP STG | Service Engineering IC | Service Engineering IC triages |
+| GAP E2E | Production Engineering IC | Production IC triages |
+| ROSA CLI E2E | Service Engineering (ROSA CLI) | Skip if triage state already set, otherwise flag in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) |
+| ROSA TF E2E | Service Engineering (TF) | Skip if triage state already set, otherwise flag |
+| CAPA E2E | Service Engineering (CAPA) | Skip if triage state already set, otherwise flag |
+
+For categories outside the watcher rotation (ROSA CLI, ROSA TF, CAPA): if the triage state is "--" and the pass rate is below threshold, ping the owning team in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) to ask if they're aware. Do not set the triage state for their category unless they ask you to.
+
+### Step 8: Take Action
 
 - Review and approve Jira stories proposed by `/ci-triage`
 - Review and merge fix PRs (request a reviewer — do not self-lgtm)
 - File Jira under [ROSAENG-391](https://redhat.atlassian.net/browse/ROSAENG-391) for anything the AI missed
 
-## Shift Start/End Slack Workflow
+## Shift Transitions
 
-A Slack Workflow automates the beginning and end of each shift to reduce duplicated effort and make handovers visible.
-
-**Monday (Shift Start):** A Slack Workflow message is posted to [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) tagging the incoming watcher with:
-- Link to the previous week's handover document
-- Link to the [PagerDuty schedule](https://redhat.pagerduty.com/schedules/PGLVMVG) and [team page](https://redhat.pagerduty.com/teams/PTYDD6M/users)
-- Checklist: read handover, run `/ci-triage`, verify open Jiras are still accurate, check for any weekend failures in [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS)
-- Reminder of key channels ([#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS), [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U), [#wg-hcm-ocp-release-enablement](https://redhat-internal.slack.com/archives/C07QEA1PDFX))
-
-**Friday (Shift End):** A Slack Workflow message is posted to [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) tagging the outgoing watcher with:
-- A free-form text field to fill in the handover summary (current status, persistent failures, open PRs, Monday action items)
-- Checklist: all open failures have Jiras, open PRs have reviewers, no un-acked failures in [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS)
-- The incoming watcher is tagged automatically so they see the handover
+Shift transitions are lightweight. There is no handover document. The CI Health dashboard triage states, open Jiras under [ROSAENG-391](https://redhat.atlassian.net/browse/ROSAENG-391), and the chai-bot thread history already capture all the context the incoming watcher needs.
 
 ```mermaid
 flowchart LR
     subgraph Friday["Friday (Shift End)"]
-        F1["Slack Workflow\ntags outgoing watcher"]
-        F2["Fill free-form handover:\n- Current status\n- Persistent failures\n- Open PRs\n- Monday action items"]
-        F1 --> F2
+        F1["Slack Workflow tags\noutgoing watcher"]
+        F2["Verify: open failures\nhave Jiras, triage\nstates are current"]
     end
 
     subgraph Monday["Monday (Shift Start)"]
-        M1["Slack Workflow\ntags incoming watcher"]
-        M2["Read handover\nRun /ci-triage\nCheck #rosa-prow-info"]
-        M1 --> M2
+        M1["Slack Workflow tags\nincoming watcher"]
+        M2["Check CI Health dashboard\nRun /ci-triage\nStart daily procedure"]
     end
 
+    F1 --> F2
     F2 -->|"incoming watcher\ntagged automatically"| M1
+    M1 --> M2
 ```
 
-## Weekly Handover Procedure
+**Monday (Shift Start):** A Slack Workflow message tags the incoming watcher in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) with:
 
-### Friday: Write Handover
+- Links to: [CI Health dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health), [Delivery dashboard](https://rosa-eng-dashboard.apps.engineering.openshift.org/delivery)
+- Checklist:
+  - [ ] Check CI Health dashboard triage states for anything in progress from last week
+  - [ ] Check [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS) for any weekend failures
+  - [ ] Review open Jiras under [ROSAENG-391](https://redhat.atlassian.net/browse/ROSAENG-391) for active investigations
+  - [ ] Run `/ci-triage` to get current status
+  - [ ] Check if any open PRs from last week need review or retest
 
-The outgoing watcher fills in the free-form handover via the Friday Slack Workflow. Keep it conversational but cover:
+**Friday (Shift End):** A Slack Workflow message tags the outgoing watcher with:
 
-- **Current status**: which jobs are healthy, which have persistent failures
-- **Persistent failures**: job name, one-line description, Jira link, any fix PR in progress
-- **Open PRs needing review**: grouped by repository
-- **Monday action items**: concrete next steps for the incoming watcher
-
-The handover stays in the Slack thread so the incoming watcher can ask follow-up questions and the conversation is visible to the whole team.
-
-### Monday: Incoming Watcher
-
-1. Read the handover message from the Slack Workflow in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U)
-2. Review the things highlighted in the handover
-3. Check that any "in progress" fixes from last week have merged
-4. Start to follow the `Daily Triage Procedure`
+- Checklist:
+  - [ ] All open failures have Jiras under [ROSAENG-391](https://redhat.atlassian.net/browse/ROSAENG-391)
+  - [ ] Triage states on the CI Health dashboard are current (not stale from earlier in the week)
+  - [ ] Open PRs have reviewers assigned
+  - [ ] No un-acked failures in [#rosa-prow-info](https://redhat-internal.slack.com/archives/C0AT31ERJLS)
+  - [ ] Any blocked investigations have the blocker noted in the Jira
+- The incoming watcher is tagged automatically
 
 ## Common Scenarios
 

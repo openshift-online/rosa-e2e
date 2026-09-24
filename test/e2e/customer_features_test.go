@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,13 +97,9 @@ var _ = Describe("Customer Features: Network Policies", labels.High, labels.Posi
 
 		namespace := "e2e-netpol-test"
 		By("Creating test namespace")
-		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-		_, err := tc.HCKubeClient().CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
-		if err == nil {
-			DeferCleanup(func() {
-				_ = tc.HCKubeClient().CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
-			})
-		}
+		cleanup, err := framework.CreateTestNamespace(ctx, tc.HCKubeClient(), namespace)
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(cleanup)
 
 		By("Creating a deny-all NetworkPolicy")
 		np := &networkingv1.NetworkPolicy{
@@ -194,8 +189,33 @@ var _ = Describe("Customer Features: Log Forwarding", labels.Medium, labels.Posi
 	})
 })
 
-var _ = Describe("Customer Features: External OIDC", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
-	PIt("should authenticate via external OIDC provider")
+// External authentication (external auth provider / BYO identity provider) is a ROSA HCP-only
+// feature. See ROSAENG-63355. These specs validate the OCM-API view of external auth
+// configuration; an end-to-end user login with a token minted by the identity provider needs IdP
+// credentials and is tracked as a follow-up.
+var _ = Describe("Customer Features: External Auth Provider", labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, func() {
+	It("should have a functional external auth provider configured", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+		tc := framework.NewTestContext(cfg, conn)
+		if !tc.IsHCP() {
+			Skip("External authentication (external auth provider) is a ROSA HCP-only feature")
+		}
+
+		By("Checking whether external authentication is enabled")
+		enabled, err := verifiers.ExternalAuthEnabled(ctx, conn, cfg.ClusterID)
+		Expect(err).NotTo(HaveOccurred())
+		if !enabled {
+			Skip("Cluster does not have external authentication (external auth provider) enabled")
+		}
+
+		By("Validating the external auth provider configuration")
+		Expect(verifiers.VerifyExternalAuthProviders(ctx, conn, cfg.ClusterID)).To(Succeed())
+
+		By("Probing the configured OIDC issuer (discovery + JWKS)")
+		Expect(verifiers.VerifyExternalAuthIssuerReachable(ctx, conn, cfg.ClusterID)).To(Succeed())
+	})
 })
 
 var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {

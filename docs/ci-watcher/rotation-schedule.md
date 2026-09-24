@@ -2,34 +2,33 @@
 
 ## Schedule
 
-The rotation is weekly (Monday 00:00 UTC to Sunday 23:59 UTC), managed via PagerDuty schedule **ROSA CI Watcher**.
+The rotation is weekly (Monday 09:00 UTC to Monday 09:00 UTC), managed via a YAML schedule in app-interface.
 
-This is a **tracking schedule only** — there is no escalation policy and no paging.
+- Schedule file: `data/teams/sd-sre/schedules/rosa-ci-watcher.yml` in app-interface
+- Pool: all ICs in the ROSA org, excluding PMs, HyperFleet, and GovCloud/FedRAMP members. Source of truth: `config/structures/hybrid_platforms/rosa/` in [hybrid-platforms/org](https://gitlab.cee.redhat.com/hybrid-platforms/org)
+- **Maintained monthly** by the CI Watcher weekly handover task (first Monday of each month). The handover checks for org changes and opens a GitLab MR against app-interface if the pool has changed
+- No PagerDuty schedule is needed
 
-- [PagerDuty schedule](https://redhat.pagerduty.com/schedules/PGLVMVG) — current and upcoming rotation assignments
-- [PagerDuty CI Watcher team](https://redhat.pagerduty.com/teams/PTYDD6M/users) — all rotation members
+## Rotation Structure
 
-## Rotation Members
-
-The rotation is intentionally cross-org (SRE + OCM) and cross-timezone (NASA, EMEA, APAC) to build shared understanding of the full CI surface.
+Each week has **1 IC** from the eligible pool, assigned in round-robin order. The pool covers the full ROSA org (excluding HyperFleet, GovCloud/FedRAMP, and PM roles), so the full rotation cycle spans as many weeks as there are eligible ICs.
 
 ## Slack
 
-- **`@rosa-ci-watcher`**: Slack alias pointing to the current watcher, auto-synced from the PagerDuty schedule via app-interface. Anyone can `@rosa-ci-watcher` in Slack to reach the current watcher
-- **`@rosa-ci-team`**: Slack handler that includes all rotation members
+- **`@rosa-ci-watcher`**: Slack alias pointing to the current IC, auto-synced from the app-interface schedule. Anyone can `@rosa-ci-watcher` in Slack to reach the current shift
+- **`@rosa-ci-team`**: Slack handle that includes all rotation members
 
 ## When You Are Not Available
 
 ### Absent for 1 or 2 Days
 
 - It is ok to skip the day(s) when you are not available
-- Make sure the handover notes are ready if you are not available at the end of your shift
+- Make sure triage states on the CI Health dashboard are current before you leave
 - Review the results when you are back if you are away at the beginning or middle of your shift
 - If there are any AI Agents running, do not let them run in the background when you are not around
 
 ### Absent for More Than 2 Days
 
-- You **must** swap your shift with someone else in the rotation if you are not available for more than half the working days of the shift
+- You **must** swap your shift with someone else
 - Ping `@rosa-ci-team` in [#wg-rosa-cicd](https://redhat-internal.slack.com/archives/C0ADGRNAT8U) to find your replacement
-- The shift is weekly and not follow-the-sun — people in any region can swap
-- Make sure the PagerDuty schedule override is taken in place correctly
+- Submit an app-interface MR to update the schedule YAML with the swap
