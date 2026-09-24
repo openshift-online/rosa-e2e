@@ -105,6 +105,12 @@ func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, err
 		SubnetIDs(cfg.SubnetIDs...).
 		STS(stsBuilder)
 
+	if cfg.ZeroEgress {
+		awsBuilder = awsBuilder.
+			PrivateLink(true).
+			ZeroEgress(cmv1.NewZeroEgress().Enabled(true))
+	}
+
 	if cfg.BillingAccountID != "" {
 		awsBuilder = awsBuilder.BillingAccountID(cfg.BillingAccountID)
 	}
@@ -289,6 +295,17 @@ func GetClusterState(conn *sdk.Connection, clusterID string) (cmv1.ClusterState,
 		return "", fmt.Errorf("getting cluster %s state: %w", clusterID, err)
 	}
 	return resp.Body().State(), nil
+}
+
+// IsZeroEgressCluster reports whether zero egress is enabled in the OCM cluster model.
+func IsZeroEgressCluster(conn *sdk.Connection, clusterID string) (bool, error) {
+	resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().Send()
+	if err != nil {
+		return false, fmt.Errorf("getting cluster %s for zero egress detection: %w", clusterID, err)
+	}
+
+	zeroEgress, ok := resp.Body().AWS().GetZeroEgress()
+	return ok && zeroEgress != nil && zeroEgress.Enabled(), nil
 }
 
 // resolveVersionForTopology finds the latest available version for the given topology.

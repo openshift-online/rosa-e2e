@@ -46,3 +46,8 @@ var (
 	ManagementPlane  = ginkgo.Label("Area:ManagementPlane")
 	Upgrade          = ginkgo.Label("Area:Upgrade")
 )
+
+// Feature labels identify tests for opt-in cluster capabilities.
+var (
+	ZeroEgress = ginkgo.Label("Feature:ZeroEgress")
+)

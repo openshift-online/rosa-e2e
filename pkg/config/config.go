@@ -41,6 +41,7 @@ type Config struct {
 	ComputeNodes       int    `yaml:"compute_nodes"`
 	ChannelGroup       string `yaml:"channel_group"`
 	OpenShiftVersion   string `yaml:"openshift_version"`
+	ZeroEgress         bool   `yaml:"zero_egress"`
 
 	// Management cluster access (for HCP namespace checks)
 	ManagementClusterID string `yaml:"management_cluster_id"`
@@ -164,6 +165,13 @@ func Load() (*Config, error) {
 	}
 	if v := os.Getenv("OPENSHIFT_VERSION"); v != "" {
 		cfg.OpenShiftVersion = v
+	}
+	if v := os.Getenv("ZERO_EGRESS"); v != "" {
+		enabled, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ZERO_EGRESS value %q: %w", v, err)
+		}
+		cfg.ZeroEgress = enabled
 	}
 	if v := os.Getenv("MANAGEMENT_CLUSTER_ID"); v != "" {
 		cfg.ManagementClusterID = v

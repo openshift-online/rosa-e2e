@@ -195,6 +195,14 @@ func (tc *TestContext) InitAWSClients(ctx context.Context) error {
 	return nil
 }
 
+// IsZeroEgress reports whether zero egress is enabled for the configured cluster.
+func (tc *TestContext) IsZeroEgress() (bool, error) {
+	if tc.cfg.ClusterID == "" {
+		return tc.cfg.ZeroEgress, nil
+	}
+	return IsZeroEgressCluster(tc.conn, tc.cfg.ClusterID)
+}
+
 // HCKubeClient returns the hosted cluster kube client, or nil if not initialized.
 func (tc *TestContext) HCKubeClient() kubernetes.Interface {
 	return tc.hcKubeClient
