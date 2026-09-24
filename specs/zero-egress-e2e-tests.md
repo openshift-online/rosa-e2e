@@ -6,7 +6,7 @@ Jira: [ROSAENG-308](https://redhat.atlassian.net/browse/ROSAENG-308)
 
 ## Background
 
-Zero egress clusters are ROSA HCP clusters whose worker subnets have no route to the public internet. They do not depend on a NAT Gateway or an Internet Gateway for cluster operation. OpenShift release images are pulled from AWS ECR mirrors instead of quay.io. The feature is day-1 only and immutable.
+Zero egress clusters are ROSA HCP clusters designed to operate without requiring public internet egress. The documented installation flow can use the standard ROSA VPC template, which includes a NAT gateway and private default route, so zero egress does not by itself prove hard network isolation. OpenShift release images are pulled from AWS ECR mirrors instead of quay.io. The feature is day-1 only and immutable.
 
 ### Existing Infrastructure
 
@@ -28,13 +28,13 @@ The E2E suite owns a capability contract, not the endpoint list implemented by a
 
 EC2, KMS, and other endpoints can be validated when they are provisioned by the selected infrastructure template, but they are template-specific checks rather than part of the initial portable runtime contract. If cluster provisioning proves that one is required across all supported zero-egress configurations, promote it into the table above.
 
-`rosa verify network` is a useful compatibility signal, but its internal endpoint list is not the source of truth for this suite. The authoritative assertions are the VPC endpoint configuration, private DNS behavior where applicable, successful mirrored image pulls, and demonstrated absence of public egress.
+`rosa verify network` is a useful compatibility signal, but its internal endpoint list is not the source of truth for this suite. The authoritative assertions are the VPC endpoint configuration, private DNS behavior where applicable, and successful mirrored image pulls.
 
 ## 1. Cluster Creation Validation
 
 ### 1.1 Happy path creation
 
-- Create cluster with `--hosted-cp --sts --private --subnet-ids <ids> --properties zero_egress:true`
+- Create cluster with `--hosted-cp --sts --private --default-ingress-private --subnet-ids <ids> --properties zero_egress:true`
 - Verify cluster reaches `ready` state
 - Verify `rosa describe cluster` shows `Zero Egress: Enabled`
 
@@ -109,7 +109,7 @@ EC2, KMS, and other endpoints can be validated when they are provisioned by the 
 - Add a `ZeroEgress` feature label and keep these tests HCP-only
 - Detect zero-egress capability from the OCM cluster model; skip endpoint-contract tests when the target cluster is not zero egress
 - Implement an AWS-side verifier for VPC endpoints, endpoint ENIs, security groups, and worker route tables
-- Implement a workload-side verifier for DNS, TLS connectivity, mirrored image pulls, and blocked public egress
+- Implement a workload-side verifier for DNS, TLS connectivity, and mirrored image pulls
 - Compare DNS answers with the endpoint ENI addresses returned by AWS instead of checking only RFC1918 ranges
 - Reuse one diagnostic workload per spec and emit DNS answers, connection results, VPC endpoint state, and relevant route-table entries on failure
 - Keep incomplete-endpoint scenarios in dedicated cluster-creation jobs so regular conformance runs remain non-destructive
@@ -153,12 +153,10 @@ EC2, KMS, and other endpoints can be validated when they are provisioned by the 
   oc get proxy cluster -o yaml
   ```
 
-### 5.2 No outbound internet
+### 5.2 Optional hard-isolation profile
 
-- From a pod, attempt HTTPS connections to multiple public destinations that are not represented by private endpoints
-- Confirm DNS resolution works before testing the connection so a DNS failure cannot create a false positive
-- Expected: all public connection attempts time out or fail while required AWS private paths remain reachable
-- Verify the worker subnet route tables have no default route through a NAT Gateway or Internet Gateway
+- Do not require blocked public traffic or the absence of NAT routes in the portable zero-egress conformance suite
+- In a dedicated restricted-network job, use a VPC intentionally created without public egress and verify public HTTPS connections fail while required AWS private paths remain reachable
 
 ## 6. DNS Resolution
 
@@ -207,7 +205,6 @@ EC2, KMS, and other endpoints can be validated when they are provisioned by the 
 | Pods healthy | `oc get pods -A` | All Running |
 | Interface endpoint DNS is private | Resolve STS and ECR endpoints from a pod | Addresses match endpoint ENIs |
 | S3 endpoint route exists | Inspect worker subnet route tables | S3 prefix-list route targets the gateway endpoint |
-| No internet | `curl https://example.com` from pod | Timeout |
 | ROSA verifier compatibility | `rosa verify network` | Pass when available |
 | Immutable | `rosa edit cluster --properties zero_egress:false` | Error |
 | Insights disabled | Pull secret missing `cloud.openshift.com` | true |

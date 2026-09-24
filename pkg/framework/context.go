@@ -71,7 +71,17 @@ func (tc *TestContext) Connection() *sdk.Connection {
 
 // InitHCClients initializes kube and dynamic clients for the hosted cluster.
 func (tc *TestContext) InitHCClients() error {
-	restCfg, err := GetClusterCredentials(tc.conn, tc.cfg.ClusterID)
+	zeroEgress, err := tc.IsZeroEgress()
+	if err != nil {
+		return fmt.Errorf("detecting zero egress for HC access: %w", err)
+	}
+
+	var restCfg *rest.Config
+	if zeroEgress {
+		restCfg, err = GetBackplaneClusterConfig(context.Background(), tc.cfg)
+	} else {
+		restCfg, err = GetClusterCredentials(tc.conn, tc.cfg.ClusterID)
+	}
 	if err != nil {
 		return fmt.Errorf("getting HC credentials: %w", err)
 	}
