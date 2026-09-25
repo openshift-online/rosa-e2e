@@ -364,6 +364,7 @@ See [docs/local-testing.md](docs/local-testing.md) for running tests from your l
 
 ## Related Documentation
 
+- **Docs Index**: [docs/README.md](docs/README.md) - operational SOPs, CI Watcher rotation, suite setup/debugging guides
 - **Planning Document**: [ROSA-E2E-PLAN.md](../hcm-design/rosa-e2e/ROSA-E2E-PLAN.md) - Full architecture, test areas, phasing, execution model
 - **Jira**:
   - [ROSA-683](https://issues.redhat.com/browse/ROSA-683) - ROSA Downstream CI Test Coverage and Validation (parent initiative)
