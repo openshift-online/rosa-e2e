@@ -47,6 +47,11 @@ type Config struct {
 	ChannelGroup       string `yaml:"channel_group"`
 	OpenShiftVersion   string `yaml:"openshift_version"`
 
+	// NoCNI provisions an HCP cluster without a managed CNI plugin (BYO CNI),
+	// equivalent to the `rosa create cluster --no-cni` flag. OCM reports such
+	// clusters with network type "Other". HCP-only.
+	NoCNI bool `yaml:"no_cni"`
+
 	// Management cluster access (for HCP namespace checks)
 	ManagementClusterID string `yaml:"management_cluster_id"`
 
@@ -179,6 +184,13 @@ func Load() (*Config, error) {
 	}
 	if v := os.Getenv("OPENSHIFT_VERSION"); v != "" {
 		cfg.OpenShiftVersion = v
+	}
+	if v := os.Getenv("NO_CNI"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid NO_CNI value %q: %w", v, err)
+		}
+		cfg.NoCNI = b
 	}
 	if v := os.Getenv("MANAGEMENT_CLUSTER_ID"); v != "" {
 		cfg.ManagementClusterID = v
