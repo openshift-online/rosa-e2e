@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand/v2"
+	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -117,6 +118,12 @@ func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, err
 	awsBuilder := cmv1.NewAWS().
 		SubnetIDs(cfg.SubnetIDs...).
 		STS(stsBuilder)
+
+	if cfg.ZeroEgress {
+		awsBuilder = awsBuilder.
+			PrivateLink(true).
+			ZeroEgress(cmv1.NewZeroEgress().Enabled(true))
+	}
 
 	if cfg.BillingAccountID != "" {
 		awsBuilder = awsBuilder.BillingAccountID(cfg.BillingAccountID)
@@ -302,6 +309,30 @@ func GetClusterState(conn *sdk.Connection, clusterID string) (cmv1.ClusterState,
 		return "", fmt.Errorf("getting cluster %s state: %w", clusterID, err)
 	}
 	return resp.Body().State(), nil
+}
+
+// IsZeroEgressEnabled reports whether zero egress is enabled in an OCM cluster model.
+func IsZeroEgressEnabled(cluster *cmv1.Cluster) (bool, error) {
+	if value, ok := cluster.Properties()["zero_egress"]; ok {
+		enabled, err := strconv.ParseBool(value)
+		if err != nil {
+			return false, fmt.Errorf("parsing zero_egress cluster property %q: %w", value, err)
+		}
+		return enabled, nil
+	}
+
+	zeroEgress, ok := cluster.AWS().GetZeroEgress()
+	return ok && zeroEgress != nil && zeroEgress.Enabled(), nil
+}
+
+// IsZeroEgressCluster fetches a cluster and reports whether zero egress is enabled.
+func IsZeroEgressCluster(conn *sdk.Connection, clusterID string) (bool, error) {
+	resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().Send()
+	if err != nil {
+		return false, fmt.Errorf("getting cluster %s for zero egress detection: %w", clusterID, err)
+	}
+
+	return IsZeroEgressEnabled(resp.Body())
 }
 
 // resolveVersionForTopology finds the latest available version for the given topology.
