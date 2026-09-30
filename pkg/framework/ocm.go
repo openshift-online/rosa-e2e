@@ -156,6 +156,13 @@ func CreateRosaHCPCluster(conn *sdk.Connection, cfg *config.Config) (string, err
 			ChannelGroup(cfg.ChannelGroup)).
 		Properties(properties)
 
+	// --no-cni: provision without a managed CNI (BYO CNI). OCM represents this
+	// as network type "Other".
+	if cfg.NoCNI {
+		clusterBuilder = clusterBuilder.Network(cmv1.NewNetwork().Type("Other"))
+		ginkgo.GinkgoWriter.Printf("Provisioning HCP cluster with no managed CNI (BYO CNI)\n")
+	}
+
 	cluster, err := clusterBuilder.Build()
 	if err != nil {
 		return "", fmt.Errorf("building cluster object: %w", err)

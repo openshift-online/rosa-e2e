@@ -52,3 +52,9 @@ var (
 	ManagementPlane  = ginkgo.Label("Area:ManagementPlane")
 	Upgrade          = ginkgo.Label("Area:Upgrade")
 )
+
+// Feature-specific labels (opt-in scenarios that require special cluster setup)
+var (
+	// NoCNI marks specs that only apply to no-CNI (BYO CNI) clusters. Requires NO_CNI=true.
+	NoCNI = ginkgo.Label("Feature:NoCNI")
+)
