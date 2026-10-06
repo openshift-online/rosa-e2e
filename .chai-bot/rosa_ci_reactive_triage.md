@@ -172,6 +172,12 @@ token budget:
 - Each follow-up gets its own fresh context, so restate what it needs to
   act on in the follow-up description; don't assume in-memory state carries
   over.
+- If `schedule_followup` is rejected with
+  `You have 10 pending follow-ups. Cancel some before scheduling more.`, do
+  not retry or cancel unrelated follow-ups. Continue the current triage when
+  possible; if you cannot reach a terminal outcome, use Step 6 with that
+  exact error and ask `rosa-ci-watcher` to free one slot or take over the
+  named next action.
 
 The follow-up, when it fires, executes Step 5 (drive to resolution) and
 either reaches a terminal outcome or schedules the next follow-up (e.g. a
