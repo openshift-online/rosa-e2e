@@ -54,9 +54,12 @@ Before analyzing, check whether this failure is already handled or is
 collateral from a known outage:
 
 - Search open issues across the relevant Jira projects (not just one), and
-  ALL open `[rosa-ci-fix]` PRs (not just recent ones -- an older open fix PR
-  still counts), for the same test id / root cause. Which project depends on
-  the owning component:
+  open remediation PRs in every relevant repository. In each repository,
+  search both the `rosa-ci-fix` label and the related Jira key and/or
+  `[rosa-ci-fix]` title marker. A zero-result label search is not sufficient
+  to conclude that no fix PR exists. Search all open matches, not just recent
+  ones -- an older open fix PR still counts. Which project depends on the
+  owning component:
   - `ROSAENG` -- ROSA-specific bugs and CI issues.
   - `OCPBUGS` -- OpenShift product bugs (OCP components).
   - `DPTP` -- Test Platform / build-farm / Prow infra.
