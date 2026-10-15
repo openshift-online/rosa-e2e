@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.338.4
 	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.44.0
-	github.com/openshift-eng/openshift-tests-extension v0.0.0-20260812190735-a8b44e9f9fed
+	github.com/openshift-eng/openshift-tests-extension v0.0.0-20261005190041-64972ccf1568
 	github.com/openshift-online/ocm-sdk-go v0.1.517
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.37.1
