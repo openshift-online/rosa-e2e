@@ -356,7 +356,10 @@ rosa-e2e/
 
 ## CI Integration
 
-See [docs/ci-setup.md](docs/ci-setup.md) for running in OpenShift CI (Prow).
+See [docs/ci-setup.md](docs/ci-setup.md) for running in OpenShift CI (Prow), and
+[docs/provisioner-types.md](docs/provisioner-types.md) for the provision × validate matrix:
+how to compose a CI job from any provisioner front-end (rosa CLI, Terraform provider, OCM SDK)
+and this suite's shared customer-plane / platform-plane validation refs.
 
 ## Local Testing
 
