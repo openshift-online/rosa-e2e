@@ -43,6 +43,11 @@ var (
 	Informing = ginkgo.Label("Lifecycle:informing")
 )
 
+// Feature labels (cluster-level features; use to include/exclude feature-specific test suites)
+var (
+	FIPS = ginkgo.Label("Feature:FIPS")
+)
+
 // Test area categories
 var (
 	ClusterLifecycle = ginkgo.Label("Area:ClusterLifecycle")
