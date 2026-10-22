@@ -220,6 +220,28 @@ In CI, secrets are mounted as files and loaded via environment variables in the 
 
 ## Test Results and Reporting
 
+### Failure-time management cluster snapshots
+
+The HCP deployment revision, deployment health, and HostedCluster health checks
+write best-effort JSON snapshots to
+`ARTIFACT_DIR/mc-failure-diagnostics/snapshot-*.json` only when the spec fails.
+Like the suite's Sippy report, the directory defaults to `/tmp` outside CI.
+Collection reuses the test's initialized MC clients and resolved namespaces;
+it does not request additional credentials or change access policy or assertions.
+
+The field allowlist contains resource names, namespaces, UIDs, generations,
+creation times, numeric rollout revisions, replica counts, Deployment/ReplicaSet
+controller ownership, pod phase and restart totals, and recognized condition
+types/statuses, observed generations and transition times. Other annotations,
+labels, specs, images, arguments, environment variables, secret references,
+condition messages/reasons, raw API errors, events and workload logs are excluded.
+Each request has a three-second deadline within a twelve-second collection budget.
+Lists stop at 100 objects without pagination, Deployment/pod conditions at 16,
+and HC conditions are projected from at most 100 entries to known unique types;
+restart totals cover at most 32 container statuses per pod. Read failures and
+truncated lists are marked in the snapshot; JSON is capped at 512 KiB.
+Diagnostic failures never replace the original test result.
+
 ### JUnit XML Output
 
 All tests generate JUnit XML reports via Ginkgo:

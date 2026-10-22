@@ -28,6 +28,7 @@ var _ = Describe("ROSA HCP HostedCluster Health", labels.Critical, labels.Positi
 		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
 
 		By("Verifying all deployments in " + ns.HCPNamespace + " are healthy")
+		registerMCFailureDiagnostics(tc)
 		Expect(verifiers.VerifyHCPNamespaceHealthy(ctx, tc.MCKubeClient(), ns.HCPNamespace)).To(Succeed())
 	})
 
@@ -45,6 +46,7 @@ var _ = Describe("ROSA HCP HostedCluster Health", labels.Critical, labels.Positi
 		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
 
 		By("Verifying HostedCluster CR in " + ns.HCNamespace)
+		registerMCFailureDiagnostics(tc)
 		Expect(verifiers.VerifyHostedClusterHealthy(ctx, tc.MCDynamicClient(), ns.HCNamespace, ns.ClusterName)).To(Succeed())
 	})
 
