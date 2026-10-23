@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand/v2"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -25,6 +27,11 @@ const (
 
 	pollInterval       = 30 * time.Second
 	defaultReadyTimout = 45 * time.Minute
+)
+
+var (
+	// channelGroupRe validates channel group names (e.g., "stable", "candidate", "fast").
+	channelGroupRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 )
 
 // NewOCMConnection creates a new OCM SDK connection using the provided configuration.
@@ -245,7 +252,7 @@ func WaitForClusterReady(conn *sdk.Connection, clusterID string, timeout time.Du
 		case <-ctx.Done():
 			return fmt.Errorf("timed out waiting for cluster %s to be ready after %v", clusterID, timeout)
 		case <-ticker.C:
-			resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().Send()
+			resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().SendContext(ctx)
 			if err != nil {
 				ginkgo.GinkgoWriter.Printf("Error polling cluster %s status: %v\n", clusterID, err)
 				continue
@@ -273,6 +280,57 @@ func DeleteCluster(conn *sdk.Connection, clusterID string) error {
 	}
 	ginkgo.GinkgoWriter.Printf("Cluster %s deletion initiated\n", clusterID)
 	return nil
+}
+
+// WaitForClusterDeleted polls the cluster status until it is deleted (404) or the timeout expires.
+// Only returns nil when the API confirms the cluster is deleted (404 response).
+// Transient errors are logged and retried; timeout is treated as an error (potential resource leak).
+func WaitForClusterDeleted(conn *sdk.Connection, clusterID string, timeout time.Duration) error {
+	if timeout == 0 {
+		timeout = 15 * time.Minute
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for cluster %s to be deleted after %v; cluster may still exist", clusterID, timeout)
+		case <-ticker.C:
+			resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().SendContext(ctx)
+			// Handle error case: only 404 means the cluster is deleted
+			if err != nil {
+				// Check if this is specifically a 404 error (cluster not found = deleted)
+				// The ocm-sdk-go library includes HTTP status in error responses
+				if resp != nil && resp.Status() == 404 {
+					ginkgo.GinkgoWriter.Printf("Cluster %s successfully deleted\n", clusterID)
+					return nil
+				}
+				// Any other error (transient, auth, etc.) is retried
+				ginkgo.GinkgoWriter.Printf("Transient error polling cluster %s for deletion: %v (retrying)\n", clusterID, err)
+				continue
+			}
+			// Successful response: check the status code
+			if resp.Status() == 404 {
+				ginkgo.GinkgoWriter.Printf("Cluster %s successfully deleted\n", clusterID)
+				return nil
+			}
+			if resp.Status() < 200 || resp.Status() >= 300 {
+				// Unexpected HTTP error in successful response (edge case)
+				ginkgo.GinkgoWriter.Printf("Unexpected status %d polling cluster %s for deletion (retrying)\n", resp.Status(), clusterID)
+				continue
+			}
+			// Cluster still exists; log its state and keep polling
+			if resp.Body() != nil {
+				state := resp.Body().State()
+				ginkgo.GinkgoWriter.Printf("Cluster %s state: %s (waiting for deletion)\n", clusterID, state)
+			}
+		}
+	}
 }
 
 // GetClusterCredentials retrieves kubeconfig credentials from the OCM API for the given cluster.
@@ -305,8 +363,14 @@ func GetClusterState(conn *sdk.Connection, clusterID string) (cmv1.ClusterState,
 }
 
 // resolveVersionForTopology finds the latest available version for the given topology.
+// If OpenShiftVersion is set, it validates that the version is available for the topology (mandatory check).
 func resolveVersionForTopology(conn *sdk.Connection, cfg *config.Config, topology string) (string, error) {
 	if cfg.OpenShiftVersion != "" {
+		// Validate the version is installable for this topology before proceeding
+		if err := ValidateVersionAvailable(conn, cfg, topology, cfg.OpenShiftVersion); err != nil {
+			return "", fmt.Errorf("version %s is not installable for %s topology in channel group %q: %w",
+				cfg.OpenShiftVersion, topology, cfg.ChannelGroup, err)
+		}
 		return "openshift-v" + cfg.OpenShiftVersion, nil
 	}
 
@@ -339,6 +403,53 @@ func resolveVersionForTopology(conn *sdk.Connection, cfg *config.Config, topolog
 	return version.ID(), nil
 }
 
+// ValidateVersionAvailable checks if a specific version is enabled for new installs in the given channel group and topology.
+// Returns nil if the version is available, an error if it's not available or if the query fails.
+// The distinction allows callers to handle query failures (transient) differently from version not found (permanent).
+// Validates both channel group and version before interpolating into the search query.
+func ValidateVersionAvailable(conn *sdk.Connection, cfg *config.Config, topology, version string) error {
+	// Validate channel group to prevent query injection
+	if !channelGroupRe.MatchString(cfg.ChannelGroup) {
+		return fmt.Errorf("invalid channel group %q (must match [A-Za-z0-9_.-]+)", cfg.ChannelGroup)
+	}
+	// Validate version format (must be semver, no pre-release suffixes)
+	if !regexp.MustCompile(`^\d+\.\d+(\.\d+)?$`).MatchString(version) {
+		return fmt.Errorf("invalid version %q (must match \\d+.\\d+(.\\d+)?)", version)
+	}
+	// Validate topology to prevent fail-open
+	topology = strings.ToLower(topology)
+	validTopologies := map[string]bool{"hcp": true, "classic": true, "osd-gcp": true}
+	if !validTopologies[topology] {
+		return fmt.Errorf("invalid topology %q (must be hcp, classic, or osd-gcp)", topology)
+	}
+
+	query := fmt.Sprintf("channel_group = '%s' AND id = 'openshift-v%s' AND enabled = 'true'", cfg.ChannelGroup, version)
+	switch topology {
+	case "hcp":
+		query += " AND rosa_enabled = 'true' AND hosted_control_plane_enabled = 'true'"
+	case "osd-gcp":
+		// OSD GCP versions are not rosa_enabled
+	default:
+		query += " AND rosa_enabled = 'true'"
+	}
+
+	resp, err := conn.ClustersMgmt().V1().Versions().List().
+		Search(query).
+		Size(1).
+		Send()
+	if err != nil {
+		// Query failed — could be transient or authentication; either way, it's an error
+		return fmt.Errorf("version lookup failed for openshift-v%s: %w", version, err)
+	}
+
+	items := resp.Items().Slice()
+	if len(items) == 0 {
+		// Query succeeded but version not found in results — version is not available
+		return fmt.Errorf("version openshift-v%s not available for %s in channel group %q (check if version is enabled for new installs)", version, topology, cfg.ChannelGroup)
+	}
+	return nil
+}
+
 // resolveProvisionShard finds a ready provision shard for the given sector and region.
 // This matches the logic in openshift/release rosa-cluster-provision-commands.sh.
 func resolveProvisionShard(conn *sdk.Connection, sector, region string) (string, error) {
@@ -354,6 +465,17 @@ func resolveProvisionShard(conn *sdk.Connection, sector, region string) (string,
 }
 
 func findShardForSector(conn *sdk.Connection, sector, region, status string) (string, error) {
+	// Validate and escape inputs to prevent query injection
+	if !sectorNameRe.MatchString(sector) {
+		return "", fmt.Errorf("invalid sector name %q", sector)
+	}
+	if !regexp.MustCompile(`^[A-Za-z0-9_-]+$`).MatchString(region) {
+		return "", fmt.Errorf("invalid region %q", region)
+	}
+	if !regexp.MustCompile(`^[A-Za-z-]+$`).MatchString(status) {
+		return "", fmt.Errorf("invalid status %q", status)
+	}
+
 	type scItem struct {
 		ProvisionShardRef struct {
 			ID string `json:"id"`
@@ -363,7 +485,10 @@ func findShardForSector(conn *sdk.Connection, sector, region, status string) (st
 		Items []scItem `json:"items"`
 	}
 
-	query := fmt.Sprintf("sector is '%s' and region is '%s' and status in ('%s')", sector, region, status)
+	escapedSector := strings.ReplaceAll(sector, "'", "''")
+	escapedRegion := strings.ReplaceAll(region, "'", "''")
+	escapedStatus := strings.ReplaceAll(status, "'", "''")
+	query := fmt.Sprintf("sector is '%s' and region is '%s' and status in ('%s')", escapedSector, escapedRegion, escapedStatus)
 	resp, err := conn.Get().
 		Path("/api/osd_fleet_mgmt/v1/service_clusters").
 		Parameter("search", query).

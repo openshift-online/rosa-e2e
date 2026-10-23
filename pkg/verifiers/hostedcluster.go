@@ -22,6 +22,16 @@ var (
 		Version:  "v1beta1",
 		Resource: "nodepools",
 	}
+	nodeGVR = schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "nodes",
+	}
+	clusterOperatorGVR = schema.GroupVersionResource{
+		Group:    "config.openshift.io",
+		Version:  "v1",
+		Resource: "clusteroperators",
+	}
 )
 
 // VerifyHostedClusterHealthy verifies that a HostedCluster CR has Available=True and Degraded=False.
@@ -140,6 +150,118 @@ func verifyConditions(obj *unstructured.Unstructured, kind, namespace, name stri
 	if len(issues) > 0 {
 		return fmt.Errorf("%s %s/%s is not healthy:\n%s",
 			kind, namespace, name, strings.Join(issues, "\n"))
+	}
+
+	return nil
+}
+
+// VerifyWorkerNodesReady verifies that all worker nodes in the hosted cluster are in Ready state.
+// Uses dynamic client to parse unstructured Node objects without importing k8s.io/api/core types.
+func VerifyWorkerNodesReady(ctx context.Context, hcClient dynamic.Interface) error {
+	nodeList, err := hcClient.Resource(nodeGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing nodes: %w", err)
+	}
+
+	if len(nodeList.Items) == 0 {
+		return fmt.Errorf("no nodes found in the cluster")
+	}
+
+	var notReadyNodes []string
+	for _, node := range nodeList.Items {
+		nodeName := node.GetName()
+		conditions, found, err := getConditions(node.Object)
+		if err != nil {
+			return fmt.Errorf("getting conditions for node %s: %w", nodeName, err)
+		}
+		if !found {
+			notReadyNodes = append(notReadyNodes, fmt.Sprintf("%s (no conditions found)", nodeName))
+			continue
+		}
+
+		nodeIsReady := false
+		var conditionDetails []string
+		for _, cond := range conditions {
+			condType, _ := cond["type"].(string)
+			condStatus, _ := cond["status"].(string)
+
+			if condType == "Ready" {
+				if condStatus == "True" {
+					nodeIsReady = true
+				}
+				conditionDetails = append(conditionDetails, fmt.Sprintf("Ready=%s", condStatus))
+			}
+		}
+
+		if !nodeIsReady {
+			details := strings.Join(conditionDetails, ", ")
+			if details == "" {
+				details = "Ready condition not found"
+			}
+			notReadyNodes = append(notReadyNodes, fmt.Sprintf("%s (%s)", nodeName, details))
+		}
+	}
+
+	if len(notReadyNodes) > 0 {
+		return fmt.Errorf("nodes not ready:\n  %s", strings.Join(notReadyNodes, "\n  "))
+	}
+
+	return nil
+}
+
+// VerifyClusterOperatorsReady verifies that all ClusterOperators are Available and not Degraded.
+// Tolerates Progressing=True (operators may take time to converge).
+// Uses dynamic client to parse unstructured ClusterOperator objects.
+func VerifyClusterOperatorsReady(ctx context.Context, hcClient dynamic.Interface) error {
+	operatorList, err := hcClient.Resource(clusterOperatorGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing clusteroperators: %w", err)
+	}
+
+	if len(operatorList.Items) == 0 {
+		return fmt.Errorf("no clusteroperators found")
+	}
+
+	var unhealthyOperators []string
+	for _, operator := range operatorList.Items {
+		operatorName := operator.GetName()
+		conditions, found, err := getConditions(operator.Object)
+		if err != nil {
+			return fmt.Errorf("getting conditions for operator %s: %w", operatorName, err)
+		}
+		if !found {
+			unhealthyOperators = append(unhealthyOperators, fmt.Sprintf("%s: no conditions found", operatorName))
+			continue
+		}
+
+		available := false
+		degraded := true
+		var conditionDetails []string
+
+		for _, cond := range conditions {
+			condType, _ := cond["type"].(string)
+			condStatus, _ := cond["status"].(string)
+
+			if condType == "Available" && condStatus == "True" {
+				available = true
+			}
+			if condType == "Degraded" && condStatus == "False" {
+				degraded = false
+			}
+
+			// Collect details for Available, Degraded, and Progressing conditions
+			if condType == "Available" || condType == "Degraded" || condType == "Progressing" {
+				conditionDetails = append(conditionDetails, fmt.Sprintf("%s=%s", condType, condStatus))
+			}
+		}
+
+		if !available || degraded {
+			unhealthyOperators = append(unhealthyOperators, fmt.Sprintf("%s: %s", operatorName, strings.Join(conditionDetails, ", ")))
+		}
+	}
+
+	if len(unhealthyOperators) > 0 {
+		return fmt.Errorf("unhealthy clusteroperators found:\n  %s", strings.Join(unhealthyOperators, "\n  "))
 	}
 
 	return nil
