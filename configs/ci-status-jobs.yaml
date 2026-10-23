@@ -377,9 +377,9 @@ categories:
     name: OCM FVT OSDFM INT
     team:
       id: "bd8a0aae-863d-4ea3-a697-028b5043fc08"
-      name: ROSA Fleet Manager
-      slack_channel: team-rosa-fleet-manager
-      slack_alias: team-rosa-fleet-manager
+      name: ROSA HCP Platform Fleet
+      slack_channel: team-rosa-hcp-platform
+      slack_alias: rosa-hcp-platform-fleet-team
     labels: [ci-failure, ocm-fvt, osd-fleet-manager]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm-integration*"
     jobs:
@@ -397,9 +397,9 @@ categories:
     gating: true
     team:
       id: "bd8a0aae-863d-4ea3-a697-028b5043fc08"
-      name: ROSA Fleet Manager
-      slack_channel: team-rosa-fleet-manager
-      slack_alias: team-rosa-fleet-manager
+      name: ROSA HCP Platform Fleet
+      slack_channel: team-rosa-hcp-platform
+      slack_alias: rosa-hcp-platform-fleet-team
     labels: [ci-failure, ocm-fvt, osd-fleet-manager]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm-staging*"
     jobs:
