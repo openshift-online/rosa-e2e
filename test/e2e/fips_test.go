@@ -24,10 +24,13 @@ func skipIfNotFIPS(tc *framework.TestContext, clusterID string) {
 	}
 }
 
-// ── Node-level FIPS ──────────────────────────────────────────────────────────
+// ── Node-level FIPS (Classic / OSD GCP) ──────────────────────────────────────
+// MachineConfig / MachineConfigPool exist on Classic and OSD guests only.
+// HCP FIPS jobs should filter Platform:HCP || (Feature:FIPS && !Platform:Classic)
+// so this spec is selected on Classic/OSD FIPS jobs but not on HCP.
 
 var _ = Describe("Security: FIPS Node Verification",
-	labels.High, labels.Positive, labels.FIPS, labels.CustomerFeatures,
+	labels.High, labels.Positive, labels.Classic, labels.OSDGCP, labels.FIPS, labels.CustomerFeatures,
 	func() {
 		It("should have kernel FIPS mode enabled on all nodes", func(ctx context.Context) {
 			if cfg.ClusterID == "" {
@@ -43,6 +46,41 @@ var _ = Describe("Security: FIPS Node Verification",
 			Expect(verifiers.VerifyNodeFIPSEnabled(ctx, tc.HCDynamicClient())).To(Succeed())
 
 			GinkgoWriter.Printf("All rendered MachineConfigs on cluster %s have FIPS enabled\n", cfg.ClusterID)
+		})
+	},
+)
+
+// ── HostedCluster FIPS (HCP) ─────────────────────────────────────────────────
+// ROSA HCP guests have no MachineConfig API. FIPS is HostedCluster.spec.fips
+// on the management cluster. Selected by Platform:HCP and Feature:FIPS.
+
+var _ = Describe("Security: FIPS HostedCluster Configuration",
+	labels.High, labels.Positive, labels.HCP, labels.FIPS, labels.CustomerFeatures, labels.MCAccess,
+	func() {
+		It("should have spec.fips enabled on HostedCluster", func(ctx context.Context) {
+			if cfg.ClusterID == "" {
+				Skip("CLUSTER_ID not set")
+			}
+			tc := framework.NewTestContext(cfg, conn)
+			skipIfNotFIPS(tc, cfg.ClusterID)
+
+			if !tc.HasMCAccess() {
+				Skip("MANAGEMENT_CLUSTER_ID not configured, skipping HCP FIPS HostedCluster verification")
+			}
+
+			By("Initializing management cluster clients")
+			Expect(tc.InitMCClients()).To(Succeed())
+
+			ns := tc.HCPNamespaces()
+			Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+
+			By("Verifying HostedCluster spec.fips is true")
+			Expect(verifiers.VerifyHCPFIPSEnabled(ctx, tc.MCDynamicClient(), ns.HCNamespace, ns.ClusterName)).To(Succeed())
+
+			By("Verifying NodePool CRs are healthy")
+			Expect(verifiers.VerifyNodePoolHealthy(ctx, tc.MCDynamicClient(), ns.HCNamespace, ns.ClusterName)).To(Succeed())
+
+			GinkgoWriter.Printf("HostedCluster %s/%s has FIPS enabled\n", ns.HCNamespace, ns.ClusterName)
 		})
 	},
 )
@@ -146,4 +184,3 @@ var _ = Describe("Security: FIPS Managed Operators (Cross-Platform)",
 		}
 	},
 )
-
