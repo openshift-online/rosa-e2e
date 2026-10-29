@@ -205,6 +205,27 @@ func VerifyClusterFIPSEnabled(conn *sdk.Connection, clusterID string) (bool, err
 	return resp.Body().FIPS(), nil
 }
 
+// VerifyHCPFIPSEnabled verifies that an HCP cluster is configured for FIPS by
+// checking HostedCluster.spec.fips=true on the management cluster.
+// ROSA HCP guests do not expose MachineConfig CRs; HyperShift applies FIPS
+// via ignition generated from this field.
+func VerifyHCPFIPSEnabled(ctx context.Context, dynamicClient dynamic.Interface, namespace, name string) error {
+	hc, err := dynamicClient.Resource(hostedClusterGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("getting HostedCluster %s/%s: %w", namespace, name, err)
+	}
+
+	fips, found, err := unstructured.NestedBool(hc.Object, "spec", "fips")
+	if err != nil {
+		return fmt.Errorf("reading spec.fips from HostedCluster %s/%s: %w", namespace, name, err)
+	}
+	if !found || !fips {
+		return fmt.Errorf("HostedCluster %s/%s does not have spec.fips=true", namespace, name)
+	}
+
+	return nil
+}
+
 // VerifyNodeFIPSEnabled verifies that FIPS is active on cluster nodes by:
 //  1. Checking rendered MachineConfig CRs have spec.fips=true (correct configuration)
 //  2. Checking MachineConfigPool status to confirm all nodes have applied the config
@@ -213,6 +234,8 @@ func VerifyClusterFIPSEnabled(conn *sdk.Connection, clusterID string) (bool, err
 // When MCO applies a FIPS-enabled config it reboots each node, so an Updated pool
 // with a FIPS-enabled rendered config guarantees kernel-level fips_enabled=1.
 // This is a read-only operation — no namespaces or workloads are created.
+// Classic / OSD only: HCP guests do not have the MachineConfig API; use
+// VerifyHCPFIPSEnabled against the management cluster instead.
 func VerifyNodeFIPSEnabled(ctx context.Context, dynamicClient dynamic.Interface) error {
 	if err := verifyRenderedMachineConfigsFIPS(ctx, dynamicClient); err != nil {
 		return err
