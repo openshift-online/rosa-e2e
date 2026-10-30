@@ -21,7 +21,7 @@ any provisioner can feed the same validation tail:
   | rosa-cli-provision        |--+             | CUSTOMER PLANE                 |
   | terraform-rhcs-provision  |  |  SHARED_DIR |   Area:DataPlane,              |
   | ocm-ui-provision (planned)|  +--------+    |   Area:CustomerFeatures        |
-  | rosa-e2e-ocm-provision    |--+        |    |   (from cluster kubeconfig)    |
+  | ocm-provision            |--+        |    |   (from cluster kubeconfig)    |
   +---------------------------+          |    +--------------------------------+
                                          v
                             +------------------------+
@@ -35,6 +35,9 @@ any provisioner can feed the same validation tail:
                                               |   (from MC/SC kubeconfigs)     |
                                               +--------------------------------+
 ```
+
+(The OCM provisioner's registered publisher ref is named `rosa-e2e-ocm-provision` in the step
+registry — the diagram uses the bare `<type>-provision` names for symmetry with the other heads.)
 
 Composition is one chain per provisioner with an identical tail — swap the head, keep the tail:
 
@@ -63,7 +66,7 @@ without per-job config.
 ```json
 {
   "schema_version": "1.0.0",
-  "provisioner": "rosa-e2e-cli",
+  "provisioner": "rosa-cli",
   "cluster_id": "...",
   "cluster_name": "...",
   "topology": "hcp",
