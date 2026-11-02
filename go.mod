@@ -6,16 +6,16 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.47.5
 	github.com/aws/aws-sdk-go-v2/config v1.33.12
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.65.7
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.341.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.343.0
 	github.com/onsi/ginkgo/v2 v2.33.1
 	github.com/onsi/gomega v1.44.0
-	github.com/openshift-eng/openshift-tests-extension v0.0.0-20261005190041-64972ccf1568
+	github.com/openshift-eng/openshift-tests-extension v0.0.0-20261026111431-8782e72e5a1f
 	github.com/openshift-online/ocm-sdk-go v0.1.520
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.37.2
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
-	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
+	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab
 )
 
 require (
