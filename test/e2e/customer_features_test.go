@@ -236,6 +236,31 @@ var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Posi
 		GinkgoWriter.Printf("KMS Key ARN: %s\n", kmsKeyARN)
 		Expect(kmsKeyARN).To(HavePrefix("arn:aws:kms:"), "KMS key ARN should be a valid AWS KMS ARN")
 	})
+
+	It("should encrypt EBS volumes with the customer-managed KMS key", func(ctx context.Context) {
+		if cfg.ClusterID == "" {
+			Skip("CLUSTER_ID not set")
+		}
+		tc := framework.NewTestContext(cfg, conn)
+
+		By("Querying cluster KMS configuration")
+		resp, err := tc.Connection().ClustersMgmt().V1().Clusters().Cluster(cfg.ClusterID).Get().SendContext(ctx)
+		Expect(err).NotTo(HaveOccurred())
+
+		kmsKeyARN := resp.Body().AWS().KMSKeyArn()
+		if kmsKeyARN == "" {
+			Skip("Cluster does not have KMS encryption configured")
+		}
+
+		By("Initializing AWS clients")
+		err = tc.InitAWSClients(ctx)
+		if err != nil || !tc.HasAWSAccess() {
+			Skip("AWS credentials not available, skipping EBS encryption validation")
+		}
+
+		By("Validating that all cluster EBS volumes are encrypted with the KMS key")
+		Expect(verifiers.VerifyEBSVolumesEncrypted(ctx, tc.EC2Client(), cfg.ClusterID, kmsKeyARN)).To(Succeed())
+	})
 })
 
 var _ = Describe("Customer Features: PrivateLink", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
