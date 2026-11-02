@@ -252,14 +252,31 @@ var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Posi
 			Skip("Cluster does not have KMS encryption configured")
 		}
 
+		By("Configuring the AWS client for the cluster region")
+		region := resp.Body().Region().ID()
+		if region == "" {
+			Skip("Cluster region not reported by OCM, skipping EBS encryption validation")
+		}
+		cfg.AWSRegion = region
+
 		By("Initializing AWS clients")
 		err = tc.InitAWSClients(ctx)
 		if err != nil || !tc.HasAWSAccess() {
 			Skip("AWS credentials not available, skipping EBS encryption validation")
 		}
 
+		By("Resolving the volume tag identifier")
+		clusterTag := cfg.ClusterID
+		if tc.IsClassic() {
+			// Classic clusters tag their AWS resources with the infrastructure
+			// ID, not the cluster ID.
+			infraID, err := tc.ResolveInfraID()
+			Expect(err).NotTo(HaveOccurred(), "failed to resolve infra ID from OCM")
+			clusterTag = infraID
+		}
+
 		By("Validating that all cluster EBS volumes are encrypted with the KMS key")
-		Expect(verifiers.VerifyEBSVolumesEncrypted(ctx, tc.EC2Client(), cfg.ClusterID, kmsKeyARN)).To(Succeed())
+		Expect(verifiers.VerifyEBSVolumesEncrypted(ctx, tc.EC2Client(), clusterTag, kmsKeyARN)).To(Succeed())
 	})
 })
 

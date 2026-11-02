@@ -37,7 +37,9 @@ func VerifyEBSVolumesEncrypted(ctx context.Context, ec2Client *ec2.Client, clust
 			problems = append(problems, fmt.Sprintf("volume %s is not encrypted", volumeID))
 			continue
 		}
-		if kmsKeyARN == "" {
+		if kmsKeyARN == "" || !isRootVolume(volume) {
+			// Persistent volumes may use a per-storage-class KMS key, so only
+			// the node root volumes are required to use the cluster key.
 			continue
 		}
 		volumeKey := ""
@@ -45,7 +47,7 @@ func VerifyEBSVolumesEncrypted(ctx context.Context, ec2Client *ec2.Client, clust
 			volumeKey = *volume.KmsKeyId
 		}
 		if volumeKey != kmsKeyARN {
-			problems = append(problems, fmt.Sprintf("volume %s is encrypted with %q, expected the cluster KMS key %q",
+			problems = append(problems, fmt.Sprintf("root volume %s is encrypted with %q, expected the cluster KMS key %q",
 				volumeID, volumeKey, kmsKeyARN))
 		}
 	}
@@ -55,4 +57,15 @@ func VerifyEBSVolumesEncrypted(ctx context.Context, ec2Client *ec2.Client, clust
 	}
 
 	return nil
+}
+
+// isRootVolume reports whether the volume is attached as a node root volume
+// (device /dev/sda1, the ROSA worker root device).
+func isRootVolume(volume types.Volume) bool {
+	for _, attachment := range volume.Attachments {
+		if attachment.Device != nil && *attachment.Device == "/dev/sda1" {
+			return true
+		}
+	}
+	return false
 }
