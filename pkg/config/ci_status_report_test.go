@@ -46,6 +46,27 @@ func TestCIStatusNewScheduledCoverageIsInformational(t *testing.T) {
 	}
 }
 
+func TestCIStatusIntegrationOwnership(t *testing.T) {
+	var stagingTeam, integrationTeam *JiraTeam
+	for _, category := range loadCIStatusConfig(t).Categories {
+		switch category.ID {
+		case "rosa-e2e-stg":
+			stagingTeam = category.Team
+		case "rosa-e2e-int":
+			integrationTeam = category.Team
+		}
+	}
+	if stagingTeam == nil || integrationTeam == nil {
+		t.Fatal("both platform environments must have category ownership")
+	}
+	if *stagingTeam != *integrationTeam {
+		t.Error("integration must resolve the existing platform owner mapping")
+	}
+	if integrationTeam.ID == "" || integrationTeam.Name == "" || integrationTeam.SlackAlias == "" {
+		t.Error("integration ownership must include identification and escalation metadata")
+	}
+}
+
 func TestCIStatusReportOffline(t *testing.T) {
 	config := loadCIStatusConfig(t)
 	temporary := t.TempDir()

@@ -54,7 +54,7 @@ categories:
     name: ROSA E2E STG
     gating: true
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-e2e-main-periodics-*"
-    team:
+    team: &rosa_e2e_team
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
       slack_channel: wg-rosa-ci-enhancement
@@ -141,6 +141,7 @@ categories:
   - id: rosa-e2e-int
     scope: platform
     name: ROSA E2E INT
+    team: *rosa_e2e_team
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp*integration*"
     jobs:
       - name: HCP 4.20
