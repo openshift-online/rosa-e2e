@@ -4,7 +4,7 @@ You are running a **cron** scheduled task that produces a daily CI health report
 
 ## Goal
 
-Check the pass/fail history (last completed builds over 7 days per job) for all ROSA CI periodic jobs across all categories defined in the job registry. Report per-category pass rates, 7-day trends, and failure classifications. If all categories are >= 80%, respond with a brief summary and `no_action_required()`. After reporting, write a YAML handoff artifact to the bot's fork. When failures are present (any category < 80%), attempt one auto-fix PR for the highest-priority fixable failure and shepherd existing `[rosa-ci-fix]` PRs — all inline, no follow-up chaining. On all-green reports, the artifact is written but no remediation action is taken.
+Check the pass/fail history (last completed builds over 7 days per job) for all ROSA CI periodic jobs across all categories defined in the job registry. Report per-category pass rates, 7-day trends, and failure classifications. Every invocation also performs full two-way registry reconciliation (step 1b), independently of job health. Write the YAML handoff artifact before delivery. Step 7 selects the highest-value safe drift or failure fix under ONE total newly opened remediation PR per invocation, shared by both types, and shepherds existing PRs — all inline, no follow-up chaining. On all-green reports, skip failure remediation, but still check and safely remediate registry drift. When no action, meaningful change, or materially incomplete reconciliation merits reporting, retain scheduled silence with `no_action_required()` after the artifact and required checks; do not emit an ordinary healthy report just to say there is no drift.
 
 ## Procedure
 
@@ -19,26 +19,23 @@ If the fetch fails, report the error and skip the health check. Do not use a har
 
 **Procedure adherence:** Follow steps 1→1b→2→3→4→5→6 sequentially. Do not use broad CI analysis tools as a shortcut for steps 1-3. The job registry is the authoritative source for which jobs to check and how to categorize them.
 
-### 1b. Registry drift detection
+### 1b. Full two-way registry reconciliation
 
-After loading the job registry, check for drift between `ci-status-jobs.yaml` and the actual periodic test definitions in `openshift/release`.
+Run this source/config audit on every scheduled invocation, including all-green health runs. It covers ALL tracked job families, not a fixed list of three HCP FVT configs. Keep the pinned registry unchanged for this run's health calculations; proposed registry edits take effect only after review and merge.
 
-1. Fetch the ci-operator config files from `openshift/release` for each OCM FVT variant:
-   - `https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/openshift-online/rosa-e2e/openshift-online-rosa-e2e-main__ocm-fvt-rosa-hcp-staging.yaml` (→ category `ocm-fvt-hcp-stg`)
-   - `https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/openshift-online/rosa-e2e/openshift-online-rosa-e2e-main__ocm-fvt-rosa-hcp-integration.yaml` (→ category `ocm-fvt-hcp-int`)
-   - `https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/openshift-online/rosa-e2e/openshift-online-rosa-e2e-main__ocm-fvt-rosa-hcp-production.yaml` (→ category `ocm-fvt-hcp-prd`)
+1. **Pin authoritative source and record completeness.** Resolve the current `openshift-online/rosa-e2e` main registry and current `openshift/release` default branch to commit SHAs using authorized source tools. Read files at those SHAs and record both audited SHAs, source paths, and any incomplete listings in the audit evidence. Confirm step 1's registry matches the pinned contents before proceeding. Use a complete source checkout or fully paginated repository/tree listings and file reads; never treat a truncated search result as a complete inventory. Fetch source once per snapshot, with a ten-minute reconciliation discovery budget. If a fetch is incomplete, forbidden, or times out, mark the affected coverage unverified and report the precise gap; do not infer absence or bypass the denial through other credentials, identities, or access paths. Continue independently verifiable corrections, not destructive guesses.
 
-2. From each config, extract all `- as: ocm-fvt-periodic-*` test names under the `tests:` key. Convert each to a full Prow job name using the pattern:
-   `periodic-ci-openshift-online-rosa-e2e-main-{variant}-{test_as_name}`
-   where `{variant}` is the ci-operator variant (e.g. `ocm-fvt-rosa-hcp-staging`) and `{test_as_name}` is the `as:` value.
+2. **Inventory every actual definition location.** Start from every category and `prow_job` in the current registry, then enumerate complete relevant Prow periodic definitions across `openshift/release`, including generated `ci-operator/jobs/` files and manually maintained definitions elsewhere in the repository. Resolve corresponding ci-operator configs, variant/branch metadata, test `as:` aliases, workflows and schedules rather than guessing a single filename or constructing all names with one template. Cover ROSA E2E staging/integration, hosted-operator upgrades, ALL OCM FVT HCP/Classic/GCP/OSDFM environments, HyperShift CI, HCP/Classic conformance, the separate CAPA variant, CLI, Terraform, GAP, SRE operator promotion tests and any additional families present in the registry. The family examples are not a permanent allowlist or a substitute for complete enumeration.
 
-3. Compare the derived Prow job names against the `prow_job` values listed in `ci-status-jobs.yaml` under each matching category.
+3. **Registry → source: audit EVERY tracked name.** Record an exact before/after disposition for every entry: exact match with definition path; proven rename with old/new names and public source/history evidence; proven removal; or unverified. Before claiming removal, search the complete relevant definition inventory and other actual locations for the exact old name, inspect the current producer config, and verify deletion/rename evidence. Missing one guessed file is not proof. Preserve the category and effective job/category `gating` override semantics for a proven rename. Run history is separate: an existing definition with genuinely empty history is an existing job with no runs, not a removed job. History fetch errors or forbidden/incomplete responses mean execution availability unverified, never no runs. Historical public run-history HTTP 403s do not block source reconciliation; do not repeat the earlier 182-job artifact probe sweep or retry a denied history read to establish definition existence.
 
-4. Report drift:
-   - **Missing coverage:** jobs defined in `openshift/release` but not listed in `ci-status-jobs.yaml` (new jobs that need to be registered).
-   - **Stale entries:** jobs listed in `ci-status-jobs.yaml` but not found in `openshift/release` (removed or renamed jobs that should be cleaned up).
+4. **Source → registry: discover comparable missing coverage.** Compare current definitions in ALL relevant families against the full registry, not only known aliases or earlier spot checks. For every untracked candidate record its exact name, definition/config paths, workflow, actual schedule or verified external trigger, environment, supported version/topology, proposed category/scope, and inclusion or exclusion rationale. Include only tests/promotions demonstrably within documented registry scope. Explicitly exclude operational cleanup/lease utilities from E2E denominators; exclude unschedulable placeholders (including February-31 cron) and event-trigger-only candidates until actual trigger wiring and test scope are verified. Do not silently extend supported versions, topologies, environments or cross-major upgrade coverage. List these candidates and exact pending support decisions instead. Distinct repositories or simultaneous STS/GCP/HCP MC definitions are not duplicates or renames merely because names resemble each other.
 
-5. If drift is found, include a `:mag: *Registry Drift*` section in the top-level summary (after the category list, before the footer) listing the specific missing or stale jobs. If no drift is found, omit this section entirely.
+5. **Verify gate evidence without changing gate policy.** Check actual authoritative gate consumers and trigger/deployment manifests, at recorded source revisions and only within existing access grants. For every audited gating claim, record that evidence or mark its actual gate role unverified; an existing registry marker preserves policy but is not independent proof of actual wiring. A job name containing `stage`, `gating` or `promotion`, a cron, or a generic bridge with an unspecified job parameter is not proof of deployed trigger wiring or a production gate. Preserve existing gating policy for proven renames; do not infer successor gate inheritance when an old job is removed or a topology/workflow changes. Require source evidence for every new category/scope and gating classification, including informational status. Use an explicit job-level `gating: false` for verified informational additions to a gating category. If gate consumers, new classifications, or support scope remain materially ambiguous, leave the affected policy unchanged, separate safe edits, and report the exact pending choices and missing evidence rather than guess.
+
+6. **Prepare one bounded, deduplicated remediation candidate.** Save a before/after audit covering all tracked names, all missing candidates and exclusions, replacement/deletion evidence, effective gating, source SHAs, and unresolved choices. Group compatible, verified registry corrections into a single reconciliation candidate for `openshift-online/rosa-e2e` main; do not alter release definitions, operational systems, bot configuration, or gate policy as part of this drift fix. Search open PRs by repository, head branch and reconciliation purpose, including PRs without `[rosa-ci-fix]`, before proposing a new one. Record a matching PR for reuse/update on its existing branch; do not create a duplicate or overwrite human work. If the PR listing is incomplete or forbidden, do not open a possibly duplicate PR. Submit the candidate to step 7's shared priority selection and ONE total newly opened PR budget, not an extra drift allowance. Check for concurrent registry/source or PR-head changes before editing; if the evidence is stale, defer rather than apply a stale destructive patch. Use existing repository generators/checks and the existing fork/PR authorization process; an approval requirement or denial is a reportable boundary, not permission to bypass it. Never merge or autoapprove.
+
+7. **Report only actionable or materially incomplete drift.** Use a concise drift result and existing/new PR link, or a precise source/policy gap, as an optional clause in the existing footer (step 4). Put specific names, evidence, exclusions and deferred work in one threaded drift reply only when action or a material gap merits attention; use the existing `---THREAD_DETAILS---` / `---THREAD_BREAK---` mechanism, not a separate top-level message. Omit drift output when there is no actionable change or material incompleteness; unchanged, already-reported exclusions or policy questions alone do not justify repeat daily noise. Neither ordinary no-run data nor unavailable execution history is source drift. If a prior material gap is unchanged, keep its evidence without repeating an unchanged notification. Carry drift candidates through step 7 even if every health category is green.
 
 ### 2. Collect build history
 
@@ -46,7 +43,7 @@ For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prow
 
 If Prow tools don't return historical build data directly, use `fetch_web_content` to retrieve the job-history page at `https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{JOB_NAME}`. The HTML contains `var allBuilds = [{ID, Result, Started, Duration}];`.
 
-**Important: fetch ALL categories.** There are 13+ categories with ~139 total jobs. Process every category completely. If a fetch fails or times out for a specific job, mark that job as "fetch error" (not "no runs") and continue with the next job. Do not skip entire categories due to fetch issues. A category should only show "no runs" if every job in it genuinely returned zero completed builds in the data, not because the fetch failed.
+**Important: fetch ALL categories.** Derive categories and job counts from the current pinned registry, not historical fixed counts. Process every category completely. If a fetch fails or times out for a specific job, mark that job as "fetch error" (not "no runs") and continue with the next job. Do not skip entire categories due to fetch issues. A category should only show "no runs" if every job in it genuinely returned zero completed builds in the data, not because the fetch failed. Respect denied history access; record execution availability unverified without retrying the denied probe sweep or treating it as a source-reconciliation blocker.
 
 **Sippy release coverage:** The ROSA CI registry spans multiple Sippy synthetic releases — `rosa-stage`, `rosa-integration`, and `rosa-production`. When using Prow CI tools that filter by Sippy release, query all three releases and merge results, deduplicating by `prow_job` name. Do not limit queries to `rosa-stage` alone — integration and production environment jobs will be missed.
 
@@ -80,7 +77,7 @@ Post a concise summary as your channel response. This is the top-level message t
 - Per-job breakdowns or job names (those go in threaded replies)
 - Categories with no Prow run data (no white circle lines)
 
-**If all categories >= 80%**: use the same per-category format below but without threaded replies. Proceed to step 6 (write handoff artifact), then step 7 (deliver response).
+**If all categories >= 80%**: skip failure analysis, not reconciliation. Proceed to step 6 (write handoff artifact), then step 7 (shared drift/failure remediation). If an actionable drift change or materially incomplete check merits delivery, use the same per-category format below with only the relevant drift/phase replies; otherwise retain scheduled silence with `no_action_required()` after required checks and artifact writing. Do not manufacture a no-drift message.
 
 **Format** (used for both all-green and mixed reports):
 
@@ -102,11 +99,13 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 - List categories with data, sorted by pass rate descending. **One category per line.** Never combine multiple categories on the same line with `·` separators. Every category gets its own line with its own emoji, pass rate, trend, and (jobs) link, even green categories.
 - For yellow/red categories, add a **short** inline note after the trend emoji (e.g., `-- AMD64 & E2E at 40%`, `-- stale since Jun 17`, `-- 1 run in 30d`). Keep notes under 40 characters.
 - If any categories had zero Prow run data, mention the count in the footer line (e.g., `2 categories skipped (no runs)`). Omit this part if all categories have data.
-- Combine Sippy, Prow, and Dashboard links on the footer line separated by ` · `.
+- Combine Sippy, Prow, and Dashboard links on the footer line separated by ` · `. Only when step 1b warrants attention, append one concise `Registry drift: {result / PR link / material gap}` clause to that same footer; details belong in the threaded drift reply. Stay within the summary limit and do not add a drift section below category lines.
 - Append a small `(<prow_filter_url|jobs>)` link at the end of each category line using the `prow_filter` URL from ci-status-jobs.yaml. This lets readers click through to the Prow job-history for that category.
 - Do NOT repeat category details in a separate section below the list.
 
 **Threading gate:** Before proceeding, check: does your summary contain any :red_circle: or :large_yellow_circle: categories? If yes, step 5 is **mandatory** — do not call `send_response()` until threaded replies are composed. If all categories are :large_green_circle:, skip step 5 and proceed directly to step 6 (write handoff artifact).
+
+**Single threading rule:** The first reply uses `---THREAD_DETAILS---`; every subsequent reply uses `---THREAD_BREAK---`, regardless of reply type (failure analysis, registry drift, remediation or phase breakdown). Never emit a second `---THREAD_DETAILS---` in one response. Apply this rule on delivered all-green reports too.
 
 ### 5. Failure analysis (threaded replies)
 
@@ -241,13 +240,15 @@ categories:
 - `team` and `labels`: from the job registry (`ci-status-jobs.yaml`). Include them verbatim. If a job overrides the category-level team/labels, use the job-level values.
 - If a job had a fetch error in step 2, set `pass_count` and `fail_count` to -1, `total` to 0, `pass_rate` to -1, `consecutive_failures` to 0, and `failure_classification` to "fetch_error". This signals that no valid data was retrieved — remediation follow-ups must skip these jobs entirely (they are not real failures).
 
-### 7. Remediation — auto-fix PRs
+### 7. Remediation — shared drift/failure PR budget
 
-After posting the health report and writing the artifact, attempt a maximum 5 of auto-fix PRs for the highest-priority fixable failures.
+After composing the health report and writing the artifact, rank the verified step 1b reconciliation candidate together with fixable step 5 failures by safety, impact and value. Select at most one remediation target per invocation; record the other candidates as deferred with their reasons. Run this selection on all-green reports too, with only registry drift eligible; never perform all-green FAILURE remediation. A verified gate-impacting issue takes priority when other factors are comparable. Avoid unrelated changes in a combined PR.
 
-**Scope:** From the jobs analyzed in step 5, pick the top failures with the highest `consecutive_failures` that matches an auto-fixable pattern. Prioritize gating jobs (`gating: true`) when failures are otherwise comparable — a failing gate blocks production release. Skip jobs that already have an open `[rosa-ci-fix]` PR.
+**Shared limit and duplicate prevention:** ONE total newly opened remediation PR per report invocation, shared by failure and drift fixes, not one per type. Before creating any PR, search open PRs for the same purpose and repository, not just title prefixes. Prefer reusing/updating the existing reconciliation PR on its current branch when that candidate is selected. Inspect at most five matching existing PRs; an incomplete search must not be treated as proof that none exists. Make at most one selected reconciliation PR update per invocation, batch its safe edits and validation into one push, and do not restart automated reviews with repeated pushes. Use only existing authorized fork/PR tools and grants; if access or approval is unavailable, report the exact blocker, retain the proposed patch/evidence, and do not bypass the restriction. Never merge or autoapprove.
 
-**Mandatory fallback (always runs if no PR was opened above):** Regardless of whether step 5 classified any failures, if no `[rosa-ci-fix]` PR was opened in the steps above, fetch the build log for the single highest `consecutive_failures` job that has an empty `failure_classification` in the artifact. Classify it using the 4-bucket system (product bug / env-config / test bug / resilience). If it matches any auto-fix pattern (1-8), open a `[rosa-ci-fix]` PR. Do NOT skip this step because classified failures exist — the point is to look beyond what step 5 analyzed.
+**Failure scope:** Only when any health category is below 80%, consider failures analyzed in step 5, ranked by `consecutive_failures` and impact. Skip creating a duplicate for a job already covered by an open `[rosa-ci-fix]` PR; shepherd it instead. Verified safe registry drift remains eligible regardless of the health thresholds.
+
+**Bounded failure fallback:** Only on a non-all-green run, if no remediation target has been selected and the shared new-PR budget is unused, fetch the build log for the single highest `consecutive_failures` job with an empty `failure_classification` in the artifact. Classify it using the 4-bucket system (product bug / env-config / test bug / resilience). If safely fixable under patterns 1-8, select it for the same shared budget. Do not run this fallback after selecting drift or updating its PR, and do not spend a second PR allowance. Skip fetch-error/no-data jobs and respect denied access.
 
 **Auto-fixable patterns** (in priority order — all four classification buckets are fixable):
 1. **Conformance skip list** — failing OCP conformance tests → add to skip list in `openshift-online/rosa-e2e`
@@ -270,51 +271,55 @@ After posting the health report and writing the artifact, attempt a maximum 5 of
 *gitlab.cee.redhat.com:*
 `service/app-interface`, `service/backplane-api`, `service/clusterimagesets`, `service/osd-rhobs-rules-and-dashboards`, `service/uhc-clusters-service`, `releng/konflux-release-data`
 
-**Process:**
+**Process (selected failure fixes only):** For selected registry drift, use step 1b's source audit and evidence instead of failure-log diagnosis or failure Jira lookup; the same shared PR budget and authorization/validation constraints apply.
 1. Fetch the build log for the selected failure
 2. Diagnose the root cause
 2b. **Check for existing Jira** — before filing a new ticket or opening a fix PR, search ROSAENG for an existing open issue covering this failure (by job name or error signature). If found, link to it and skip creating a duplicate.
-3. If fixable: spin up a workspace, write the fix, push, open a PR with `[rosa-ci-fix]` in the title
+3. If safely fixable and selected within the shared budget: spin up a workspace, follow repository instructions, write and validate the fix, then reuse/update the matching PR or open one authorized PR with `[rosa-ci-fix]` in the title. A reconciliation PR changes only the verified registry corrections and preserves unrelated work. A pre-existing matching PR may have another title; reuse it rather than require a duplicate.
 4. If NOT fixable after diagnosis: note it in the report as "investigated, not auto-fixable — [reason]"
 
-**Bias to action:** Always attempt the fix. If the change is complex, open a smaller-scoped PR addressing the specific failure (a skip-list entry, a version gate, a timeout increase). Let PR reviewers judge safety — do not self-censor based on perceived risk or complexity. The PR review process (CodeRabbit + human `/approve`) is the safety net, not your judgment about whether a fix is "too risky."
+**Bias to safe action:** Attempt the selected evidence-backed fix within the shared limit. If only a smaller in-scope fix is safe, propose it and record deferred work. Human review is required but does not authorize guessing support/gating policy, changing production configuration, exposing non-public information, or bypassing grants.
 
 **Constraints:**
-- Maximum **5 PRs per run** — if multiple failures are fixable, pick only the 5 highest priority ones
+- Maximum **ONE newly opened remediation PR per invocation**, total across drift, failure fixes and fallback. Selecting/updating a reconciliation PR does not enable an additional failure fix in the same invocation; record lower-priority work as deferred.
 - Never modify production configs (`app-interface`)
 - PRs require human `/lgtm` and `/approve` before merge
-- PR title must start with `[rosa-ci-fix]` for tracking
+- Newly opened remediation PR titles must start with `[rosa-ci-fix]` for tracking; reuse an existing matching reconciliation PR even if its title differs.
+- Broad duplicate lookup includes human-authored PRs, but automatic updates, retests, comments or closure are restricted to bot-owned PRs or explicitly authorized work. Link and report other human-authored matching PRs without modification or a duplicate PR; defer any change requiring their owner's authorization. Apply this ownership rule to both failure and reconciliation PRs, regardless of title.
+- Public commits, PR text and reports must use public-source evidence only; do not copy secrets, private/internal source content, internal discussion, personal names/handles or attribution into them. Unavailable authoritative evidence is a pending choice, not permission to expose confidential material or weaken policy.
 - Before proposing a new Jira ticket, search for existing open ROSAENG issues for the same job or error pattern — skip duplicates
 
 **Shepherd existing `[rosa-ci-fix]` PRs:**
-After the auto-fix attempt, check for any open PRs with `[rosa-ci-fix]` in the title across the allowed repos (authored by `redhat-chai-bot`). For each:
+On runs with health failures, after the selected remediation attempt, check existing `[rosa-ci-fix]` PRs and any matching reconciliation PR. On all-green runs, limit this to reconciliation PRs; do not run failure remediation/shepherding. Within the existing grants, for each:
 - If CI passed and no blocking review comments: note "ready for /lgtm + /approve" in the report
 - If CI failed on a check relevant to the change: `/retest` once
 - If PR is older than 7 days with no review activity: close with a comment "stale — closing, will re-evaluate in next daily run"
-- Process at most 5 existing PRs per run
+- Process at most five existing PRs per run, including reconciliation lookup/update and failure shepherding, not five per type. A code update must be the single selected remediation target; status checks/retests do not grant another new PR. Never merge or autoapprove.
 
-**Report remediation results** in a threaded reply (using `---THREAD_BREAK---`):
+**Report remediation results** in a threaded reply using the single threading rule: `---THREAD_DETAILS---` if this is the first reply, otherwise `---THREAD_BREAK---`:
 ```
 :wrench: *Remediation*
 • Auto-fix: [opened PR #N in repo / or "no fixable failures found"]
+• Registry drift: [updated/open PR link, material gap, or deferred reason — omit when unchanged/non-actionable]
+• Deferred: [lower-priority work excluded by the shared budget — omit when empty]
 • Shepherded: N existing [rosa-ci-fix] PRs (N ready, N retested, N closed stale)
 ```
 
 ## Constraints
 
 - Keep the top-level summary under 1200 characters. The message should be a scannable scoreboard, not a report. All detailed analysis goes in threaded replies.
-- Never add sections, headers, or bullet lists below the category lines. The only thing after the last category line is the footer.
+- Never add sections, headers, or bullet lists below the category lines. The only thing after the last category line is the footer, which may contain the one concise actionable/materially incomplete drift clause allowed by step 4; detailed drift evidence goes in the existing thread.
 - If more than half the jobs return no data, warn about possible Prow/GCS issues at the top.
 - Before sending: if any category is below 80%, verify your response content contains `---THREAD_DETAILS---` followed by at least one threaded reply section. If these delimiters are missing, your threaded replies will not be posted — go back to step 5.
 - Always write the handoff artifact (step 6) before calling `send_response()`, even if all categories are green.
 - `send_response()` ends the turn immediately — no tool calls after it.
-- On the all-green path (all categories >= 80%), skip step 7 (remediation) entirely.
+- On the all-green path (all categories >= 80%), skip failure analysis and FAILURE remediation, not step 1b reconciliation or step 7's safe drift remediation. After the required artifact/checks, use `no_action_required()` when no action/change or newly material incomplete result merits reporting; do not post unchanged healthy/no-drift noise.
 
 ## Additional phase-breakdown follow-up
 
 This section is additive. Do not change the top-level report format, existing failure-analysis replies, handoff artifact, or remediation flow above.
 
-After the existing report and any remediation reply are composed, but before `send_response()`, append exactly one phase-breakdown reply and one HTML attachment to the same report thread. On an all-green report, this is the only threaded reply.
+When a report merits delivery, after the existing report and any remediation/drift reply are composed, but before `send_response()`, append exactly one phase-breakdown reply and one HTML attachment to the same report thread. On a delivered all-green report, the phase reply may accompany an actionable/materially incomplete drift reply. Do not create a phase reply or attachment to defeat the scheduled silence of `no_action_required()`.
 
 ### Reuse the report sample
 
@@ -348,8 +353,8 @@ Include every category represented by the existing report and a totals row. Use 
 
 Add the follow-up through the existing single-response delimiter mechanism:
 
-- If failure-analysis replies already exist, append `---THREAD_BREAK---` and then the phase reply.
-- Otherwise append `---THREAD_DETAILS---` and then the phase reply.
+- If any reply already exists (failure analysis, registry drift or remediation), append `---THREAD_BREAK---` and then the phase reply.
+- Otherwise append `---THREAD_DETAILS---` and then the phase reply; this is the first reply, not an additional thread.
 - Begin the reply with: `Failure-phase breakdown for the same reporting window; see the attached summary table.`
 - Attach the HTML file to that same report thread.
 - Never create another top-level message or a second thread.
