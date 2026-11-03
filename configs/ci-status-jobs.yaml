@@ -6,6 +6,10 @@
 #
 # To add a new job: add an entry under the appropriate category.
 # To add a new category: add a new top-level entry to the categories list.
+# New scheduled coverage is informational unless production gating is verified;
+# explicit gating: false keeps new jobs out of an existing category's gate.
+# Placeholder schedules and event-only candidates need verified trigger wiring
+# before inclusion. Definition existence does not depend on available run history.
 #
 # Each category has a scope that determines how its CI health maps to components:
 #   component: Tests specific component(s). Must have a components list with
@@ -50,7 +54,7 @@ categories:
     name: ROSA E2E STG
     gating: true
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-e2e-main-periodics-*"
-    team:
+    team: &rosa_e2e_team
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
       slack_channel: wg-rosa-ci-enhancement
@@ -67,7 +71,7 @@ categories:
       - name: HCP 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-22
       - name: HCP 5.0
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-nightly-5-0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-candidate-5-0
       # HCP FIPS
       - name: HCP FIPS 4.19
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-stable-4-19
@@ -115,6 +119,41 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-2
       - name: STS Upgrade Y-1
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-1
+      - name: HCP AWS VPC CNI
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-aws-vpc-cni-staging
+        gating: false
+      - name: HCP External OIDC
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-external-oidc-e2e-staging
+        gating: false
+      - name: HCP Private
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-private-staging
+        gating: false
+      - name: HCP PrivateLink Connectivity / MC Health
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-privatelink-connectivity-mc-health-staging
+        gating: false
+      - name: STS PrivateLink
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-privatelink-staging
+        gating: false
+      - name: HCP Hosted Operator Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ho-upgrade-rosa-hcp-ho-upgrade-staging
+        gating: false
+
+  - id: rosa-e2e-int
+    scope: platform
+    name: ROSA E2E INT
+    team: *rosa_e2e_team
+    prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp*integration*"
+    jobs:
+      - name: HCP 4.20
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-20
+      - name: HCP 4.21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-21
+      - name: HCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-22
+      - name: HCP 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-candidate-5-0
+      - name: HCP Hosted Operator Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ho-upgrade-rosa-hcp-ho-upgrade-integration
 
   - id: rosa-cx-e2e
     scope: platform
@@ -386,6 +425,15 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-root-disk-staging-main
       - name: GCP WIF SV
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main
+      - name: GCP PSC WIF SV
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-psc-wif-sv-staging-main
+        gating: false
+      - name: GCP WIF Version Pruning
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-version-pruning-staging-main
+        gating: false
+      - name: GCP Firewall Rules
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-firewall-rules-staging-main
+        gating: false
 
   - id: ocm-fvt-osdfm-int
     scope: component
@@ -562,13 +610,6 @@ categories:
         prow_job: periodic-ci-openshift-configure-alertmanager-operator-master-rosa-sts-e2e-promotion-stage
         gating: true
         labels: [configure-alertmanager-operator]
-      - name: AVO Promotion INT
-        prow_job: periodic-ci-openshift-aws-vpce-operator-main-rosa-sts-e2e-promotion-int
-        labels: [aws-vpce-operator]
-      - name: AVO Promotion STG
-        prow_job: periodic-ci-openshift-aws-vpce-operator-main-rosa-sts-e2e-promotion-stage
-        gating: true
-        labels: [aws-vpce-operator]
       - name: MUO Promotion INT
         prow_job: periodic-ci-openshift-managed-upgrade-operator-master-rosa-sts-e2e-promotion-int
         labels: [managed-upgrade-operator]
