@@ -46,6 +46,21 @@ func TestCIStatusNewScheduledCoverageIsInformational(t *testing.T) {
 	}
 }
 
+func TestCIStatusRetiredJobsAbsent(t *testing.T) {
+	retired := map[string]bool{
+		"periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-nightly-5-0": true,
+		"periodic-ci-openshift-aws-vpce-operator-main-rosa-sts-e2e-promotion-int":               true,
+		"periodic-ci-openshift-aws-vpce-operator-main-rosa-sts-e2e-promotion-stage":             true,
+	}
+	for _, category := range loadCIStatusConfig(t).Categories {
+		for _, job := range category.Jobs {
+			if retired[job.ProwJob] {
+				t.Errorf("category %s contains retired job %s", category.ID, job.ProwJob)
+			}
+		}
+	}
+}
+
 func TestCIStatusIntegrationOwnership(t *testing.T) {
 	var stagingTeam, integrationTeam *JiraTeam
 	for _, category := range loadCIStatusConfig(t).Categories {
