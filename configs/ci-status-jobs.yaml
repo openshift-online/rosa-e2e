@@ -116,6 +116,22 @@ categories:
       - name: STS Upgrade Y-1
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-1
 
+  - id: rosa-cx-e2e
+    scope: platform
+    name: ROSA CX E2E
+    team:
+      id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
+      name: ROSA CI
+      slack_channel: wg-rosa-ci-enhancement
+      slack_alias: rosa-ci-team
+    labels: [ci-failure, rosa-e2e]
+    prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp-external-oidc-e2e-staging*,*rosa-hcp-e2e-aws-vpc-cni-staging*"
+    jobs:
+      - name: HCP External OIDC
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-rosa-hcp-external-oidc-e2e-staging
+      - name: HCP VPC-CNI
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-rosa-hcp-e2e-aws-vpc-cni-staging
+
   - id: capa-e2e-stg
     scope: component
     components: [cluster-api-provider-aws]
