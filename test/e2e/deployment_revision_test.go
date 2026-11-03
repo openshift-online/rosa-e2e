@@ -44,6 +44,7 @@ var _ = Describe("HCP Namespace Deployment Revision Stability", labels.High, lab
 
 		ns := tc.HCPNamespaces()
 		Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+		registerMCFailureDiagnostics(tc)
 
 		By("Observing deployment revisions in " + ns.HCPNamespace + " for 30 seconds")
 		Expect(verifiers.VerifyDeploymentRevisionsStable(ctx, tc.MCKubeClient(), ns.HCPNamespace, 30*time.Second)).To(Succeed())
