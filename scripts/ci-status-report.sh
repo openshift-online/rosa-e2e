@@ -22,8 +22,9 @@ if [[ ! -f "${JOBS_CONFIG}" ]]; then
 fi
 
 # Parse the YAML config into shell-friendly format using python3.
-# Outputs lines: category_id|category_name|prow_filter|job_display_name|prow_job_name|gating
-# (gating is "true" when the job's category gates or the job sets gating: true)
+# Outputs lines: category_id|category_name|prow_filter|job_display_name|prow_job_name|gating|informing
+# (gating is "true" when the job's category gates or the job sets gating: true;
+# informing is "true" when the job sets informing: true, excluding it from pass rates)
 # followed by a metadata line: META|sippy_url|<url>
 parse_config() {
   python3 -c "
@@ -83,10 +84,18 @@ for line in config_text.split('\n'):
                 current_cat['gating'] = val
             continue
 
+        # informing flag (job-level): result is reported but excluded from
+        # pass rates, category health, and the failure exit code
+        m = re.match(r'informing:\s*(.+)', stripped)
+        if m:
+            if current_job is not None:
+                current_job['informing'] = m.group(1).strip().lower() in ('true', 'yes', '1')
+            continue
+
         # Job-level fields
         m = re.match(r'-\s+name:\s*(.+)', stripped)
         if m:
-            current_job = {'name': m.group(1).strip(), 'prow_job': '', 'gating': None}
+            current_job = {'name': m.group(1).strip(), 'prow_job': '', 'gating': None, 'informing': False}
             current_cat['jobs'].append(current_job)
             continue
 
@@ -102,7 +111,8 @@ for cat in categories:
         jg = job.get('gating')
         eff = cat_g if jg is None else jg
         g = 'true' if eff else 'false'
-        print(f\"{cat['id']}|{cat['name']}|{cat['prow_filter']}|{job['name']}|{job['prow_job']}|{g}\")
+        inf = 'true' if job.get('informing') else 'false'
+        print(f\"{cat['id']}|{cat['name']}|{cat['prow_filter']}|{job['name']}|{job['prow_job']}|{g}|{inf}\")
 
 print(f'META|sippy_url|{sippy_url}')
 " < "${JOBS_CONFIG}"
@@ -149,7 +159,7 @@ else:
 }
 
 check_job() {
-  local category="$1" display_name="$2" job_name="$3" gating="$4"
+  local category="$1" display_name="$2" job_name="$3" gating="$4" informing="$5"
   local status_line build_id result
 
   status_line=$(get_job_status "${job_name}")
@@ -157,14 +167,14 @@ check_job() {
   result="${status_line##*|}"
 
   if [[ "${result}" == "NO_DATA" ]] || [[ -z "${result}" ]]; then
-    echo "${category}|${display_name}|NO_DATA|||${gating}"
+    echo "${category}|${display_name}|NO_DATA|||${gating}|${informing}"
     return
   fi
 
   if [[ -n "${build_id}" ]]; then
-    echo "${category}|${display_name}|${result}|${PROW_BASE}/logs/${job_name}/${build_id}|${job_name}|${gating}"
+    echo "${category}|${display_name}|${result}|${PROW_BASE}/logs/${job_name}/${build_id}|${job_name}|${gating}|${informing}"
   else
-    echo "${category}|${display_name}|${result}||${job_name}|${gating}"
+    echo "${category}|${display_name}|${result}||${job_name}|${gating}|${informing}"
   fi
 }
 
@@ -214,9 +224,9 @@ main() {
   trap "rm -rf '${tmpdir}'" EXIT
 
   local idx=0
-  while IFS='|' read -r cat_id _ _ display_name prow_job gating; do
+  while IFS='|' read -r cat_id _ _ display_name prow_job gating informing; do
     if [[ "${cat_id}" == "META" ]]; then continue; fi
-    (check_job "${cat_id}" "${display_name}" "${prow_job}" "${gating}" > "${tmpdir}/${idx}.txt" 2>"${tmpdir}/${idx}.err") &
+    (check_job "${cat_id}" "${display_name}" "${prow_job}" "${gating}" "${informing}" > "${tmpdir}/${idx}.txt" 2>"${tmpdir}/${idx}.err") &
     idx=$((idx + 1))
   done <<< "${config_lines}"
   wait
@@ -224,6 +234,7 @@ main() {
   # Collect results and per-category stats
   local fail_count=0 pass_count=0 other_count=0
   local g_pass=0 g_fail=0 g_other=0 ng_pass=0 ng_fail=0 ng_other=0
+  local i_pass=0 i_fail=0 i_other=0
   local -A cat_pass cat_fail cat_other cat_fail_names
   for cat in "${category_order[@]}"; do
     cat_pass[${cat}]=0
@@ -236,32 +247,43 @@ main() {
 
   for i in $(seq 0 $((idx - 1))); do
     if [[ -f "${tmpdir}/${i}.txt" ]]; then
-      local line category name result url gating
+      local line category name result url gating informing
       line=$(cat "${tmpdir}/${i}.txt")
       category=$(echo "${line}" | cut -d'|' -f1)
       name=$(echo "${line}" | cut -d'|' -f2)
       result=$(echo "${line}" | cut -d'|' -f3)
       url=$(echo "${line}" | cut -d'|' -f4)
       gating=$(echo "${line}" | cut -d'|' -f6)
+      informing=$(echo "${line}" | cut -d'|' -f7)
 
-      case "${result}" in
-        SUCCESS)
-          pass_count=$((pass_count + 1))
-          cat_pass[${category}]=$(( ${cat_pass[${category}]} + 1 ))
-          if [[ "${gating}" == "true" ]]; then g_pass=$((g_pass + 1)); else ng_pass=$((ng_pass + 1)); fi
-          ;;
-        FAILURE|ABORTED)
-          fail_count=$((fail_count + 1))
-          cat_fail[${category}]=$(( ${cat_fail[${category}]} + 1 ))
-          cat_fail_names[${category}]+="${name}, "
-          if [[ "${gating}" == "true" ]]; then g_fail=$((g_fail + 1)); else ng_fail=$((ng_fail + 1)); fi
-          ;;
-        *)
-          other_count=$((other_count + 1))
-          cat_other[${category}]=$(( ${cat_other[${category}]} + 1 ))
-          if [[ "${gating}" == "true" ]]; then g_other=$((g_other + 1)); else ng_other=$((ng_other + 1)); fi
-          ;;
-      esac
+      if [[ "${informing}" == "true" ]]; then
+        # Informing jobs are checked and listed but excluded from pass
+        # rates, category health, and the failure exit code.
+        case "${result}" in
+          SUCCESS) i_pass=$((i_pass + 1)) ;;
+          FAILURE|ABORTED) i_fail=$((i_fail + 1)) ;;
+          *) i_other=$((i_other + 1)) ;;
+        esac
+      else
+        case "${result}" in
+          SUCCESS)
+            pass_count=$((pass_count + 1))
+            cat_pass[${category}]=$(( ${cat_pass[${category}]} + 1 ))
+            if [[ "${gating}" == "true" ]]; then g_pass=$((g_pass + 1)); else ng_pass=$((ng_pass + 1)); fi
+            ;;
+          FAILURE|ABORTED)
+            fail_count=$((fail_count + 1))
+            cat_fail[${category}]=$(( ${cat_fail[${category}]} + 1 ))
+            cat_fail_names[${category}]+="${name}, "
+            if [[ "${gating}" == "true" ]]; then g_fail=$((g_fail + 1)); else ng_fail=$((ng_fail + 1)); fi
+            ;;
+          *)
+            other_count=$((other_count + 1))
+            cat_other[${category}]=$(( ${cat_other[${category}]} + 1 ))
+            if [[ "${gating}" == "true" ]]; then g_other=$((g_other + 1)); else ng_other=$((ng_other + 1)); fi
+            ;;
+        esac
+      fi
 
       local icon
       case "${result}" in
@@ -273,10 +295,15 @@ main() {
         *)       icon="${result}" ;;
       esac
 
+      local list_name="${name}"
+      if [[ "${informing}" == "true" ]]; then
+        list_name="${name} (informing)"
+      fi
+
       if [[ -n "${url}" ]]; then
-        result_lines+=("$(printf "  %-20s %-8s %s" "${name}" "${icon}" "${url}")")
+        result_lines+=("$(printf "  %-20s %-8s %s" "${list_name}" "${icon}" "${url}")")
       else
-        result_lines+=("$(printf "  %-20s %s" "${name}" "${icon}")")
+        result_lines+=("$(printf "  %-20s %s" "${list_name}" "${icon}")")
       fi
     fi
 
@@ -355,6 +382,9 @@ main() {
   printf "  %s %-12s %d/%d passing (%s)" "$(log_indicator "${ng_pass}" "${ng_def}")" "Non-gating:" "${ng_pass}" "${ng_def}" "${ng_pct}"
   if [[ "${ng_other}" -gt 0 ]]; then printf "  [%d no-data/running]" "${ng_other}"; fi
   echo ""
+  if [[ $((i_pass + i_fail + i_other)) -gt 0 ]]; then
+    printf "  %-12s %d/%d passing (excluded from pass rates)\n" "Informing:" "${i_pass}" "$((i_pass + i_fail))"
+  fi
   echo "  (Gating target: 95% -- tracked in ROSAENG-62472)"
 
   echo ""

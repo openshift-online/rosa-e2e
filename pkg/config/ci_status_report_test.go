@@ -113,7 +113,7 @@ fi
 	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 {
 		t.Fatalf("expected report failure for the fixture's failed job, got %v\n%s", err, output)
 	}
-	total, gating := 0, 0
+	total, gating, informing := 0, 0, 0
 	for _, category := range config.Categories {
 		for _, job := range category.Jobs {
 			total++
@@ -123,6 +123,12 @@ fi
 			}
 			if gates {
 				gating++
+			}
+			if job.Informing != nil && *job.Informing {
+				informing++
+				if gates {
+					t.Error("informing job must not gate promotion")
+				}
 			}
 			if _, err := os.Stat(filepath.Join(requests, job.ProwJob)); err != nil {
 				t.Errorf("report did not request configured job %s: %v", job.ProwJob, err)
@@ -142,12 +148,15 @@ fi
 	if len(entries) != total {
 		t.Errorf("requested %d distinct jobs, want %d", len(entries), total)
 	}
+	// Informing jobs are requested and listed but excluded from every rate.
+	signaled := total - informing
 	for _, expected := range []string{
-		fmt.Sprintf("Passing: %d/%d", total-2, total),
-		fmt.Sprintf("Failing: 1/%d", total),
-		fmt.Sprintf("Other:   1/%d (running/no data)", total),
+		fmt.Sprintf("Passing: %d/%d", signaled-2, signaled),
+		fmt.Sprintf("Failing: 1/%d", signaled),
+		fmt.Sprintf("Other:   1/%d (running/no data)", signaled),
 		fmt.Sprintf("Gating:      %d/%d passing (100%%)  [1 no-data/running]", gating-1, gating-1),
-		fmt.Sprintf("Non-gating:  %d/%d passing", total-gating-1, total-gating),
+		fmt.Sprintf("Non-gating:  %d/%d passing", signaled-gating-1, signaled-gating),
+		fmt.Sprintf("Informing:   %d/%d passing (excluded from pass rates)", informing, informing),
 	} {
 		if !strings.Contains(string(output), expected) {
 			t.Errorf("report missing %q\n%s", expected, output)

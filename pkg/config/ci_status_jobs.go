@@ -19,11 +19,12 @@ type StatusCategory struct {
 }
 
 type StatusJob struct {
-	Name    string    `yaml:"name"`
-	ProwJob string    `yaml:"prow_job"`
-	Gating  *bool     `yaml:"gating,omitempty"`
-	Team    *JiraTeam `yaml:"team,omitempty"`
-	Labels  []string  `yaml:"labels,omitempty"`
+	Name      string    `yaml:"name"`
+	ProwJob   string    `yaml:"prow_job"`
+	Gating    *bool     `yaml:"gating,omitempty"`
+	Informing *bool     `yaml:"informing,omitempty"`
+	Team      *JiraTeam `yaml:"team,omitempty"`
+	Labels    []string  `yaml:"labels,omitempty"`
 }
 
 type JiraTeam struct {
