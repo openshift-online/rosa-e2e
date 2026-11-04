@@ -5,7 +5,7 @@ package e2e
 import (
 	"context"
 
-	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/openshift-online/rosa-e2e/pkg/reporting"
 	"k8s.io/client-go/kubernetes"
 )
@@ -19,6 +19,6 @@ func collectDNSFailureDiagnostics(failed bool, client kubernetes.Interface, name
 		return
 	}
 	if err := reporting.WriteDNSFailureDiagnostics(context.Background(), client, namespace); err != nil {
-		GinkgoWriter.Println("WARNING: DNS failure diagnostics could not be written")
+		ginkgo.GinkgoWriter.Println("WARNING: DNS failure diagnostics could not be written")
 	}
 }
