@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
@@ -36,10 +37,8 @@ func ListHCPNodePools(ctx context.Context, dyn dynamic.Interface, namespace stri
 	pools := make([]HCPNodePool, 0, len(list.Items))
 	for _, item := range list.Items {
 		pool := HCPNodePool{Name: item.GetName()}
-		if spec, found := item.Object["spec"].(map[string]interface{}); found {
-			if replicas, ok := spec["replicas"].(float64); ok {
-				pool.Replicas = int32(replicas)
-			}
+		if replicas, found, err := unstructured.NestedInt64(item.Object, "spec", "replicas"); err == nil && found {
+			pool.Replicas = int32(replicas)
 		}
 		pools = append(pools, pool)
 	}
@@ -57,8 +56,9 @@ func ScaleHCPNodePool(ctx context.Context, dyn dynamic.Interface, namespace, nam
 		return fmt.Errorf("marshalling NodePool %s/%s patch: %w", namespace, name, err)
 	}
 
+	// JSON merge patch: the API server rejects strategic merge patches on CRDs.
 	_, err = dyn.Resource(nodePoolGVR).Namespace(namespace).Patch(ctx, name,
-		types.StrategicMergePatchType, raw, metav1.PatchOptions{})
+		types.MergePatchType, raw, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("patching NodePool %s/%s replicas to %d: %w", namespace, name, replicas, err)
 	}
