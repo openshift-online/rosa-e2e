@@ -11,8 +11,8 @@ import (
 
 func TestCIStatusNewScheduledCoverageIsInformational(t *testing.T) {
 	expected := map[string]string{
-		"periodics-rosa-hcp-e2e-aws-vpc-cni-staging":                                           "rosa-e2e-stg",
-		"periodics-rosa-hcp-external-oidc-e2e-staging":                                         "rosa-e2e-stg",
+		"periodics-rosa-hcp-e2e-aws-vpc-cni-staging":                                           "rosa-cx-e2e",
+		"periodics-rosa-hcp-external-oidc-e2e-staging":                                         "rosa-cx-e2e",
 		"periodics-rosa-hcp-e2e-private-staging":                                               "rosa-e2e-stg",
 		"periodics-rosa-hcp-e2e-privatelink-connectivity-mc-health-staging":                    "rosa-e2e-stg",
 		"periodics-rosa-classic-sts-e2e-privatelink-staging":                                   "rosa-e2e-stg",

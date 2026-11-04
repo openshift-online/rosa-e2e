@@ -119,12 +119,6 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-2
       - name: STS Upgrade Y-1
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-1
-      - name: HCP AWS VPC CNI
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-aws-vpc-cni-staging
-        gating: false
-      - name: HCP External OIDC
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-external-oidc-e2e-staging
-        gating: false
       - name: HCP Private
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-private-staging
         gating: false
@@ -167,9 +161,9 @@ categories:
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp-external-oidc-e2e-staging*,*rosa-hcp-e2e-aws-vpc-cni-staging*"
     jobs:
       - name: HCP External OIDC
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-rosa-hcp-external-oidc-e2e-staging
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-external-oidc-e2e-staging
       - name: HCP VPC-CNI
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-rosa-hcp-e2e-aws-vpc-cni-staging
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-aws-vpc-cni-staging
 
   - id: capa-e2e-stg
     scope: component
