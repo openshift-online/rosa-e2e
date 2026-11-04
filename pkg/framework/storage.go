@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -102,4 +103,58 @@ func CreateTestPodWithPVC(ctx context.Context, client kubernetes.Interface, name
 	}
 
 	return podName, nil
+}
+
+// CreateKMSStorageClass creates a gp3 storage class whose dynamically
+// provisioned volumes are encrypted with the given customer-managed KMS key,
+// and returns a cleanup function that deletes it.
+func CreateKMSStorageClass(ctx context.Context, client kubernetes.Interface, name, kmsKeyARN string) (cleanup func() error, err error) {
+	sc := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Provisioner:       "ebs.csi.aws.com",
+		VolumeBindingMode: ptr.To(storagev1.VolumeBindingImmediate),
+		ReclaimPolicy:     ptr.To(corev1.PersistentVolumeReclaimDelete),
+		Parameters: map[string]string{
+			"type":      "gp3",
+			"encrypted": "true",
+			"kmsKeyId":  kmsKeyARN,
+		},
+	}
+
+	_, err = client.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("creating storage class %s: %w", name, err)
+	}
+
+	cleanup = func() error {
+		if deleteErr := client.StorageV1().StorageClasses().Delete(context.Background(), name, metav1.DeleteOptions{}); deleteErr != nil {
+			return fmt.Errorf("deleting storage class %s: %w", name, deleteErr)
+		}
+		return nil
+	}
+
+	return cleanup, nil
+}
+
+// GetPVCVolumeID resolves the EBS volume ID backing a bound PVC.
+func GetPVCVolumeID(ctx context.Context, client kubernetes.Interface, namespace, pvcName string) (string, error) {
+	pvc, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("getting PVC %s/%s: %w", namespace, pvcName, err)
+	}
+	if pvc.Spec.VolumeName == "" {
+		return "", fmt.Errorf("PVC %s/%s is not bound to a volume yet", namespace, pvcName)
+	}
+
+	pv, err := client.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("getting PV %s: %w", pvc.Spec.VolumeName, err)
+	}
+	if pv.Spec.CSI == nil || pv.Spec.CSI.VolumeHandle == "" {
+		return "", fmt.Errorf("PV %s has no CSI volume handle", pv.Name)
+	}
+
+	return pv.Spec.CSI.VolumeHandle, nil
 }

@@ -9,6 +9,7 @@ import (
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	sdk "github.com/openshift-online/ocm-sdk-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -54,6 +55,7 @@ type TestContext struct {
 	// AWS clients (set when AWS credentials are available)
 	ec2Client        *ec2.Client
 	cloudtrailClient *cloudtrail.Client
+	kmsClient        *kms.Client
 }
 
 // NewTestContext creates a new test context with the given configuration and OCM connection.
@@ -197,6 +199,7 @@ func (tc *TestContext) InitAWSClients(ctx context.Context) error {
 
 	tc.ec2Client = ec2.NewFromConfig(cfg)
 	tc.cloudtrailClient = cloudtrail.NewFromConfig(cfg)
+	tc.kmsClient = kms.NewFromConfig(cfg)
 	return nil
 }
 
@@ -228,6 +231,11 @@ func (tc *TestContext) EC2Client() *ec2.Client {
 // CloudTrailClient returns the CloudTrail client, or nil if not initialized.
 func (tc *TestContext) CloudTrailClient() *cloudtrail.Client {
 	return tc.cloudtrailClient
+}
+
+// KMSClient returns the KMS client, or nil if not initialized.
+func (tc *TestContext) KMSClient() *kms.Client {
+	return tc.kmsClient
 }
 
 // InitSCClients initializes kube and dynamic clients for the service cluster.

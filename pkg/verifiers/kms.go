@@ -7,6 +7,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	kmsTypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 )
 
 // VerifyEBSVolumesEncrypted verifies that all EBS volumes owned by the cluster
@@ -68,4 +70,97 @@ func isRootVolume(volume types.Volume) bool {
 		}
 	}
 	return false
+}
+
+// CountRootVolumes returns how many cluster-tagged EBS volumes are attached
+// as node root volumes.
+func CountRootVolumes(ctx context.Context, ec2Client *ec2.Client, clusterTag string) (int, error) {
+	resp, err := ec2Client.DescribeVolumes(ctx, &ec2.DescribeVolumesInput{
+		Filters: []types.Filter{
+			{
+				Name:   stringPtr("tag:kubernetes.io/cluster/" + clusterTag),
+				Values: []string{"owned"},
+			},
+		},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("describing volumes: %w", err)
+	}
+
+	count := 0
+	for _, volume := range resp.Volumes {
+		if isRootVolume(volume) {
+			count++
+		}
+	}
+	return count, nil
+}
+
+// VerifyEBSVolumeEncryptedWithKey verifies that a single EBS volume is
+// encrypted with the given KMS key.
+func VerifyEBSVolumeEncryptedWithKey(ctx context.Context, ec2Client *ec2.Client, volumeID, kmsKeyARN string) error {
+	resp, err := ec2Client.DescribeVolumes(ctx, &ec2.DescribeVolumesInput{
+		VolumeIds: []string{volumeID},
+	})
+	if err != nil {
+		return fmt.Errorf("describing volume %s: %w", volumeID, err)
+	}
+	if len(resp.Volumes) == 0 {
+		return fmt.Errorf("volume %s not found", volumeID)
+	}
+
+	volume := resp.Volumes[0]
+	if volume.Encrypted == nil || !*volume.Encrypted {
+		return fmt.Errorf("volume %s is not encrypted", volumeID)
+	}
+	volumeKey := ""
+	if volume.KmsKeyId != nil {
+		volumeKey = *volume.KmsKeyId
+	}
+	if volumeKey != kmsKeyARN {
+		return fmt.Errorf("volume %s is encrypted with %q, expected KMS key %q",
+			volumeID, volumeKey, kmsKeyARN)
+	}
+	return nil
+}
+
+// VerifyKMSKeyHealthy verifies that the cluster's KMS key is enabled, is not
+// scheduled for deletion, is an encryption key, and that its key policy
+// grants the cluster's operator roles.
+func VerifyKMSKeyHealthy(ctx context.Context, kmsClient *kms.Client, keyARN, operatorRolePrefix string) error {
+	keyResp, err := kmsClient.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: &keyARN})
+	if err != nil {
+		return fmt.Errorf("describing KMS key: %w", err)
+	}
+	metadata := keyResp.KeyMetadata
+	if metadata == nil {
+		return fmt.Errorf("KMS key %s has no metadata", keyARN)
+	}
+
+	var problems []string
+	if !metadata.Enabled {
+		problems = append(problems, "key is not enabled")
+	}
+	if metadata.DeletionDate != nil {
+		problems = append(problems, fmt.Sprintf("key is scheduled for deletion at %s", metadata.DeletionDate))
+	}
+	if metadata.KeyUsage != kmsTypes.KeyUsageTypeEncryptDecrypt {
+		problems = append(problems, fmt.Sprintf("key usage is %q, expected ENCRYPT_DECRYPT", metadata.KeyUsage))
+	}
+
+	policyResp, err := kmsClient.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
+		KeyId:      &keyARN,
+		PolicyName: stringPtr("default"),
+	})
+	if err != nil {
+		return fmt.Errorf("getting KMS key policy: %w", err)
+	}
+	if policyResp.Policy == nil || !strings.Contains(*policyResp.Policy, operatorRolePrefix) {
+		problems = append(problems, fmt.Sprintf("key policy does not reference the cluster operator roles (prefix %q)", operatorRolePrefix))
+	}
+
+	if len(problems) > 0 {
+		return fmt.Errorf("KMS key %s is unhealthy:\n%s", keyARN, strings.Join(problems, "\n"))
+	}
+	return nil
 }

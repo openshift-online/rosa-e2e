@@ -218,7 +218,7 @@ var _ = Describe("Customer Features: External Auth Provider", labels.Medium, lab
 	})
 })
 
-var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, func() {
+var _ = Describe("Customer Features: KMS Encryption", labels.Medium, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.CustomerFeatures, labels.KMS, func() {
 	It("should report KMS configuration via OCM API", func(ctx context.Context) {
 		if cfg.ClusterID == "" {
 			Skip("CLUSTER_ID not set")
