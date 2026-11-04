@@ -1,3 +1,7 @@
+# The runtime stage is a Red Hat Hardened Image (Project Hummingbird) with no
+# package manager. Builder and tools stages are build-time only and are never
+# shipped, so they can use any image.
+
 FROM registry.access.redhat.com/ubi9/go-toolset:latest AS builder
 
 USER root
@@ -9,7 +13,29 @@ RUN go mod download
 COPY . .
 RUN go run github.com/onsi/ginkgo/v2/ginkgo build --tags E2Etests ./test/e2e/
 
-FROM registry.access.redhat.com/ubi9/ubi:latest
+# The CI step scripts that run inside this image call ocm, oc and kubectl, so
+# those binaries are staged here from the same upstream sources as before.
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS tools
+
+RUN microdnf install -y coreutils-single tar gzip && microdnf clean all
+
+# coreutils-single is a single multicall binary. Hardlink it out as rm and chmod
+# so the copy into the runtime stage picks up real files, not symlinks.
+RUN mkdir /out \
+ && ln /usr/bin/coreutils /out/rm \
+ && ln /usr/bin/coreutils /out/chmod
+
+RUN curl -sL https://github.com/openshift-online/ocm-cli/releases/latest/download/ocm-linux-amd64 -o /out/ocm \
+ && chmod +x /out/ocm
+
+RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+ | tar -C /out -xzf - oc kubectl
+
+# jq is only useful with libjq and libonig, so it is a named stage to keep the
+# binary and its libraries on one version.
+FROM registry.access.redhat.com/hi/jq:1.8@sha256:4392d7a9bb69cdd232594aeaee0fc66a8468501c14845a7f9576431700cb14f7 AS jq
+
+FROM registry.access.redhat.com/hi/core-runtime:2.43@sha256:4163796d8b7f28021178093d31cb97c05336fd3f3a4d7006603a7fef29e997e7
 
 LABEL com.redhat.component="rosa-e2e" \
       name="rosa-e2e" \
@@ -22,19 +48,20 @@ LABEL com.redhat.component="rosa-e2e" \
       distribution-scope="public" \
       maintainer="ROSA SRE <rosa-sre@redhat.com>"
 
-RUN yum -y install --setopt=skip_missing_names_on_install=False \
-    jq && yum clean all
-
-RUN curl -sL https://github.com/openshift-online/ocm-cli/releases/latest/download/ocm-linux-amd64 -o /usr/local/bin/ocm && \
-    chmod +x /usr/local/bin/ocm
-
-RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | \
-    tar -C /usr/local/bin -xzf - oc kubectl
-
+# core-runtime already carries the bash, coreutils subset and glibc the step
+# scripts rely on, plus the CA bundle. Only the missing pieces are added here.
+COPY --from=tools /out/rm /usr/local/bin/rm
+COPY --from=tools /out/chmod /usr/local/bin/chmod
+COPY --from=tools /out/ocm /usr/local/bin/ocm
+COPY --from=tools /out/oc /usr/local/bin/oc
+COPY --from=tools /out/kubectl /usr/local/bin/kubectl
+COPY --from=jq /usr/bin/jq /usr/local/bin/jq
+COPY --from=jq /usr/lib64/libjq.so.1* /usr/lib64/
+COPY --from=jq /usr/lib64/libonig.so.5* /usr/lib64/
 COPY --from=builder /build/test/e2e/e2e.test /usr/local/bin/e2e.test
 
-RUN useradd -r -s /sbin/nologin -M e2e
-USER e2e
+# Hardened images run non-root by default; 65532 matches the upstream default.
+USER 65532
 WORKDIR /tmp
 
 ENTRYPOINT ["/usr/local/bin/e2e.test"]
