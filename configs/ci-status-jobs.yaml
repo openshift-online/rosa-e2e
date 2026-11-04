@@ -26,6 +26,14 @@
 #   overrides the category default, so gating: false opts a single job out of a
 #   gating category. Jobs without gating are informational signal only.
 #   Tracked in ROSAENG-62472.
+#
+# informing: true marks a job as informing signal in the OCP CI sense
+#   (blocking vs informing): the job still runs and its latest result is
+#   checked and listed in the daily report, but it is excluded from the
+#   gating and non-gating pass rates, from category health counts, and from
+#   the report's failure exit code. Use for pre-GA project validation whose
+#   failures are expected project noise rather than release signal (e.g.
+#   Seaplane regional jobs).
 
 sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
 
@@ -329,6 +337,7 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-cpupzfin-integration-main
       - name: HCP AD Regional
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-ad-integration-regional-main
+        informing: true
 
   - id: ocm-fvt-hcp-prd
     scope: component
@@ -547,6 +556,7 @@ categories:
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-f3
       - name: HCP Advanced Regional
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-regional-f3
+        informing: true
       - name: HCP External Auth
         prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-external-auth-f3
       - name: HCP Private Link

@@ -92,6 +92,38 @@ func TestCIStatusJobsNamingConvention(t *testing.T) {
 	}
 }
 
+func TestCIStatusSeaplaneRegionalJobsAreInforming(t *testing.T) {
+	// Seaplane (regionality) validation jobs are pre-GA project signal:
+	// reported but excluded from pass rates. They must never gate and must
+	// carry the informing flag so ci-status-report.sh skips their counts.
+	regional := map[string]bool{
+		"periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-ad-integration-regional-main": true,
+		"periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-regional-f3":                                                               true,
+	}
+	found := 0
+	for _, cat := range loadCIStatusConfig(t).Categories {
+		for _, job := range cat.Jobs {
+			if !regional[job.ProwJob] {
+				continue
+			}
+			found++
+			gates := cat.Gating
+			if job.Gating != nil {
+				gates = *job.Gating
+			}
+			if gates {
+				t.Errorf("%s: Seaplane regional job must not gate promotion", job.ProwJob)
+			}
+			if job.Informing == nil || !*job.Informing {
+				t.Errorf("%s: Seaplane regional job must set informing: true to stay out of pass rates", job.ProwJob)
+			}
+		}
+	}
+	if found != len(regional) {
+		t.Errorf("expected %d Seaplane regional jobs in the registry, found %d", len(regional), found)
+	}
+}
+
 func TestCIStatusJobsExistInProw(t *testing.T) {
 	if os.Getenv("VALIDATE_PROW") == "" {
 		t.Skip("set VALIDATE_PROW=1 to validate job names against Prow (requires network)")
