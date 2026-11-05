@@ -7,6 +7,11 @@
 # slack_reporter posts to Slack based on exit code; the "Full report"
 # link in Slack points to this build log.
 #
+# For gating jobs it also computes a 7-day run-weighted pass rate (total
+# successes / total completed runs over the trailing 7 days), which is the
+# ROSAENG-62472 target metric: a latest-result snapshot hides flake-luck,
+# the windowed rate does not.
+#
 # Requirements: curl, python3
 
 set -euo pipefail
@@ -158,23 +163,97 @@ else:
 " <<< "${raw}" 2>/dev/null || echo "|NO_DATA"
 }
 
+# Fetch success/failure counts for a job over the trailing 7 days from Prow
+# job-history, paginating until the window is covered. Prints "succ|fail".
+get_job_window() {
+  local job_name="$1"
+  PROW_JOB_NAME="${job_name}" python3 -c "
+import os, re, json, urllib.request
+from datetime import datetime, timedelta, timezone
+
+job = os.environ['PROW_JOB_NAME']
+base = 'https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/' + job
+cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+
+def parse_time(s):
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+
+builds = []
+seen = set()
+start = None
+for _ in range(15):
+    url = base + ('?start=' + str(start) if start else '')
+    try:
+        html = urllib.request.urlopen(url, timeout=25).read().decode('utf-8', 'replace')
+    except Exception:
+        break
+    m = re.search(r'var allBuilds = (\[.+?\]);', html, re.DOTALL)
+    if not m:
+        break
+    try:
+        page = json.loads(m.group(1))
+    except ValueError:
+        break
+    if not page:
+        break
+    new = [b for b in page if b.get('ID') not in seen]
+    if not new:
+        break
+    for b in new:
+        seen.add(b.get('ID'))
+    builds.extend(new)
+    oldest = parse_time(new[-1].get('Started'))
+    if oldest is None or oldest < cutoff:
+        break
+    start = new[-1].get('ID')
+
+succ = fail = 0
+for b in builds:
+    t = parse_time(b.get('Started'))
+    if t is None or t < cutoff:
+        continue
+    r = b.get('Result', '')
+    if r == 'SUCCESS':
+        succ += 1
+    elif r == 'FAILURE':
+        fail += 1
+print(f'{succ}|{fail}')
+" 2>/dev/null || echo ""
+}
+
 check_job() {
   local category="$1" display_name="$2" job_name="$3" gating="$4" informing="$5"
   local status_line build_id result
+  local w7_succ="" w7_fail=""
+
+  # 7-day windowed counts are only needed for gating jobs
+  if [[ "${gating}" == "true" && "${informing}" != "true" ]]; then
+    local window_line
+    window_line=$(get_job_window "${job_name}")
+    if [[ "${window_line}" == *"|"* ]]; then
+      w7_succ="${window_line%%|*}"
+      w7_fail="${window_line##*|}"
+    fi
+  fi
 
   status_line=$(get_job_status "${job_name}")
   build_id="${status_line%%|*}"
   result="${status_line##*|}"
 
   if [[ "${result}" == "NO_DATA" ]] || [[ -z "${result}" ]]; then
-    echo "${category}|${display_name}|NO_DATA|||${gating}|${informing}"
+    echo "${category}|${display_name}|NO_DATA|||${gating}|${informing}|${w7_succ}|${w7_fail}"
     return
   fi
 
   if [[ -n "${build_id}" ]]; then
-    echo "${category}|${display_name}|${result}|${PROW_BASE}/logs/${job_name}/${build_id}|${job_name}|${gating}|${informing}"
+    echo "${category}|${display_name}|${result}|${PROW_BASE}/logs/${job_name}/${build_id}|${job_name}|${gating}|${informing}|${w7_succ}|${w7_fail}"
   else
-    echo "${category}|${display_name}|${result}||${job_name}|${gating}|${informing}"
+    echo "${category}|${display_name}|${result}||${job_name}|${gating}|${informing}|${w7_succ}|${w7_fail}"
   fi
 }
 
@@ -235,6 +314,7 @@ main() {
   local fail_count=0 pass_count=0 other_count=0
   local g_pass=0 g_fail=0 g_other=0 ng_pass=0 ng_fail=0 ng_other=0
   local i_pass=0 i_fail=0 i_other=0
+  local g7_pass=0 g7_fail=0 g7_jobs=0 g7_clean=0
   local -A cat_pass cat_fail cat_other cat_fail_names
   for cat in "${category_order[@]}"; do
     cat_pass[${cat}]=0
@@ -255,6 +335,21 @@ main() {
       url=$(echo "${line}" | cut -d'|' -f4)
       gating=$(echo "${line}" | cut -d'|' -f6)
       informing=$(echo "${line}" | cut -d'|' -f7)
+      w7_succ=$(echo "${line}" | cut -d'|' -f8)
+      w7_fail=$(echo "${line}" | cut -d'|' -f9)
+
+      # Accumulate the 7-day windowed gating totals (fields are only set
+      # for gating, non-informing jobs)
+      if [[ "${gating}" == "true" && "${informing}" != "true" ]]; then
+        if [[ "${w7_succ}" =~ ^[0-9]+$ && "${w7_fail}" =~ ^[0-9]+$ ]] && [[ $((w7_succ + w7_fail)) -gt 0 ]]; then
+          g7_pass=$((g7_pass + w7_succ))
+          g7_fail=$((g7_fail + w7_fail))
+          g7_jobs=$((g7_jobs + 1))
+          if [[ "${w7_fail}" -eq 0 ]]; then
+            g7_clean=$((g7_clean + 1))
+          fi
+        fi
+      fi
 
       if [[ "${informing}" == "true" ]]; then
         # Informing jobs are checked and listed but excluded from pass
@@ -367,7 +462,8 @@ main() {
 
   # Gating (production release gate) vs non-gating pass rates. Pass rate is
   # computed over definitive results (pass + fail); no-data/running are shown
-  # separately so they don't skew the gate signal. Target: 95% (ROSAENG-62472).
+  # separately so they don't skew the gate signal. This is a latest-result
+  # snapshot; the 7-day windowed rate below is the ROSAENG-62472 target metric.
   echo ""
   echo "--- Gating vs Non-Gating (production release gate) ---"
   echo ""
@@ -385,7 +481,19 @@ main() {
   if [[ $((i_pass + i_fail + i_other)) -gt 0 ]]; then
     printf "  %-12s %d/%d passing (excluded from pass rates)\n" "Informing:" "${i_pass}" "$((i_pass + i_fail))"
   fi
-  echo "  (Gating target: 95% -- tracked in ROSAENG-62472)"
+
+  # 7-day run-weighted gating pass rate: total successes / total completed
+  # runs over the trailing 7 days. Unlike the latest-result snapshot above,
+  # a flaky job cannot look green here by luck of timing.
+  local g7_total=$((g7_pass + g7_fail))
+  if [[ "${g7_total}" -gt 0 ]]; then
+    local g7_pct=$(( (g7_pass * 100) / g7_total ))
+    printf "  %s %-12s %d/%d runs passing (%d%%) over trailing 7 days, %d/%d jobs at 100%%\n" \
+      "$(log_indicator "${g7_pass}" "${g7_total}")" "Gating 7d:" "${g7_pass}" "${g7_total}" "${g7_pct}" "${g7_clean}" "${g7_jobs}"
+  else
+    printf "  %-12s no completed gating runs in the trailing 7 days\n" "Gating 7d:"
+  fi
+  echo "  (Gating target: 75% run-weighted over trailing 7 days -- tracked in ROSAENG-62472)"
 
   echo ""
   echo "========================================="
