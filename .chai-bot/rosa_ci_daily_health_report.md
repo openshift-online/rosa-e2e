@@ -237,7 +237,7 @@ categories:
 
 **Field notes:**
 - Include **ALL** categories and **ALL** jobs, not just failing ones. The remediation follow-ups need the full picture.
-- `gating_pass_rate` / `non_gating_pass_rate`: the two weighted pass rates from step 3. The target gating rate is 95%.
+- `gating_pass_rate` / `non_gating_pass_rate`: the two weighted pass rates from step 3.
 - `gating`: per-job effective gating value (job-level `gating` overrides the category default). Remediation should prioritize gate failures (`gating: true`) when picking auto-fix targets.
 - `informing`: per-job value from the registry (`informing: true` marks pre-GA project validation, excluded from all pass rates). Failure analysis and remediation must skip these jobs — they are project noise for the owning team, not remediation targets — unless a shared-infrastructure defect is confirmed to also affect release-gating jobs, in which case route the fix to the affected gating job, not the informing job.
 - `consecutive_failures`: count of consecutive recent failed builds (0 if the latest passed).
