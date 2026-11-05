@@ -95,7 +95,7 @@ func TestCIStatusJobsNamingConvention(t *testing.T) {
 func TestCIStatusSeaplaneRegionalJobsAreInforming(t *testing.T) {
 	// Seaplane (regionality) validation jobs are pre-GA project signal:
 	// reported but excluded from pass rates. They must never gate and must
-	// carry the informing flag so ci-status-report.sh skips their counts.
+	// carry the informing flag so the daily health report excludes their counts.
 	regional := map[string]bool{
 		"periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-ad-integration-regional-main": true,
 		"periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-regional-f3":                                                               true,
