@@ -27,6 +27,20 @@ where to escalate, not whether the flow runs. When a failure has no routing
 entry, run the flow normally and escalate to `rosa-ci-watcher` (Step 6) so a
 human can triage ownership.
 
+**Informing jobs (reduced flow):** Failures from jobs marked `informing:
+true` in `configs/ci-status-jobs.yaml` are pre-GA project validation
+(currently the Seaplane regional jobs). Their failures are expected project
+noise for the owning project team, not release signal: do not file Jira
+tickets, do not open fix PRs, and do not drive the standing
+resilience/artifact questions to resolution. Post at most one brief
+analysis note in the thread and stop. One exception: a shared-infrastructure
+defect with evidence that the same defect also affects at least one
+release-gating job (e.g. the same gather step or credential mount failing
+in gating jobs in the same window) gets the full flow above -- classify and
+drive it normally, routing the fix to the affected gating job. A
+job-specific credential-mount or gather-step failure with no gating-job
+impact stays on the reduced flow.
+
 ## Goal
 
 Each failure thread should reach a terminal outcome on its own, pinging a
