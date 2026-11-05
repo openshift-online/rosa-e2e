@@ -321,7 +321,7 @@ make build
 |--------|---------|
 | `scripts/provision-e2e-cluster.sh` | Create VPC, account roles, OIDC config, and ROSA HCP cluster (`EXTERNAL_AUTH_ENABLED=true` for external auth) |
 | `scripts/create-external-auth-provider.sh` | Add an external auth provider to an external-auth-enabled cluster |
-| `scripts/deprovision-e2e-cluster.sh` | Delete cluster, operator roles, OIDC provider, and VPC |
+| `scripts/deprovision-e2e-cluster.sh` | Delete cluster, operator roles, OIDC provider, and VPC (plus the OIDC config and KMS key when the provision script created them) |
 | `scripts/run-e2e.sh` | Run tests (works both locally and in Prow CI) |
 
 ## Known Issues

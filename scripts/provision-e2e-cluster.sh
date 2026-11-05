@@ -84,6 +84,7 @@ fi
 # Prefer a managed OIDC config: unmanaged configs store their private key in AWS
 # Secrets Manager, and a deleted/inaccessible secret leaves a dangling config that
 # breaks cluster creation with "Failed to get secret value from '<arn>'".
+OIDC_CONFIG_CREATED="false"
 if [[ -z "${OIDC_CONFIG_ID}" ]]; then
   echo ""
   echo "--- Getting OIDC config ---"
@@ -91,6 +92,7 @@ if [[ -z "${OIDC_CONFIG_ID}" ]]; then
   if [[ -z "${OIDC_CONFIG_ID}" ]]; then
     echo "Creating managed OIDC config..."
     OIDC_CONFIG_ID=$(rosa create oidc-config --managed --mode auto --yes -o json | jq -r '.id')
+    OIDC_CONFIG_CREATED="true"
   fi
 fi
 echo "OIDC Config: ${OIDC_CONFIG_ID}"
@@ -280,6 +282,7 @@ export AWS_REGION=${REGION}
 export VPC_ID=${VPC_ID}
 export VPC_STACK_NAME=${STACK_NAME}
 export OIDC_CONFIG_ID=${OIDC_CONFIG_ID}
+export OIDC_CONFIG_CREATED=${OIDC_CONFIG_CREATED}
 export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
 export BILLING_ACCOUNT=${BILLING_ACCOUNT}
 export CLUSTER_SECTOR=${CLUSTER_SECTOR}
