@@ -10,7 +10,26 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
+
+func WaitForDefaultServiceAccount(ctx context.Context, client typedcorev1.ServiceAccountInterface, timeout time.Duration) error {
+	return waitForDefaultServiceAccount(ctx, client, time.Second, timeout)
+}
+
+func waitForDefaultServiceAccount(ctx context.Context, client typedcorev1.ServiceAccountInterface, interval, timeout time.Duration) error {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		_, err := client.Get(ctx, "default", metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return err == nil, err
+	})
+	if err != nil {
+		return fmt.Errorf("waiting for default service account (timeout %s): %w", timeout, err)
+	}
+	return nil
+}
 
 // isNonTransientError returns true for API errors that will not resolve on retry.
 func isNonTransientError(err error) bool {

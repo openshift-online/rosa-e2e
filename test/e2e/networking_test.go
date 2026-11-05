@@ -50,6 +50,10 @@ var _ = Describe("Data Plane: Networking", labels.High, labels.Positive, labels.
 		cleanup, err := framework.CreateTestNamespace(ctx, tc.HCKubeClient(), namespace)
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(cleanup)
+		deferDNSFailureDiagnostics(func(callback func()) { DeferCleanup(callback) }, func() bool { return CurrentSpecReport().Failed() }, tc.HCKubeClient(), namespace)
+
+		By("Waiting for the default service account")
+		Expect(framework.WaitForDefaultServiceAccount(ctx, tc.HCKubeClient().CoreV1().ServiceAccounts(namespace), time.Minute)).To(Succeed(), "default service account in namespace %s is not ready", namespace)
 
 		By("Creating DNS test pod")
 		podName := "dns-test-pod"
