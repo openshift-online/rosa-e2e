@@ -1,8 +1,9 @@
 # ci-status-jobs.yaml -- Single source of truth for ROSA CI daily status tracking.
 #
-# The ci-status-report.sh script reads this file to determine which Prow jobs
-# to check and how to group them in the Slack summary. The rosa-eng-dashboard
-# also fetches this file to build CI health views and component mappings.
+# The chai-bot rosa_ci_daily_health_report scheduled task fetches this file to
+# determine which Prow jobs to check and how to group them in the daily Slack
+# health report. The rosa-eng-dashboard also fetches this file to build CI
+# health views and component mappings.
 #
 # To add a new job: add an entry under the appropriate category.
 # To add a new category: add a new top-level entry to the categories list.
