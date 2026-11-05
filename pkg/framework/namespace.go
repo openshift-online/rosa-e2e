@@ -51,6 +51,20 @@ func CreateTestNamespace(ctx context.Context, client kubernetes.Interface, name 
 		return nil, fmt.Errorf("creating namespace %s: %w", name, err)
 	}
 
+	// Wait for the default ServiceAccount: pod admission rejects pods referencing a
+	// service account that does not exist yet, and the controller creates the default
+	// one asynchronously after namespace creation.
+	err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+		_, saErr := client.CoreV1().ServiceAccounts(name).Get(ctx, "default", metav1.GetOptions{})
+		if saErr == nil || errors.IsNotFound(saErr) {
+			return saErr == nil, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("waiting for default ServiceAccount in namespace %s: %w", name, err)
+	}
+
 	cleanup = func() error {
 		if deleteErr := client.CoreV1().Namespaces().Delete(context.Background(), name, metav1.DeleteOptions{}); deleteErr != nil && !errors.IsNotFound(deleteErr) {
 			return fmt.Errorf("deleting test namespace %s: %w", name, deleteErr)

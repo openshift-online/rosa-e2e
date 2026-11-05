@@ -46,6 +46,7 @@ var (
 // Feature labels (cluster-level features; use to include/exclude feature-specific test suites)
 var (
 	FIPS = ginkgo.Label("Feature:FIPS")
+	KMS  = ginkgo.Label("Feature:KMS")
 )
 
 // Test area categories

@@ -27,6 +27,26 @@ fi
 echo "=== ROSA E2E Cluster Deprovisioning ==="
 echo "Cluster: ${CLUSTER_NAME:-${CLUSTER_ID}}"
 
+# Resolve the operator role prefix before deleting the cluster: once the OCM
+# record is gone, `rosa delete operator-roles -c <id>` no longer finds the roles.
+# Operator role names follow <cluster-name>-<random4>-<namespace>-<operator>.
+OPERATOR_ROLE_PREFIX="${OPERATOR_ROLE_PREFIX:-}"
+if [[ -z "${OPERATOR_ROLE_PREFIX}" && -n "${CLUSTER_NAME:-${CLUSTER_ID}}" ]]; then
+  CLUSTER_DESC=$(rosa describe cluster -c "${CLUSTER_NAME:-${CLUSTER_ID}}" -o json 2>/dev/null || true)
+  if [[ -n "${CLUSTER_DESC}" ]]; then
+    FIRST_OPERATOR_ROLE=$(jq -r '[.aws.sts.operator_iam_roles[].role_arn][0] // empty' <<<"${CLUSTER_DESC}" | sed 's|.*/||')
+    NAME_FROM_DESC=$(jq -r '.name // empty' <<<"${CLUSTER_DESC}")
+    if [[ -n "${FIRST_OPERATOR_ROLE}" && -n "${NAME_FROM_DESC}" ]]; then
+      OPERATOR_ROLE_PREFIX=$(sed "s/^${NAME_FROM_DESC}-\([^-]*\)-.*/${NAME_FROM_DESC}-\1-/" <<<"${FIRST_OPERATOR_ROLE}")
+      # If the role name did not match the expected pattern, do not guess.
+      [[ "${OPERATOR_ROLE_PREFIX}" == "${FIRST_OPERATOR_ROLE}" ]] && OPERATOR_ROLE_PREFIX=""
+    fi
+  fi
+fi
+if [[ -n "${OPERATOR_ROLE_PREFIX}" ]]; then
+  echo "Operator role prefix: ${OPERATOR_ROLE_PREFIX}"
+fi
+
 # Step 1: Delete the cluster
 echo ""
 echo "--- Deleting cluster ---"
@@ -38,8 +58,12 @@ rosa logs uninstall -c "${CLUSTER_NAME:-${CLUSTER_ID}}" --watch 2>/dev/null || t
 # Step 2: Clean up operator roles and OIDC provider
 echo ""
 echo "--- Cleaning up operator roles ---"
-if [[ -n "${CLUSTER_ID}" ]]; then
+if [[ -n "${OPERATOR_ROLE_PREFIX}" ]]; then
+  rosa delete operator-roles --prefix "${OPERATOR_ROLE_PREFIX}" --mode auto --yes || true
+elif [[ -n "${CLUSTER_ID}" ]]; then
   rosa delete operator-roles -c "${CLUSTER_ID}" --mode auto --yes 2>/dev/null || true
+fi
+if [[ -n "${CLUSTER_ID}" ]]; then
   rosa delete oidc-provider -c "${CLUSTER_ID}" --mode auto --yes 2>/dev/null || true
 fi
 
@@ -53,7 +77,7 @@ if [[ -n "${VPC_STACK_NAME}" ]]; then
   VPC_ID_FROM_STACK=$(aws cloudformation describe-stacks \
     --stack-name "${VPC_STACK_NAME}" \
     --region "${REGION}" \
-    --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue' \
+    --query 'Stacks[0].Outputs[?OutputKey==`VPCId`].OutputValue' \
     --output text 2>/dev/null || echo "")
 
   if [[ -n "${VPC_ID_FROM_STACK}" ]]; then
@@ -72,6 +96,11 @@ if [[ -n "${VPC_STACK_NAME}" ]]; then
 
   echo "Waiting for VPC stack deletion..."
   aws cloudformation wait stack-delete-complete --stack-name "${VPC_STACK_NAME}" --region ${REGION} 2>/dev/null || true
+  STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "${VPC_STACK_NAME}" --region "${REGION}" \
+    --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "")
+  if [[ -n "${STACK_STATUS}" && "${STACK_STATUS}" != "DELETE_COMPLETE" ]]; then
+    echo "WARNING: VPC stack deletion ended in ${STACK_STATUS}; run 'aws cloudformation describe-stack-resources --stack-name ${VPC_STACK_NAME} --region ${REGION}' to find the resource blocking deletion."
+  fi
 elif [[ -n "${VPC_ID}" ]]; then
   echo ""
   echo "--- Cleaning up VPC ${VPC_ID} (legacy manual cleanup) ---"
@@ -120,11 +149,32 @@ elif [[ -n "${VPC_ID}" ]]; then
   aws ec2 delete-vpc --vpc-id ${VPC_ID} --region ${REGION} 2>/dev/null || true
 fi
 
-# Step 4: Clean up OIDC config (optional, shared across clusters)
+# Step 4: Delete the OIDC config, but only when this run created it: a config
+# the provision script adopted (any managed config in the org) may be shared
+# with other clusters and is not ours to delete.
+OIDC_CONFIG_CREATED="${OIDC_CONFIG_CREATED:-false}"
 if [[ -n "${OIDC_CONFIG_ID}" ]]; then
+  if [[ "${OIDC_CONFIG_CREATED}" == "true" ]]; then
+    echo ""
+    echo "--- Deleting OIDC config ${OIDC_CONFIG_ID} ---"
+    rosa delete oidc-config --oidc-config-id "${OIDC_CONFIG_ID}" --mode auto --yes 2>/dev/null || true
+  else
+    echo ""
+    echo "--- Keeping OIDC config ${OIDC_CONFIG_ID} (not created by the provision script) ---"
+  fi
+fi
+
+# Step 5: Schedule KMS key deletion if the provision script created it (the key must
+# no longer be in use by the cluster, so this runs after cluster deletion)
+KMS_KEY_ARN="${KMS_KEY_ARN:-}"
+KMS_KEY_CREATED="${KMS_KEY_CREATED:-false}"
+if [[ "${KMS_KEY_CREATED}" == "true" && -n "${KMS_KEY_ARN}" ]]; then
   echo ""
-  echo "--- Deleting OIDC config ${OIDC_CONFIG_ID} ---"
-  rosa delete oidc-config --oidc-config-id "${OIDC_CONFIG_ID}" --mode auto --yes 2>/dev/null || true
+  echo "--- Scheduling KMS key deletion: ${KMS_KEY_ARN} ---"
+  aws kms schedule-key-deletion \
+    --key-id "${KMS_KEY_ARN}" \
+    --pending-window-in-days 7 \
+    --region "${REGION}" 2>/dev/null || true
 fi
 
 # Clean up env file

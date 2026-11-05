@@ -29,6 +29,12 @@ CLUSTER_SECTOR="${CLUSTER_SECTOR:-}"
 # it can only be enabled at cluster creation. Set EXTERNAL_AUTH_ENABLED=true to create a cluster that
 # can later host external auth providers via ./scripts/create-external-auth-provider.sh.
 EXTERNAL_AUTH_ENABLED="${EXTERNAL_AUTH_ENABLED:-false}"
+# KMS encryption with a customer-managed key is a day-1 feature: EBS storage encryption can only be
+# enabled at cluster creation. Set KMS_ENABLED=true to create a KMS key scoped to the cluster's
+# account and operator roles (deleted by deprovision-e2e-cluster.sh), or pass KMS_KEY_ARN to reuse
+# an existing key. Enables both EBS storage encryption and etcd encryption.
+KMS_ENABLED="${KMS_ENABLED:-false}"
+KMS_KEY_ARN="${KMS_KEY_ARN:-}"
 
 # AWS payer/billing account per OCM environment
 # integration/staging: 277304166082 (osd-staging-1) or 811685182089 (osd-staging-2)
@@ -43,6 +49,7 @@ echo "Cluster name: ${CLUSTER_NAME}"
 echo "Region: ${REGION}"
 echo "Compute: ${COMPUTE_NODES}x ${COMPUTE_MACHINE_TYPE}"
 echo "External auth: ${EXTERNAL_AUTH_ENABLED}"
+echo "KMS encryption: ${KMS_ENABLED}"
 echo ""
 
 # Verify prerequisites
@@ -77,6 +84,7 @@ fi
 # Prefer a managed OIDC config: unmanaged configs store their private key in AWS
 # Secrets Manager, and a deleted/inaccessible secret leaves a dangling config that
 # breaks cluster creation with "Failed to get secret value from '<arn>'".
+OIDC_CONFIG_CREATED="false"
 if [[ -z "${OIDC_CONFIG_ID}" ]]; then
   echo ""
   echo "--- Getting OIDC config ---"
@@ -84,6 +92,7 @@ if [[ -z "${OIDC_CONFIG_ID}" ]]; then
   if [[ -z "${OIDC_CONFIG_ID}" ]]; then
     echo "Creating managed OIDC config..."
     OIDC_CONFIG_ID=$(rosa create oidc-config --managed --mode auto --yes -o json | jq -r '.id')
+    OIDC_CONFIG_CREATED="true"
   fi
 fi
 echo "OIDC Config: ${OIDC_CONFIG_ID}"
@@ -111,20 +120,20 @@ aws cloudformation wait stack-create-complete \
 VPC_ID=$(aws cloudformation describe-stacks \
   --stack-name "${STACK_NAME}" \
   --region "${REGION}" \
-  --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue' \
+  --query 'Stacks[0].Outputs[?OutputKey==`VPCId`].OutputValue' \
   --output text)
 
 # Get subnet IDs (public and private)
 PUBLIC_SUBNET_IDS=$(aws cloudformation describe-stacks \
   --stack-name "${STACK_NAME}" \
   --region "${REGION}" \
-  --query 'Stacks[0].Outputs[?OutputKey==`PublicSubnetIds`].OutputValue' \
+  --query 'Stacks[0].Outputs[?OutputKey==`PublicSubnets`].OutputValue' \
   --output text)
 
 PRIVATE_SUBNET_IDS=$(aws cloudformation describe-stacks \
   --stack-name "${STACK_NAME}" \
   --region "${REGION}" \
-  --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnetIds`].OutputValue' \
+  --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnets`].OutputValue' \
   --output text)
 
 SUBNET_IDS="${PUBLIC_SUBNET_IDS},${PRIVATE_SUBNET_IDS}"
@@ -156,6 +165,75 @@ if [[ "${EXTERNAL_AUTH_ENABLED}" == "true" ]]; then
   EXTERNAL_AUTH_ARGS="--external-auth-providers-enabled"
 fi
 
+# Step 4c: Create the KMS key if requested (day-1, immutable)
+# Key policy mirrors the rosa-sts-kms-key-create CI step: role ARNs as explicit principals
+# (a role ARN principal in a KMS key policy also grants the role's assumed-role sessions).
+# The cluster's operator roles are created by `rosa create cluster --mode auto` with the
+# cluster-name prefix and are granted access after cluster creation, below.
+KMS_ARGS=""
+KMS_KEY_CREATED="false"
+KMS_POLICY_FILE="${SHARED_DIR:-/tmp}/rosa-e2e-kms-policy.json"
+
+write_kms_policy() {
+  local principal_list
+  principal_list=$(printf '"%s"\n' $1 | paste -sd, -)
+  cat > "${KMS_POLICY_FILE}" <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EnableIAMPermissions",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::${AWS_ACCOUNT_ID}:root" },
+      "Action": "kms:*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowClusterRolesUse",
+      "Effect": "Allow",
+      "Principal": { "AWS": [${principal_list}] },
+      "Action": [
+        "kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*",
+        "kms:DescribeKey"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowClusterRolesGrants",
+      "Effect": "Allow",
+      "Principal": { "AWS": [${principal_list}] },
+      "Action": ["kms:CreateGrant", "kms:ListGrants", "kms:RevokeGrant"],
+      "Resource": "*",
+      "Condition": { "Bool": { "kms:GrantIsForAWSResource": "true" } }
+    }
+  ]
+}
+EOF
+}
+
+if [[ "${KMS_ENABLED}" == "true" ]]; then
+  if [[ -z "${KMS_KEY_ARN}" ]]; then
+    echo ""
+    echo "--- Creating KMS key ---"
+    ACCOUNT_ROLE_ARNS=$(rosa list account-roles -o json |
+      jq -r '[.[] | select(.RoleName | startswith("ManagedOpenShift-HCP-")) | .RoleARN] | join(" ")')
+    if [[ -z "${ACCOUNT_ROLE_ARNS}" ]]; then
+      echo "ERROR: No HCP account roles found."
+      exit 1
+    fi
+    write_kms_policy "${ACCOUNT_ROLE_ARNS}"
+    KMS_KEY_ARN=$(aws kms create-key \
+      --region "${REGION}" \
+      --description "rosa-e2e KMS test key for ${CLUSTER_NAME}" \
+      --policy "file://${KMS_POLICY_FILE}" \
+      --query 'KeyMetadata.Arn' \
+      --output text)
+    KMS_KEY_CREATED="true"
+  fi
+  echo "KMS key: ${KMS_KEY_ARN}"
+  KMS_ARGS="--enable-customer-managed-key --kms-key-arn ${KMS_KEY_ARN} --etcd-encryption-kms-arn ${KMS_KEY_ARN}"
+fi
+
 # Step 5: Create cluster
 echo ""
 echo "--- Creating ROSA HCP cluster ---"
@@ -172,9 +250,28 @@ rosa create cluster \
   --subnet-ids "${SUBNET_IDS}" \
   ${SECTOR_ARGS} \
   ${EXTERNAL_AUTH_ARGS} \
+  ${KMS_ARGS} \
   --yes
 
 CLUSTER_ID=$(rosa describe cluster -c "${CLUSTER_NAME}" -o json | jq -r '.id')
+
+# Grant the cluster's operator roles access to the KMS key: `rosa create cluster --mode auto`
+# creates them during cluster creation. Use the key ID rather than the ARN: older AWS CLI
+# builds reject KMS key ARNs here.
+if [[ "${KMS_ENABLED}" == "true" && "${KMS_KEY_CREATED}" == "true" ]]; then
+  OPERATOR_ROLE_ARNS=$(rosa describe cluster -c "${CLUSTER_NAME}" -o json |
+    jq -r '[.aws.sts.operator_iam_roles[].role_arn] | join(" ")')
+  if [[ -n "${OPERATOR_ROLE_ARNS}" ]]; then
+    echo ""
+    echo "--- Granting KMS access to operator roles ---"
+    write_kms_policy "${ACCOUNT_ROLE_ARNS} ${OPERATOR_ROLE_ARNS}"
+    aws kms put-key-policy \
+      --region "${REGION}" \
+      --key-id "${KMS_KEY_ARN##*/}" \
+      --policy-name default \
+      --policy "file://${KMS_POLICY_FILE}"
+  fi
+fi
 
 # Save cluster info
 cat > "${SHARED_DIR:-/tmp}/rosa-e2e-cluster.env" << EOF
@@ -185,10 +282,14 @@ export AWS_REGION=${REGION}
 export VPC_ID=${VPC_ID}
 export VPC_STACK_NAME=${STACK_NAME}
 export OIDC_CONFIG_ID=${OIDC_CONFIG_ID}
+export OIDC_CONFIG_CREATED=${OIDC_CONFIG_CREATED}
 export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
 export BILLING_ACCOUNT=${BILLING_ACCOUNT}
 export CLUSTER_SECTOR=${CLUSTER_SECTOR}
 export EXTERNAL_AUTH_ENABLED=${EXTERNAL_AUTH_ENABLED}
+export KMS_ENABLED=${KMS_ENABLED}
+export KMS_KEY_ARN=${KMS_KEY_ARN}
+export KMS_KEY_CREATED=${KMS_KEY_CREATED}
 EOF
 
 echo ""
