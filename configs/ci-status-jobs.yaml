@@ -148,14 +148,19 @@ categories:
     jobs:
       - name: HCP 4.20
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-20
+        informing: true
       - name: HCP 4.21
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-21
+        informing: true
       - name: HCP 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-22
+        informing: true
       - name: HCP 5.0
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-candidate-5-0
+        informing: true
       - name: HCP Hosted Operator Upgrade
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ho-upgrade-rosa-hcp-ho-upgrade-integration
+        informing: true
 
   - id: rosa-cx-e2e
     scope: platform
@@ -327,14 +332,19 @@ categories:
     jobs:
       - name: HCP Autonode
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-autonode-integration-main
+        informing: true
       - name: HCP Backup Restore
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-rest-integration-main
+        informing: true
       - name: HCP Backup Scale
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-scale-integration-main
+        informing: true
       - name: HCP Backup CP Up
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-ip-integration-main
+        informing: true
       - name: HCP Backup CP In Progress
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-cpupzfin-integration-main
+        informing: true
       - name: HCP AD Regional
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-ad-integration-regional-main
         informing: true
@@ -400,10 +410,13 @@ categories:
     jobs:
       - name: STS AD
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-integration-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main
+        informing: true
       - name: STS Custom Channel
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-integration-ocm-fvt-periodic-cs-rosa-classic-cust-chan-integration-main
+        informing: true
       - name: OSD CCS AWS AD
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-aws-integration-ocm-fvt-periodic-cs-osd-ccs-aws-ad-integration-main
+        informing: true
 
   - id: ocm-fvt-gcp-stg
     scope: component
@@ -452,10 +465,13 @@ categories:
     jobs:
       - name: OSDFM Basic Periodic
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-integration-ocm-fvt-periodic-osdfm-basic-periodic-integration
+        informing: true
       - name: OSDFM MC Autoscaling
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-integration-ocm-fvt-periodic-osdfm-mc-autoscaling-integration
+        informing: true
       - name: OSDFM SC Autoscaling
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-integration-ocm-fvt-periodic-osdfm-sc-autoscaling-integration
+        informing: true
 
   - id: ocm-fvt-osdfm-stg
     scope: component
@@ -487,6 +503,7 @@ categories:
     jobs:
       - name: INT HCP 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-hypershift-ci-rosa-hcp-e2e-integration-stable-4-22
+        informing: true
       - name: STG HCP 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-hypershift-ci-rosa-hcp-e2e-staging-stable-4-22
 
@@ -602,6 +619,7 @@ categories:
     jobs:
       - name: RMO Promotion INT
         prow_job: periodic-ci-openshift-route-monitor-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
         labels: [route-monitor-operator]
       - name: RMO Promotion STG
         prow_job: periodic-ci-openshift-route-monitor-operator-master-rosa-sts-e2e-promotion-stage
@@ -609,6 +627,7 @@ categories:
         labels: [route-monitor-operator]
       - name: CAMO Promotion INT
         prow_job: periodic-ci-openshift-configure-alertmanager-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
         labels: [configure-alertmanager-operator]
       - name: CAMO Promotion STG
         prow_job: periodic-ci-openshift-configure-alertmanager-operator-master-rosa-sts-e2e-promotion-stage
@@ -616,6 +635,7 @@ categories:
         labels: [configure-alertmanager-operator]
       - name: MUO Promotion INT
         prow_job: periodic-ci-openshift-managed-upgrade-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
         labels: [managed-upgrade-operator]
       - name: MUO Promotion STG
         prow_job: periodic-ci-openshift-managed-upgrade-operator-master-rosa-sts-e2e-promotion-stage
@@ -623,6 +643,7 @@ categories:
         labels: [managed-upgrade-operator]
       - name: OAO Promotion INT
         prow_job: periodic-ci-openshift-ocm-agent-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
         labels: [ocm-agent-operator]
       - name: OAO Promotion STG
         prow_job: periodic-ci-openshift-ocm-agent-operator-master-rosa-sts-e2e-promotion-stage
@@ -630,6 +651,7 @@ categories:
         labels: [ocm-agent-operator]
       - name: OME Promotion INT
         prow_job: periodic-ci-openshift-osd-metrics-exporter-main-rosa-sts-e2e-promotion-int
+        informing: true
         labels:
           - osd-metrics-exporter
       - name: OME Promotion STG
@@ -639,6 +661,7 @@ categories:
           - osd-metrics-exporter
       - name: SFO Promotion INT
         prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
         labels: [splunk-forwarder-operator]
       - name: SFO Promotion STG
         prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-rosa-sts-e2e-promotion-stage
@@ -646,6 +669,7 @@ categories:
         labels: [splunk-forwarder-operator]
       - name: Certman Promotion INT
         prow_job: periodic-ci-openshift-certman-operator-master-hive-e2e-promotion-int
+        informing: true
         labels: [certman-operator]
       - name: Certman Promotion STG
         prow_job: periodic-ci-openshift-certman-operator-master-hive-e2e-promotion-stage
@@ -653,6 +677,7 @@ categories:
         labels: [certman-operator]
       - name: CIO Promotion INT
         prow_job: periodic-ci-openshift-cloud-ingress-operator-master-rosa-osd-aws-e2e-promotion-int
+        informing: true
         labels: [cloud-ingress-operator]
       - name: CIO Promotion STG
         prow_job: periodic-ci-openshift-cloud-ingress-operator-master-rosa-osd-aws-e2e-promotion-stage
@@ -660,6 +685,7 @@ categories:
         labels: [cloud-ingress-operator]
       - name: RPO Promotion INT
         prow_job: periodic-ci-openshift-rbac-permissions-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
         labels: [rbac-permissions-operator]
       - name: RPO Promotion STG
         prow_job: periodic-ci-openshift-rbac-permissions-operator-master-rosa-sts-e2e-promotion-stage
@@ -667,6 +693,7 @@ categories:
         labels: [rbac-permissions-operator]
       - name: AAO Promotion INT
         prow_job: periodic-ci-openshift-aws-account-operator-master-hive-e2e-promotion-int
+        informing: true
         labels: [aws-account-operator]
       - name: AAO Promotion STG
         prow_job: periodic-ci-openshift-aws-account-operator-master-hive-e2e-promotion-stage
@@ -674,6 +701,7 @@ categories:
         labels: [aws-account-operator]
       - name: MCVW Promotion INT
         prow_job: periodic-ci-openshift-managed-cluster-validating-webhooks-master-rosa-sts-e2e-promotion-int
+        informing: true
         labels: [managed-cluster-validating-webhooks]
       - name: MCVW Promotion STG
         prow_job: periodic-ci-openshift-managed-cluster-validating-webhooks-master-rosa-sts-e2e-promotion-stage
@@ -682,6 +710,7 @@ categories:
       # OSD GCP
       - name: RMO GCP INT
         prow_job: periodic-ci-openshift-route-monitor-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
         labels: [route-monitor-operator]
       - name: RMO GCP STG
         prow_job: periodic-ci-openshift-route-monitor-operator-master-osd-gcp-e2e-promotion-stage
@@ -689,6 +718,7 @@ categories:
         labels: [route-monitor-operator]
       - name: CAMO GCP INT
         prow_job: periodic-ci-openshift-configure-alertmanager-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
         labels: [configure-alertmanager-operator]
       - name: CAMO GCP STG
         prow_job: periodic-ci-openshift-configure-alertmanager-operator-master-osd-gcp-e2e-promotion-stage
@@ -696,6 +726,7 @@ categories:
         labels: [configure-alertmanager-operator]
       - name: MUO GCP INT
         prow_job: periodic-ci-openshift-managed-upgrade-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
         labels: [managed-upgrade-operator]
       - name: MUO GCP STG
         prow_job: periodic-ci-openshift-managed-upgrade-operator-master-osd-gcp-e2e-promotion-stage
@@ -703,6 +734,7 @@ categories:
         labels: [managed-upgrade-operator]
       - name: OAO GCP INT
         prow_job: periodic-ci-openshift-ocm-agent-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
         labels: [ocm-agent-operator]
       - name: OAO GCP STG
         prow_job: periodic-ci-openshift-ocm-agent-operator-master-osd-gcp-e2e-promotion-stage
@@ -710,6 +742,7 @@ categories:
         labels: [ocm-agent-operator]
       - name: SFO GCP INT
         prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
         labels: [splunk-forwarder-operator]
       - name: SFO GCP STG
         prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-osd-gcp-e2e-promotion-stage
