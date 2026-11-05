@@ -87,6 +87,34 @@ CONSOLE_CLIENT_SECRET=<client-secret> \
 Without external auth enabled at creation, the External Auth Provider spec skips gracefully, and
 `rosa create external-auth-provider` fails with "External authentication configuration is not enabled".
 
+## Provision a Cluster with KMS Encryption
+
+KMS encryption with a customer-managed key is a **day-1, immutable** HCP feature — EBS storage
+encryption can only be enabled at cluster creation, not added later. To exercise the KMS specs
+(`Feature:KMS`) you need a cluster created with a customer-managed KMS key.
+
+```bash
+# Step 1: AWS credentials (same as above)
+eval $(echo "y" | osdctl account cli -i <ACCOUNT_ID> -p osd-staging-2 -r us-east-2 -oenv 2>/dev/null | tr '\n' ' ' | sed 's/.*AWS_ACCESS/AWS_ACCESS/')
+
+# Step 2: Provision WITH KMS enabled (creates a KMS key scoped to the cluster's
+# account/operator roles, enables EBS storage + etcd encryption)
+KMS_ENABLED=true ./scripts/provision-e2e-cluster.sh
+
+# To reuse an existing key instead of creating one:
+# KMS_ENABLED=true KMS_KEY_ARN=arn:aws:kms:... ./scripts/provision-e2e-cluster.sh
+
+# Step 3: Wait for the cluster to be ready (~15 min)
+rosa logs install -c rosa-e2e-$(date +%m%d) --watch
+
+# Step 4: Run the KMS tests
+source /tmp/rosa-e2e-cluster.env
+OCM_TOKEN=$(ocm token) LABEL_FILTER="Feature:KMS" make test
+```
+
+Cleanup via `./scripts/deprovision-e2e-cluster.sh` schedules the created KMS key
+for deletion after the cluster is gone.
+
 ## Quick Start: Test Against Any Existing Cluster
 
 The simplest path. The framework auto-detects whether the cluster is HCP or Classic.

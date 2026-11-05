@@ -127,6 +127,19 @@ if [[ -n "${OIDC_CONFIG_ID}" ]]; then
   rosa delete oidc-config --oidc-config-id "${OIDC_CONFIG_ID}" --mode auto --yes 2>/dev/null || true
 fi
 
+# Step 5: Schedule KMS key deletion if the provision script created it (the key must
+# no longer be in use by the cluster, so this runs after cluster deletion)
+KMS_KEY_ARN="${KMS_KEY_ARN:-}"
+KMS_KEY_CREATED="${KMS_KEY_CREATED:-false}"
+if [[ "${KMS_KEY_CREATED}" == "true" && -n "${KMS_KEY_ARN}" ]]; then
+  echo ""
+  echo "--- Scheduling KMS key deletion: ${KMS_KEY_ARN} ---"
+  aws kms schedule-key-deletion \
+    --key-id "${KMS_KEY_ARN}" \
+    --pending-window-in-days 7 \
+    --region "${REGION}" 2>/dev/null || true
+fi
+
 # Clean up env file
 rm -f "${ENV_FILE}"
 

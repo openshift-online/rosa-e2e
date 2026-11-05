@@ -61,39 +61,18 @@ func VerifyEBSVolumesEncrypted(ctx context.Context, ec2Client *ec2.Client, clust
 	return nil
 }
 
-// isRootVolume reports whether the volume is attached as a node root volume
-// (device /dev/sda1, the ROSA worker root device).
+// isRootVolume reports whether the volume is attached as a node root volume.
+// Classic workers attach their root volume as /dev/sda1, HCP workers as /dev/xvda.
 func isRootVolume(volume types.Volume) bool {
 	for _, attachment := range volume.Attachments {
-		if attachment.Device != nil && *attachment.Device == "/dev/sda1" {
+		if attachment.Device == nil {
+			continue
+		}
+		if *attachment.Device == "/dev/sda1" || *attachment.Device == "/dev/xvda" {
 			return true
 		}
 	}
 	return false
-}
-
-// CountRootVolumes returns how many cluster-tagged EBS volumes are attached
-// as node root volumes.
-func CountRootVolumes(ctx context.Context, ec2Client *ec2.Client, clusterTag string) (int, error) {
-	resp, err := ec2Client.DescribeVolumes(ctx, &ec2.DescribeVolumesInput{
-		Filters: []types.Filter{
-			{
-				Name:   stringPtr("tag:kubernetes.io/cluster/" + clusterTag),
-				Values: []string{"owned"},
-			},
-		},
-	})
-	if err != nil {
-		return 0, fmt.Errorf("describing volumes: %w", err)
-	}
-
-	count := 0
-	for _, volume := range resp.Volumes {
-		if isRootVolume(volume) {
-			count++
-		}
-	}
-	return count, nil
 }
 
 // VerifyEBSVolumeEncryptedWithKey verifies that a single EBS volume is
