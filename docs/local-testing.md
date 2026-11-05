@@ -8,7 +8,7 @@ How to run rosa-e2e tests from your laptop against staging clusters. The test su
 - `ocm` CLI logged into staging: `ocm login --use-auth-code --url stage`
 - `rosa` CLI (for cluster provisioning)
 - `osdctl` CLI (for AWS credentials)
-- `ocm-backplane` CLI (for management cluster access)
+- `ocm-backplane` CLI (for zero-egress hosted clusters and management cluster access)
 
 ## Provision Your Own Cluster
 
