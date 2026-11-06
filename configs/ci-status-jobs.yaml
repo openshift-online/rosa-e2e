@@ -238,7 +238,7 @@ categories:
     name: OCM FVT HCP STG
     gating: true
     team:
-      id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
+      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
       name: ROSA Coffee Focaccia
       slack_channel: rosa-coffee-focaccia
       slack_alias: team-rosa-coffee
@@ -326,7 +326,7 @@ categories:
     components: [clusters-service]
     name: OCM FVT HCP INT
     team:
-      id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
+      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
       name: ROSA Coffee Focaccia
       slack_channel: rosa-coffee-focaccia
       slack_alias: team-rosa-coffee
@@ -357,7 +357,7 @@ categories:
     components: [clusters-service]
     name: OCM FVT HCP PROD
     team:
-      id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
+      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
       name: ROSA Coffee Focaccia
       slack_channel: rosa-coffee-focaccia
       slack_alias: team-rosa-coffee
@@ -373,7 +373,7 @@ categories:
     name: OCM FVT Classic STG
     gating: true
     team:
-      id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
+      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
       name: ROSA Coffee Focaccia
       slack_channel: rosa-coffee-focaccia
       slack_alias: team-rosa-coffee
@@ -404,7 +404,7 @@ categories:
     components: [clusters-service]
     name: OCM FVT Classic INT
     team:
-      id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
+      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
       name: ROSA Coffee Focaccia
       slack_channel: rosa-coffee-focaccia
       slack_alias: team-rosa-coffee
@@ -427,7 +427,7 @@ categories:
     name: OCM FVT GCP STG
     gating: true
     team:
-      id: "ec74d716-af36-4b3c-950f-f79213d08f71-3174"
+      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
       name: ROSA Coffee Focaccia
       slack_channel: rosa-coffee-focaccia
       slack_alias: team-rosa-coffee
@@ -559,7 +559,7 @@ categories:
     components: [rosa-cli]
     name: ROSA CLI E2E
     team:
-      id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
+      id: "a23288d3-e663-4c68-8580-ce719fc78cfc"
       name: ROSA CLI/Terraform
       slack_channel: ocm-qe-prow-ci-jobs
       slack_alias: rosa-cli-tf-team
@@ -757,7 +757,7 @@ categories:
     components: [terraform-provider-rhcs]
     name: ROSA TF E2E
     team:
-      id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
+      id: "a23288d3-e663-4c68-8580-ce719fc78cfc"
       name: ROSA CLI/Terraform
       slack_channel: ocm-qe-prow-ci-jobs
       slack_alias: rosa-cli-tf-team
