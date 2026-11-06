@@ -82,18 +82,44 @@ func (tc *TestContext) InitHCClients() error {
 	if err != nil {
 		return fmt.Errorf("getting HC credentials: %w", err)
 	}
-	tc.hcRestConfig = restCfg
 
 	kubeClient, err := NewKubeClient(restCfg)
 	if err != nil {
 		return fmt.Errorf("creating HC kube client: %w", err)
 	}
-	tc.hcKubeClient = kubeClient
 
 	dynClient, err := dynamic.NewForConfig(restCfg)
 	if err != nil {
 		return fmt.Errorf("creating HC dynamic client: %w", err)
 	}
+
+	tc.hcRestConfig = restCfg
+	tc.hcKubeClient = kubeClient
+	tc.hcDynamicClient = dynClient
+	return nil
+}
+
+// InitHCClientsForClusterID initializes kube and dynamic clients for a specific cluster ID,
+// bypassing any KUBECONFIG env var to ensure the correct cluster is targeted.
+// Used by tests that need to explicitly test a particular cluster.
+func (tc *TestContext) InitHCClientsForClusterID(clusterID string) error {
+	restCfg, err := GetClusterCredentials(tc.conn, clusterID)
+	if err != nil {
+		return fmt.Errorf("getting HC credentials for cluster %s: %w", clusterID, err)
+	}
+
+	kubeClient, err := NewKubeClient(restCfg)
+	if err != nil {
+		return fmt.Errorf("creating HC kube client for cluster %s: %w", clusterID, err)
+	}
+
+	dynClient, err := dynamic.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("creating HC dynamic client for cluster %s: %w", clusterID, err)
+	}
+
+	tc.hcRestConfig = restCfg
+	tc.hcKubeClient = kubeClient
 	tc.hcDynamicClient = dynClient
 	return nil
 }

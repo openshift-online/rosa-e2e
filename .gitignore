@@ -4,6 +4,7 @@ test/e2e/e2e.test
 
 # Test output
 junit-report.xml
+junit-min-version*.xml
 
 # IDE
 .idea/
