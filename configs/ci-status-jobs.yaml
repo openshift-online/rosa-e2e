@@ -66,8 +66,8 @@ categories:
     team: &rosa_e2e_team
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
-      slack_channel: wg-rosa-ci-enhancement
-      slack_alias: rosa-ci-team
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
     labels: [ci-failure, rosa-e2e]
     jobs:
       # HCP
@@ -169,8 +169,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
-      slack_channel: wg-rosa-ci-enhancement
-      slack_alias: rosa-ci-team
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
     labels: [ci-failure, rosa-e2e]
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp-external-oidc-e2e-staging*,*rosa-hcp-e2e-aws-vpc-cni-staging*,*rosa-hcp-kms-e2e-staging*"
     jobs:
@@ -216,8 +216,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
-      slack_channel: wg-rosa-ci-enhancement
-      slack_alias: rosa-ci-team
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
     labels: [ci-failure, gap-analysis]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-gap-analysis-main-periodics*"
     jobs:
@@ -516,8 +516,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
-      slack_channel: wg-rosa-ci-enhancement
-      slack_alias: rosa-ci-team
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
     labels: [ci-failure, conformance]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-hcp-ovn"
     jobs:
@@ -540,8 +540,8 @@ categories:
     team:
       id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
       name: ROSA CI
-      slack_channel: wg-rosa-ci-enhancement
-      slack_alias: rosa-ci-team
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
     labels: [ci-failure, conformance]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-sts-ovn"
     jobs:
@@ -615,8 +615,8 @@ categories:
     team:
       id: "a0f44498-f22b-4cd4-a98f-f298cc375a94"
       name: ROSA Rocket
-      slack_channel: hcm-sre-team-rocket
-      slack_alias: sd-srep-team-rocket
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
     labels: [ci-failure, sre-operator]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*operator*e2e*promotion*"
     jobs:
