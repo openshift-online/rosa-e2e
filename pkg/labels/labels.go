@@ -52,4 +52,5 @@ var (
 	Infrastructure   = ginkgo.Label("Area:Infrastructure")
 	ManagementPlane  = ginkgo.Label("Area:ManagementPlane")
 	Upgrade          = ginkgo.Label("Area:Upgrade")
+	MinVersion       = ginkgo.Label("Area:MinVersion")
 )

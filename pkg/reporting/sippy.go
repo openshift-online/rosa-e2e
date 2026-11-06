@@ -24,9 +24,9 @@ type SignalResult struct {
 }
 
 type junitTestSuites struct {
-	XMLName  xml.Name       `xml:"testsuites"`
-	Tests    int            `xml:"tests,attr"`
-	Failures int            `xml:"failures,attr"`
+	XMLName  xml.Name         `xml:"testsuites"`
+	Tests    int              `xml:"tests,attr"`
+	Failures int              `xml:"failures,attr"`
 	Suites   []junitTestSuite `xml:"testsuite"`
 }
 
