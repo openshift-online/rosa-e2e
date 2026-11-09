@@ -1,0 +1,279 @@
+source:
+  repo: hybrid-platforms/org
+  sha: da4daed35a532595b1396a93e53b2f3aecfaf823
+  generated_at: "2026-11-09T21:54:49Z"
+teams:
+  mcs_rocket:
+    display_name: MCS Rocket
+    jira_team_id: a0f44498-f22b-4cd4-a98f-f298cc375a94
+    slack_channel: team-mcs-rocket
+    escalation:
+      type: team_lead
+      person: nreuck
+    components:
+      - aws-account-shredder
+      - configure-alertmanager-operator
+      - deadmanssnitch-operator
+      - hypershift-dataplane-metrics-forwarder
+      - hypershift-logging-operator
+      - hypershift-platform-rhobs-rules
+      - managed-notifications
+      - managed-prometheus-exporter-base
+      - managed-prometheus-exporter-initcontainer
+      - observability-operator
+      - operator-curator
+      - osd-cluster-ready
+      - osd-gcp-marketplace-config
+      - osd-metrics-exporter
+      - osd-operator-status
+      - osd-rhobs-rules-and-dashboards
+      - pagerduty-operator
+      - rhobs-synthetics-agent
+      - rhobs-synthetics-api
+      - route-monitor-operator
+      - srep-bot
+  observability_intelligence:
+    display_name: Observability Intelligence
+    slack_channel: team-rosa-trust-engineering
+    escalation:
+      type: manager
+      person: geadams
+    components:
+      - deadmanssnitch-operator
+      - hypershift-dataplane-metrics-forwarder
+      - ocm-container
+      - osd-metrics-exporter
+      - rhobs-synthetics-agent
+      - rhobs-synthetics-api
+      - route-monitor-operator
+  rosa_console:
+    display_name: ROSA Console UI
+    slack_channel: team-console-ocmui
+    escalation:
+      type: team_lead
+      person: egilman
+    components:
+      - OCMUI
+  rosa_hcp_platform:
+    display_name: ROSA HCP Platform
+    jira_team_id: a5267ed5-eaa8-4cd6-90e3-d0ce145dbfbf
+    escalation:
+      type: manager
+      person: njean
+    components:
+      - boilerplate
+      - compliance-monkey
+      - hypershift
+      - osd-aws-privatelink-terraform-hypershift
+      - osd-privatelink-terraform-classic
+      - rosa-srep-zero-egress
+  rosa_hyperfleet:
+    display_name: ROSA HyperFleet
+    jira_team_id: 0c538cd9-152b-49f6-ad7c-e2fa2f865809
+    escalation:
+      type: manager
+      person: mworthin
+    components:
+      - ROSA HyperFleet
+      - rosa-boundary
+      - rosa-regional-platform-internal
+  rosa_osd_gcp:
+    display_name: ROSA OSD GCP team
+    jira_team_id: 1513346b-e10f-419a-925a-8da9e7e83369
+    escalation:
+      type: parent_manager
+      person: njean
+    components:
+      - clusters-service
+      - ocm-cli
+  rosa_prod_hulk:
+    display_name: ROSA Hulk
+    jira_team_id: da409b64-3cdc-409c-939c-417b93001f22
+    slack_channel: team-rosa-hulk
+    escalation:
+      type: manager
+      person: dranders
+    components:
+      - addon-operator
+      - ask-sre
+      - certman-operator
+      - clusterimagesets
+      - managed-cluster-config
+      - managed-node-metadata-operator
+      - managed-upgrade-operator
+      - managed-velero-operator
+      - must-gather-operator
+      - ocm-agent
+      - ocm-agent-operator
+      - ops-sop-mirror
+      - package-operator
+  rosa_prod_service_lifecycle_a:
+    display_name: ROSA Service Lifecycle - Team A
+    jira_team_id: 16c10b5d-b9d1-4b9a-949d-39888ef9455a
+    escalation:
+      type: manager
+      person: nreuck
+    components:
+      - acm-operators
+      - addons-service
+  rosa_prod_thor:
+    display_name: ROSA Thor
+    jira_team_id: 51fd486e-45a1-48de-955e-57899973d2b3
+    slack_channel: team-rosa-thor
+    escalation:
+      type: team_lead
+      person: danhall
+    components:
+      - aws-jumpaccounts-terraform
+      - aws-payer-accounts-terraform
+      - backplane-api
+      - backplane-cli
+      - dedicated-admin-operator
+      - managed-cluster-validating-webhooks
+      - rbac-permissions-operator
+      - sre-platform-rhcontrol-terraform
+  rosa_svc_ams:
+    display_name: ROSA AMS
+    jira_team_id: 971fb543-5d1b-4b9b-84f6-e70cb43e24b0
+    escalation:
+      type: manager
+      person: tdrozdow
+    components: []
+  rosa_svc_capa:
+    display_name: ROSA CAPA
+    escalation:
+      type: team_lead
+      person: melserng
+    components:
+      - rosa-capa
+  rosa_svc_cli_terraform:
+    display_name: ROSA CLI/Terraform
+    jira_team_id: a23288d3-e663-4c68-8580-ce719fc78cfc
+    escalation:
+      type: manager
+      person: njean
+    components:
+      - rosa-cli
+      - rosa-tf
+      - terraform-provider-rhcs
+      - terraform-rhcs-rosa-classic
+      - terraform-rhcs-rosa-hcp
+  rosa_svc_coffee:
+    display_name: ROSA Cluster Service Coffee
+    jira_team_id: b1d72bb9-7e1c-4fc4-96f0-44eb3aebea7e
+    escalation:
+      type: team_lead
+      person: gbranco
+    components:
+      - access-transparency
+      - clusters-service
+      - ocm-api-model
+      - ocm-common
+      - ocm-sdk-go
+      - ocm-service-common
+      - rosa-backend-tests
+  rosa_svc_fm:
+    display_name: ROSA Fleet Manager
+    jira_team_id: bd8a0aae-863d-4ea3-a697-028b5043fc08
+    escalation:
+      type: manager
+      person: njean
+    components:
+      - osd-fleet-manager
+  rosa_svc_focaccia:
+    display_name: ROSA Cluster Service Focaccia
+    jira_team_id: 461df7eb-f4e2-4492-84f4-b24ad53f3201
+    escalation:
+      type: team_lead
+      person: adecorte
+    components:
+      - access-transparency
+      - clusters-service
+      - ocm-api-model
+      - ocm-common
+      - ocm-sdk-go
+      - ocm-service-common
+      - rosa-backend-tests
+      - service-log
+  rosa_svc_operators:
+    display_name: ROSA Operators
+    jira_team_id: 375bfc7d-06e7-492d-b1ca-f14d2e0145ea
+    escalation:
+      type: parent_manager
+      person: njean
+    components:
+      - account-manager
+      - cert-manager-operators
+  rosa_trust_engineering_team:
+    display_name: ROSA Trust Engineering Team
+    slack_channel: team-rosa-trust-engineering
+    escalation:
+      type: parent_manager
+      person: kseiter
+    components:
+      - aws-account-operator
+      - aws-vpce-operator
+      - backplane-cli
+      - backplane-tools
+      - configuration-anomaly-detection
+      - configure-goalert-operator
+      - custom-domains-operator
+      - deadmanssnitch-operator
+      - gcp-project-operator
+      - hypershift-dataplane-metrics-forwarder
+      - managed-scripts
+      - ocm-container
+      - osd-aws-privatelink-terraform
+      - osd-aws-privatelink-terraform-rosa
+      - osd-backplane-bastion-infra
+      - osd-metrics-exporter
+      - osdctl
+      - rhobs-configuration
+      - rhobs-synthetics-agent
+      - rhobs-synthetics-api
+      - rosa-boundary
+      - rosa-marketplace-release-generator
+      - route-monitor-operator
+      - splunk-forwarder-images
+      - splunk-forwarder-operator
+      - terraform-aws-s3-bootstrap
+      - terraform-aws-vpc-private
+  rosa_trust_fedramp_core:
+    display_name: ROSA FedRAMP Core
+    jira_team_id: f9ad3210-48ec-40d0-b65a-068bc6f222f3
+    escalation:
+      type: manager
+      person: dbomhof
+    components:
+      - advanced-cluster-security-operator-catalog
+      - keycloak
+  rosa_trust_govcloud_sre:
+    display_name: ROSA GovCloud SRE
+    jira_team_id: 6c51c1cd-5997-4938-8bef-00cbb8168cd9
+    slack_channel: forum-rosa-eng
+    escalation:
+      type: manager
+      person: dfreiber
+    components:
+      - clamav-images
+      - compliance-operator-catalog
+      - configure-goalert-operator
+      - container-security-operator-catalog
+      - dynatrace-config
+      - file-integrity-operator-catalog
+      - goalert
+      - security-tester-images
+  rosa_trust_orange:
+    display_name: ROSA Orange
+    jira_team_id: 48d0de77-cfe4-424a-a34e-2800a9c44862
+    slack_channel: sd-sre-team-orange
+    escalation:
+      type: manager
+      person: evalis
+    components:
+      - backplane-tools
+      - configuration-anomaly-detection
+      - managed-scripts
+      - ocm-container
+      - osdctl
+      - srep-network-toolbox

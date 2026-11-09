@@ -1,0 +1,833 @@
+sippy_url: https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage
+component_prow_filters:
+  aws-account-operator: https://prow.ci.openshift.org/?type=periodic&job=*aws-account-operator*hive-e2e*promotion*
+  aws-vpce-operator: https://prow.ci.openshift.org/?type=periodic&job=*aws-vpce-operator*e2e*promotion*
+  certman-operator: https://prow.ci.openshift.org/?type=periodic&job=*certman-operator*e2e*promotion*
+  cloud-ingress-operator: https://prow.ci.openshift.org/?type=periodic&job=*cloud-ingress-operator*e2e*promotion*
+  clusters-service: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*staging*
+  configure-alertmanager-operator: https://prow.ci.openshift.org/?type=periodic&job=*configure-alertmanager-operator*e2e*promotion*
+  managed-cluster-validating-webhooks: https://prow.ci.openshift.org/?type=periodic&job=*managed-cluster-validating-webhooks*rosa-sts-e2e*promotion*
+  managed-upgrade-operator: https://prow.ci.openshift.org/?type=periodic&job=*managed-upgrade-operator*e2e*promotion*
+  ocm-agent-operator: https://prow.ci.openshift.org/?type=periodic&job=*ocm-agent-operator*e2e*promotion*
+  osd-fleet-manager: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm*
+  osd-metrics-exporter: https://prow.ci.openshift.org/?type=periodic&job=*osd-metrics-exporter*e2e*promotion*
+  rbac-permissions-operator: https://prow.ci.openshift.org/?type=periodic&job=*rbac-permissions-operator*e2e*promotion*
+  route-monitor-operator: https://prow.ci.openshift.org/?type=periodic&job=*route-monitor-operator*e2e*promotion*
+  splunk-forwarder-operator: https://prow.ci.openshift.org/?type=periodic&job=*splunk-forwarder-operator*e2e*promotion*
+categories:
+  - id: rosa-e2e-stg
+    name: ROSA E2E STG
+    scope: platform
+    prow_filter: https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-e2e-main-periodics-*
+    gating: true
+    team:
+      id: 97412673-7d28-430b-bdee-ce3d1eb702b2
+      name: ROSA CI
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
+    labels:
+      - ci-failure
+      - rosa-e2e
+    jobs:
+      - name: HCP 4.19
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-19
+      - name: HCP 4.20
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-20
+      - name: HCP 4.21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-21
+      - name: HCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-22
+      - name: HCP 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-candidate-5-0
+      - name: HCP FIPS 4.19
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-hcp-fips-e2e-staging-stable-4-19
+      - name: HCP FIPS 4.20
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-hcp-fips-e2e-staging-stable-4-20
+      - name: HCP FIPS 4.21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-hcp-fips-e2e-staging-stable-4-21
+      - name: HCP FIPS 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-hcp-fips-e2e-staging-stable-4-22
+      - name: HCP FIPS 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-hcp-fips-e2e-staging-nightly-5-0
+      - name: STS 4.19
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-19
+      - name: STS 4.20
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-20
+      - name: STS 4.21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-21
+      - name: STS 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-22
+      - name: STS FIPS 4.19
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-19
+      - name: STS FIPS 4.20
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-20
+      - name: STS FIPS 4.21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-21
+      - name: STS FIPS 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-22
+      - name: OSD GCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-staging-stable-4-22
+      - name: OSD GCP FIPS 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-osd-gcp-fips-e2e-staging-stable-4-22
+      - name: HCP Upgrade Y-3
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-3
+      - name: HCP Upgrade Y-2
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-2
+      - name: HCP Upgrade Y-1
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-1
+      - name: STS Upgrade Y-3
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-3
+      - name: STS Upgrade Y-2
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-2
+      - name: STS Upgrade Y-1
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-1
+      - name: HCP Private
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-private-staging
+        gating: false
+      - name: HCP PrivateLink Connectivity / MC Health
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-privatelink-connectivity-mc-health-staging
+        gating: false
+      - name: STS PrivateLink
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-privatelink-staging
+        gating: false
+      - name: HCP Hosted Operator Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ho-upgrade-rosa-hcp-ho-upgrade-staging
+        gating: false
+  - id: rosa-e2e-int
+    name: ROSA E2E INT
+    scope: platform
+    prow_filter: https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp*integration*
+    team:
+      id: 97412673-7d28-430b-bdee-ce3d1eb702b2
+      name: ROSA CI
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
+    jobs:
+      - name: HCP 4.20
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-20
+        informing: true
+      - name: HCP 4.21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-21
+        informing: true
+      - name: HCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-22
+        informing: true
+      - name: HCP 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-candidate-5-0
+        informing: true
+      - name: HCP Hosted Operator Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ho-upgrade-rosa-hcp-ho-upgrade-integration
+        informing: true
+  - id: rosa-cx-e2e
+    name: ROSA CX E2E
+    scope: platform
+    prow_filter: https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp-external-oidc-e2e-staging*,*rosa-hcp-e2e-aws-vpc-cni-staging*,*rosa-hcp-kms-e2e-staging*
+    team:
+      id: 97412673-7d28-430b-bdee-ce3d1eb702b2
+      name: ROSA CI
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
+    labels:
+      - ci-failure
+      - rosa-e2e
+    jobs:
+      - name: HCP External OIDC
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-external-oidc-e2e-staging
+      - name: HCP VPC-CNI
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-aws-vpc-cni-staging
+      - name: HCP KMS Encryption
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-kms-e2e-staging
+  - id: capa-e2e-stg
+    name: CAPA E2E STG
+    scope: component
+    components:
+      - cluster-api-provider-aws
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*rosa-e2e-main_capa-e2e*
+    team:
+      id: 47afa339-b9ce-44bc-bd25-3e5b7e0808dd
+      name: '[ROSA] CAPA'
+      slack_channel: team-rosa-capa
+      slack_alias: rosa-capa-team
+    labels:
+      - ci-failure
+      - capa-e2e
+    jobs:
+      - name: CAPA E2E Smoke
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e
+      - name: CAPA E2E Full Lifecycle
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e-full
+      - name: CAPA E2E Smoke 4.21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e-stable-4-21
+      - name: CAPA E2E Full 4.21
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e-stable-4-21-full
+      - name: CAPA E2E Smoke 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e-stable-4-22
+      - name: CAPA E2E Full 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e-stable-4-22-full
+      - name: CAPA E2E Smoke 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e-candidate-5-0
+      - name: CAPA E2E Full 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main_capa-e2e-capa-e2e-candidate-5-0-full
+  - id: rosa-gap-analysis
+    name: GAP E2E
+    scope: platform
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*rosa-gap-analysis-main-periodics*
+    team:
+      id: 97412673-7d28-430b-bdee-ce3d1eb702b2
+      name: ROSA CI
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
+    labels:
+      - ci-failure
+      - gap-analysis
+    jobs:
+      - name: GAP 4.19
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-19
+      - name: GAP 4.20
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-20
+      - name: GAP 4.21
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-21
+      - name: GAP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-4-22
+      - name: GAP 5.0
+        prow_job: periodic-ci-openshift-online-rosa-gap-analysis-main-periodics-nightly-5-0
+  - id: ocm-fvt-hcp-stg
+    name: OCM FVT HCP STG
+    scope: component
+    components:
+      - clusters-service
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-staging*
+    gating: true
+    team:
+      id: 461df7eb-f4e2-4492-84f4-b24ad53f3201
+      name: ROSA Cluster Service Focaccia
+      slack_channel: rosa-coffee-focaccia
+      slack_alias: team-rosa-coffee
+    labels:
+      - ci-failure
+      - ocm-fvt
+      - clusters-service
+    jobs:
+      - name: HCP AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
+      - name: HCP Adobe
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-adobe-staging-main
+      - name: HCP AMD64
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-staging-main
+      - name: HCP AMD64 Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-upgrade-staging-main
+      - name: HCP ARM
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-arm-staging-main
+      - name: HCP Autonode
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-autonode-staging-main
+      - name: HCP E2E
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-hcp-e2e-staging-main
+      - name: HCP PL
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-pl-staging-main
+      - name: HCP Shared VPC
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-shared-vpc-staging-main
+      - name: HCP Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-upgrade-staging-main
+      - name: HCP Y-Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-y-upgrade-staging-main
+      - name: HCP n-X Y-Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-nx-y-upgrade-staging-main
+        gating: false
+      - name: HCP Zero Egress
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-staging-main
+      - name: HCP Zero Egress Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-upgrade-staging-main
+      - name: HCP Access Request
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-access-request-staging-main
+      - name: HCP Sanity
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-staging-main
+      - name: HCP Sanity Jira
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-jira-staging-main
+        gating: false
+      - name: HCP Access Request OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-acc-req-ocp5-lt-rc-staging-main
+      - name: HCP AD OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-ad-ocp5-latest-rc-staging-main
+      - name: HCP Adobe OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-adobe-ocp5-lt-rc-staging-main
+      - name: HCP AMD64 OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-ocp5-lt-rc-staging-main
+      - name: HCP AMD64 Upgrade OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-upg-ocp5-ltrc-staging-main
+      - name: HCP ARM OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-arm-ocp5-latest-rc-staging-main
+      - name: HCP Autonode OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-autonode-ocp5-lt-rc-staging-main
+      - name: HCP E2E OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-hcp-e2e-ocp5-latest-rc-staging-main
+      - name: HCP n-X Y-Upgrade OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-nx-y-upg-ocp5-lt-rc-staging-main
+      - name: HCP PL OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-pl-ocp5-latest-rc-staging-main
+      - name: HCP Sanity OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-ocp5-latest-rc-staging-main
+      - name: HCP Sanity Jira OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-jira-ocp5-staging-main
+        gating: false
+      - name: HCP Resource Cleaner OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-ocp5-resource-cleaner
+        gating: false
+      - name: HCP Shared VPC OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-shvpc-ocp5-lt-rc-staging-main
+      - name: HCP Upgrade OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-upg-ocp5-latest-rc-staging-main
+      - name: HCP Y-Upgrade OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-y-upg-ocp5-lt-rc-staging-main
+      - name: HCP Zero Egress OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egr-ocp5-lt-rc-staging-main
+      - name: HCP Zero Egress Upgrade OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-z-egr-upg-ocp5-ltrc-staging-main
+  - id: ocm-fvt-hcp-int
+    name: OCM FVT HCP INT
+    scope: component
+    components:
+      - clusters-service
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-integration*
+    team:
+      id: 461df7eb-f4e2-4492-84f4-b24ad53f3201
+      name: ROSA Cluster Service Focaccia
+      slack_channel: rosa-coffee-focaccia
+      slack_alias: team-rosa-coffee
+    labels:
+      - ci-failure
+      - ocm-fvt
+      - clusters-service
+    jobs:
+      - name: HCP Autonode
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-autonode-integration-main
+        informing: true
+      - name: HCP Backup Restore
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-rest-integration-main
+        informing: true
+      - name: HCP Backup Scale
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-scale-integration-main
+        informing: true
+      - name: HCP Backup CP Up
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-ip-integration-main
+        informing: true
+      - name: HCP Backup CP In Progress
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-cpupzfin-integration-main
+        informing: true
+      - name: HCP AD Regional
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-ad-integration-regional-main
+        informing: true
+  - id: ocm-fvt-hcp-prd
+    name: OCM FVT HCP PROD
+    scope: component
+    components:
+      - clusters-service
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-production*
+    team:
+      id: 461df7eb-f4e2-4492-84f4-b24ad53f3201
+      name: ROSA Cluster Service Focaccia
+      slack_channel: rosa-coffee-focaccia
+      slack_alias: team-rosa-coffee
+    labels:
+      - ci-failure
+      - ocm-fvt
+      - clusters-service
+    jobs:
+      - name: HCP AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-production-ocm-fvt-periodic-cs-rosa-hcp-ad-production-main
+  - id: ocm-fvt-classic-stg
+    name: OCM FVT Classic STG
+    scope: component
+    components:
+      - clusters-service
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-classic-staging*
+    gating: true
+    team:
+      id: 461df7eb-f4e2-4492-84f4-b24ad53f3201
+      name: ROSA Cluster Service Focaccia
+      slack_channel: rosa-coffee-focaccia
+      slack_alias: team-rosa-coffee
+    labels:
+      - ci-failure
+      - ocm-fvt
+      - clusters-service
+    jobs:
+      - name: ROSA AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-ad-staging-main
+      - name: STS AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-ad-staging-main
+      - name: STS PL
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-pl-staging-main
+      - name: STS Shared VPC
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-shared-vpc-staging-main
+      - name: STS Custom Channel
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-classic-cust-chan-staging-main
+      - name: STS Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-upgrade-staging-main
+      - name: STS n-X Y-Upgrade
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-nx-y-upgrade-staging-main
+      - name: OCM Resources
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-ocm-resources-staging-main
+      - name: OSD RH AWS
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-osd-rh-aws-staging-main
+  - id: ocm-fvt-classic-int
+    name: OCM FVT Classic INT
+    scope: component
+    components:
+      - clusters-service
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-classic-integration*,*ocm-fvt-osd-aws-integration*
+    team:
+      id: 461df7eb-f4e2-4492-84f4-b24ad53f3201
+      name: ROSA Cluster Service Focaccia
+      slack_channel: rosa-coffee-focaccia
+      slack_alias: team-rosa-coffee
+    labels:
+      - ci-failure
+      - ocm-fvt
+      - clusters-service
+    jobs:
+      - name: STS AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-integration-ocm-fvt-periodic-cs-rosa-sts-ad-integration-main
+        informing: true
+      - name: STS Custom Channel
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-integration-ocm-fvt-periodic-cs-rosa-classic-cust-chan-integration-main
+        informing: true
+      - name: OSD CCS AWS AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-aws-integration-ocm-fvt-periodic-cs-osd-ccs-aws-ad-integration-main
+        informing: true
+  - id: ocm-fvt-gcp-stg
+    name: OCM FVT GCP STG
+    scope: component
+    components:
+      - clusters-service
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osd-gcp-staging*
+    gating: true
+    team:
+      id: 461df7eb-f4e2-4492-84f4-b24ad53f3201
+      name: ROSA Cluster Service Focaccia
+      slack_channel: rosa-coffee-focaccia
+      slack_alias: team-rosa-coffee
+    labels:
+      - ci-failure
+      - ocm-fvt
+      - clusters-service
+    jobs:
+      - name: GCP CCS AD
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-ccs-gcp-ad-staging-main
+      - name: GCP Marketplace
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-ccs-gcp-marketplace-staging-main
+      - name: GCP Non-Cross-Proj WIF
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-non-cross-proj-wif-staging-main
+      - name: GCP Root Disk
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-root-disk-staging-main
+      - name: GCP WIF SV
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main
+      - name: GCP PSC WIF SV
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-psc-wif-sv-staging-main
+        gating: false
+      - name: GCP WIF Version Pruning
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-version-pruning-staging-main
+        gating: false
+      - name: GCP Firewall Rules
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-firewall-rules-staging-main
+        gating: false
+  - id: ocm-fvt-osdfm-int
+    name: OCM FVT OSDFM INT
+    scope: component
+    components:
+      - osd-fleet-manager
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm-integration*
+    team:
+      id: bd8a0aae-863d-4ea3-a697-028b5043fc08
+      name: ROSA Fleet Manager
+      slack_channel: team-rosa-fleet-manager
+      slack_alias: team-rosa-fleet-manager
+    labels:
+      - ci-failure
+      - ocm-fvt
+      - osd-fleet-manager
+    jobs:
+      - name: OSDFM Basic Periodic
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-integration-ocm-fvt-periodic-osdfm-basic-periodic-integration
+        informing: true
+      - name: OSDFM MC Autoscaling
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-integration-ocm-fvt-periodic-osdfm-mc-autoscaling-integration
+        informing: true
+      - name: OSDFM SC Autoscaling
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-integration-ocm-fvt-periodic-osdfm-sc-autoscaling-integration
+        informing: true
+  - id: ocm-fvt-osdfm-stg
+    name: OCM FVT OSDFM STG
+    scope: component
+    components:
+      - osd-fleet-manager
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm-staging*
+    gating: true
+    team:
+      id: bd8a0aae-863d-4ea3-a697-028b5043fc08
+      name: ROSA Fleet Manager
+      slack_channel: team-rosa-fleet-manager
+      slack_alias: team-rosa-fleet-manager
+    labels:
+      - ci-failure
+      - ocm-fvt
+      - osd-fleet-manager
+    jobs:
+      - name: OSDFM Basic Periodic
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-staging-ocm-fvt-periodic-osdfm-basic-periodic-stage
+  - id: hypershift-ci
+    name: HyperShift CI
+    scope: component
+    components:
+      - hypershift
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*hypershift-ci*
+    team:
+      id: a5267ed5-eaa8-4cd6-90e3-d0ce145dbfbf
+      name: ROSA HCP Platform
+      slack_channel: team-rosa-hcp-platform
+      slack_alias: team-rosa-hcp-platform
+    labels:
+      - ci-failure
+      - hypershift-ci
+    jobs:
+      - name: INT HCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-hypershift-ci-rosa-hcp-e2e-integration-stable-4-22
+        informing: true
+      - name: STG HCP 4.22
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-hypershift-ci-rosa-hcp-e2e-staging-stable-4-22
+  - id: hcp-conformance
+    name: HCP Conformance
+    scope: upstream
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-hcp-ovn
+    team:
+      id: 97412673-7d28-430b-bdee-ce3d1eb702b2
+      name: ROSA CI
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
+    labels:
+      - ci-failure
+      - conformance
+    jobs:
+      - name: HCP 4.19
+        prow_job: periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-hcp-ovn
+      - name: HCP 4.20
+        prow_job: periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-hcp-ovn
+      - name: HCP 4.21
+        prow_job: periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-hcp-ovn
+      - name: HCP 4.22
+        prow_job: periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-hcp-ovn
+      - name: HCP 5.0
+        prow_job: periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn
+      - name: HCP 5.1
+        prow_job: periodic-ci-openshift-release-main-nightly-5.1-e2e-rosa-hcp-ovn
+  - id: classic-conformance
+    name: Classic STS Conformance
+    scope: upstream
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-sts-ovn
+    team:
+      id: 97412673-7d28-430b-bdee-ce3d1eb702b2
+      name: ROSA CI
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
+    labels:
+      - ci-failure
+      - conformance
+    jobs:
+      - name: STS 4.19
+        prow_job: periodic-ci-openshift-release-main-nightly-4.19-e2e-rosa-sts-ovn
+      - name: STS 4.20
+        prow_job: periodic-ci-openshift-release-main-nightly-4.20-e2e-rosa-sts-ovn
+      - name: STS 4.21
+        prow_job: periodic-ci-openshift-release-main-nightly-4.21-e2e-rosa-sts-ovn
+      - name: STS 4.22
+        prow_job: periodic-ci-openshift-release-main-nightly-4.22-e2e-rosa-sts-ovn
+  - id: rosa-cli-jobs
+    name: ROSA CLI E2E
+    scope: component
+    components:
+      - rosa-cli
+    prow_filter: https://prow.ci.openshift.org/?repo=openshift%2Frosa&type=periodic
+    team:
+      id: a23288d3-e663-4c68-8580-ce719fc78cfc
+      name: ROSA CLI/Terraform
+      slack_channel: ocm-qe-prow-ci-jobs
+      slack_alias: rosa-cli-tf-team
+    labels:
+      - ci-failure
+      - rosa-cli
+    jobs:
+      - name: Day-1 Negative
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-day1-negative-f7
+      - name: Day-1 Supplemental
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-day1-supplemental-f3
+      - name: HCP ARM
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-arm-f7
+      - name: HCP Advanced
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-f3
+      - name: HCP Advanced Regional
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-advanced-regional-f3
+        informing: true
+      - name: HCP External Auth
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-external-auth-f3
+      - name: HCP Private Link
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-private-link-f3
+      - name: HCP Shared VPC
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-shared-vpc-f3
+      - name: HCP Upgrade Y-Stream
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-upgrade-y-stream-f3
+      - name: HCP Upgrade Z-Stream
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-hcp-upgrade-z-stream-f3
+      - name: Non-STS Advanced (Critical/High)
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-non-sts-advanced-critical-high-f3
+      - name: Non-STS Upgrade Y-Stream
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-non-sts-upgrade-y-stream-f7
+      - name: OCM Resources
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-ocm-resources-f3
+      - name: STS Advanced
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-advanced-f3
+      - name: STS Hibernation
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-hibernation-f14
+      - name: STS Private Link
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-private-link-f3
+      - name: STS Shared VPC
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-shared-vpc-f3
+      - name: STS Shared VPC Upgrade Y-Stream
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-shared-vpc-upgrade-y-stream-f3
+      - name: STS Upgrade Y-Stream
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-upgrade-y-stream-f3
+      - name: STS Upgrade Z-Stream
+        prow_job: periodic-ci-openshift-rosa-master-e2e-rosa-sts-upgrade-z-stream-f3
+  - id: sre-operator-e2e
+    name: SRE Operator E2E
+    scope: component
+    components:
+      - certman-operator
+      - cloud-ingress-operator
+      - rbac-permissions-operator
+      - route-monitor-operator
+      - configure-alertmanager-operator
+      - aws-vpce-operator
+      - managed-upgrade-operator
+      - ocm-agent-operator
+      - osd-metrics-exporter
+      - splunk-forwarder-operator
+      - aws-account-operator
+      - managed-cluster-validating-webhooks
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*operator*e2e*promotion*
+    team:
+      id: a0f44498-f22b-4cd4-a98f-f298cc375a94
+      name: MCS Rocket
+      slack_channel: wg-rosa-cicd
+      slack_alias: rosa-release-assurance-team
+    labels:
+      - ci-failure
+      - sre-operator
+    jobs:
+      - name: RMO Promotion INT
+        prow_job: periodic-ci-openshift-route-monitor-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
+        labels:
+          - route-monitor-operator
+      - name: RMO Promotion STG
+        prow_job: periodic-ci-openshift-route-monitor-operator-master-rosa-sts-e2e-promotion-stage
+        gating: true
+        labels:
+          - route-monitor-operator
+      - name: CAMO Promotion INT
+        prow_job: periodic-ci-openshift-configure-alertmanager-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
+        labels:
+          - configure-alertmanager-operator
+      - name: CAMO Promotion STG
+        prow_job: periodic-ci-openshift-configure-alertmanager-operator-master-rosa-sts-e2e-promotion-stage
+        gating: true
+        labels:
+          - configure-alertmanager-operator
+      - name: MUO Promotion INT
+        prow_job: periodic-ci-openshift-managed-upgrade-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
+        labels:
+          - managed-upgrade-operator
+      - name: MUO Promotion STG
+        prow_job: periodic-ci-openshift-managed-upgrade-operator-master-rosa-sts-e2e-promotion-stage
+        gating: true
+        labels:
+          - managed-upgrade-operator
+      - name: OAO Promotion INT
+        prow_job: periodic-ci-openshift-ocm-agent-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
+        labels:
+          - ocm-agent-operator
+      - name: OAO Promotion STG
+        prow_job: periodic-ci-openshift-ocm-agent-operator-master-rosa-sts-e2e-promotion-stage
+        gating: true
+        labels:
+          - ocm-agent-operator
+      - name: OME Promotion INT
+        prow_job: periodic-ci-openshift-osd-metrics-exporter-main-rosa-sts-e2e-promotion-int
+        informing: true
+        labels:
+          - osd-metrics-exporter
+      - name: OME Promotion STG
+        prow_job: periodic-ci-openshift-osd-metrics-exporter-main-rosa-sts-e2e-promotion-stage
+        gating: true
+        labels:
+          - osd-metrics-exporter
+      - name: SFO Promotion INT
+        prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
+        labels:
+          - splunk-forwarder-operator
+      - name: SFO Promotion STG
+        prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-rosa-sts-e2e-promotion-stage
+        gating: true
+        labels:
+          - splunk-forwarder-operator
+      - name: Certman Promotion INT
+        prow_job: periodic-ci-openshift-certman-operator-master-hive-e2e-promotion-int
+        informing: true
+        labels:
+          - certman-operator
+      - name: Certman Promotion STG
+        prow_job: periodic-ci-openshift-certman-operator-master-hive-e2e-promotion-stage
+        gating: true
+        labels:
+          - certman-operator
+      - name: CIO Promotion INT
+        prow_job: periodic-ci-openshift-cloud-ingress-operator-master-rosa-osd-aws-e2e-promotion-int
+        informing: true
+        labels:
+          - cloud-ingress-operator
+      - name: CIO Promotion STG
+        prow_job: periodic-ci-openshift-cloud-ingress-operator-master-rosa-osd-aws-e2e-promotion-stage
+        gating: true
+        labels:
+          - cloud-ingress-operator
+      - name: RPO Promotion INT
+        prow_job: periodic-ci-openshift-rbac-permissions-operator-master-rosa-sts-e2e-promotion-int
+        informing: true
+        labels:
+          - rbac-permissions-operator
+      - name: RPO Promotion STG
+        prow_job: periodic-ci-openshift-rbac-permissions-operator-master-rosa-sts-e2e-promotion-stage
+        gating: true
+        labels:
+          - rbac-permissions-operator
+      - name: AAO Promotion INT
+        prow_job: periodic-ci-openshift-aws-account-operator-master-hive-e2e-promotion-int
+        informing: true
+        labels:
+          - aws-account-operator
+      - name: AAO Promotion STG
+        prow_job: periodic-ci-openshift-aws-account-operator-master-hive-e2e-promotion-stage
+        gating: true
+        labels:
+          - aws-account-operator
+      - name: MCVW Promotion INT
+        prow_job: periodic-ci-openshift-managed-cluster-validating-webhooks-master-rosa-sts-e2e-promotion-int
+        informing: true
+        labels:
+          - managed-cluster-validating-webhooks
+      - name: MCVW Promotion STG
+        prow_job: periodic-ci-openshift-managed-cluster-validating-webhooks-master-rosa-sts-e2e-promotion-stage
+        gating: true
+        labels:
+          - managed-cluster-validating-webhooks
+      - name: RMO GCP INT
+        prow_job: periodic-ci-openshift-route-monitor-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
+        labels:
+          - route-monitor-operator
+      - name: RMO GCP STG
+        prow_job: periodic-ci-openshift-route-monitor-operator-master-osd-gcp-e2e-promotion-stage
+        gating: true
+        labels:
+          - route-monitor-operator
+      - name: CAMO GCP INT
+        prow_job: periodic-ci-openshift-configure-alertmanager-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
+        labels:
+          - configure-alertmanager-operator
+      - name: CAMO GCP STG
+        prow_job: periodic-ci-openshift-configure-alertmanager-operator-master-osd-gcp-e2e-promotion-stage
+        gating: true
+        labels:
+          - configure-alertmanager-operator
+      - name: MUO GCP INT
+        prow_job: periodic-ci-openshift-managed-upgrade-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
+        labels:
+          - managed-upgrade-operator
+      - name: MUO GCP STG
+        prow_job: periodic-ci-openshift-managed-upgrade-operator-master-osd-gcp-e2e-promotion-stage
+        gating: true
+        labels:
+          - managed-upgrade-operator
+      - name: OAO GCP INT
+        prow_job: periodic-ci-openshift-ocm-agent-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
+        labels:
+          - ocm-agent-operator
+      - name: OAO GCP STG
+        prow_job: periodic-ci-openshift-ocm-agent-operator-master-osd-gcp-e2e-promotion-stage
+        gating: true
+        labels:
+          - ocm-agent-operator
+      - name: SFO GCP INT
+        prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-osd-gcp-e2e-promotion-int
+        informing: true
+        labels:
+          - splunk-forwarder-operator
+      - name: SFO GCP STG
+        prow_job: periodic-ci-openshift-splunk-forwarder-operator-master-osd-gcp-e2e-promotion-stage
+        gating: true
+        labels:
+          - splunk-forwarder-operator
+  - id: terraform-provider-rhcs-jobs
+    name: ROSA TF E2E
+    scope: component
+    components:
+      - terraform-provider-rhcs
+    prow_filter: https://prow.ci.openshift.org/?repo=terraform-redhat%2Fterraform-provider-rhcs&type=periodic
+    team:
+      id: a23288d3-e663-4c68-8580-ce719fc78cfc
+      name: ROSA CLI/Terraform
+      slack_channel: ocm-qe-prow-ci-jobs
+      slack_alias: rosa-cli-tf-team
+    labels:
+      - ci-failure
+      - terraform-provider-rhcs
+    jobs:
+      - name: Day-1 Supplemental
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-day1-supplemental-f3
+      - name: HCP Advanced
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-advanced-f3
+      - name: HCP Arm
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-arm-f7
+      - name: HCP Encryption
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-encryption-f7
+      - name: HCP Full Resources
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-full-resource-f7
+      - name: HCP Network
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-network-f7
+      - name: HCP Private
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-private-f3
+      - name: HCP Upgrade Y-Stream
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-upgrade-y-f7
+      - name: HCP Upgrade Z-Stream
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-upgrade-z-f7
+      - name: STS Advanced
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-f3
+      - name: STS Advanced (Day-1 Negative)
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-day1-negative-f7
+      - name: STS Classic Full Resources
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-classic-full-resource-f7
+      - name: STS Private
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-f3
+      - name: STS Private (Day-1 Negative)
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-day1-negative-f7
+      - name: STS Shared VPC
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-shared-vpc-f3
+      - name: STS Upgrade Y-Stream
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-upgrade-y-f7
+      - name: STS Upgrade Z-Stream
+        prow_job: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-upgrade-z-f7

@@ -1,9 +1,17 @@
-# ci-status-jobs.yaml -- Single source of truth for ROSA CI daily status tracking.
+# ci-status-jobs.yaml -- Lean source for ROSA CI daily status tracking.
 #
-# The chai-bot rosa_ci_daily_health_report scheduled task fetches this file to
-# determine which Prow jobs to check and how to group them in the daily Slack
-# health report. The rosa-eng-dashboard also fetches this file to build CI
-# health views and component mappings.
+# This is the hand-edited lean form. Team identity (Jira team ID, display
+# name) is NOT stored here: each category references a team by org file name
+# (the keys in configs/generated/org-teams.yaml, vendored from
+# hybrid-platforms/org). `make configs` resolves this file plus the snapshot
+# into configs/generated/ci-status-jobs.yaml, which is what the
+# chai-bot rosa_ci_daily_health_report task and rosa-eng-dashboard fetch.
+# `make configs-snapshot` regenerates the snapshot from a local org checkout
+# (ORG_REPO, default ../org) after org team data changes.
+#
+# slack_channel/slack_alias on a category are overrides that win over the
+# org snapshot; drop them once the org team file carries the right channel.
+# Teams the org repo does not describe yet live under stopgaps: below.
 #
 # To add a new job: add an entry under the appropriate category.
 # To add a new category: add a new top-level entry to the categories list.
@@ -19,14 +27,12 @@
 #              platform tests contributes to every component's health indicator.
 #   upstream:  Tests upstream OCP/HyperShift. Shown in exec summary only.
 #
-# gating: true marks a category or job as a production release gate: its
-#   staging results block promotion of the release bundle (bundle.yaml) to
-#   production. Set at category level = every job in the category gates. Set at
-#   job level = only that job gates (used where a category mixes gating and
-#   non-gating jobs, e.g. STG vs INT promotion jobs). A job-level gating value
-#   overrides the category default, so gating: false opts a single job out of a
-#   gating category. Jobs without gating are informational signal only.
-#   Tracked in ROSAENG-62472.
+# gating is explicit on every category: true marks a production release gate
+#   (staging results block promotion of the release bundle (bundle.yaml) to
+#   production); false is informational signal only. Set at category level =
+#   every job in the category. A job-level gating value overrides the category
+#   default, so gating: false opts a single job out of a gating category (used
+#   where a category mixes gating and non-gating jobs). Tracked in ROSAENG-62472.
 #
 # informing: true marks a job as informing signal in the OCP CI sense
 #   (blocking vs informing): the job still runs and its latest result is
@@ -57,17 +63,36 @@ component_prow_filters:
   aws-account-operator: "https://prow.ci.openshift.org/?type=periodic&job=*aws-account-operator*hive-e2e*promotion*"
   managed-cluster-validating-webhooks: "https://prow.ci.openshift.org/?type=periodic&job=*managed-cluster-validating-webhooks*rosa-sts-e2e*promotion*"
 
+
+# Interim team identity for teams the org repo does not describe yet
+# (ROSAENG-75792 org backfill). Keyed by the org file name the team will
+# get, so deleting an entry once the org file lands is the whole migration.
+# The registry lint stays warn-only while any stopgap exists.
+stopgaps:
+  rosa_trust_release_assurance:
+    display_name: ROSA CI
+    jira_team_id: 97412673-7d28-430b-bdee-ce3d1eb702b2
+    slack_channel: wg-rosa-cicd
+    slack_alias: rosa-release-assurance-team
+    remove_by: "2026-11-20"
+    reason: org team file lands with the 2026-11-13 reorg update (ROSAENG-75792)
+  rosa_svc_capa:
+    display_name: "[ROSA] CAPA"
+    jira_team_id: 47afa339-b9ce-44bc-bd25-3e5b7e0808dd
+    slack_channel: team-rosa-capa
+    slack_alias: rosa-capa-team
+    remove_by: "2026-11-20"
+    reason: org rosa_svc_capa has no Atlassian team resource yet (ROSAENG-75792)
+
 categories:
   - id: rosa-e2e-stg
     scope: platform
     name: ROSA E2E STG
     gating: true
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-e2e-main-periodics-*"
-    team: &rosa_e2e_team
-      id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
-      name: ROSA CI
-      slack_channel: wg-rosa-cicd
-      slack_alias: rosa-release-assurance-team
+    team: rosa_trust_release_assurance
+    slack_channel: wg-rosa-cicd
+    slack_alias: rosa-release-assurance-team
     labels: [ci-failure, rosa-e2e]
     jobs:
       # HCP
@@ -144,7 +169,10 @@ categories:
   - id: rosa-e2e-int
     scope: platform
     name: ROSA E2E INT
-    team: *rosa_e2e_team
+    gating: false
+    team: rosa_trust_release_assurance
+    slack_channel: wg-rosa-cicd
+    slack_alias: rosa-release-assurance-team
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp*integration*"
     jobs:
       - name: HCP 4.20
@@ -166,11 +194,10 @@ categories:
   - id: rosa-cx-e2e
     scope: platform
     name: ROSA CX E2E
-    team:
-      id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
-      name: ROSA CI
-      slack_channel: wg-rosa-cicd
-      slack_alias: rosa-release-assurance-team
+    gating: false
+    team: rosa_trust_release_assurance
+    slack_channel: wg-rosa-cicd
+    slack_alias: rosa-release-assurance-team
     labels: [ci-failure, rosa-e2e]
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp-external-oidc-e2e-staging*,*rosa-hcp-e2e-aws-vpc-cni-staging*,*rosa-hcp-kms-e2e-staging*"
     jobs:
@@ -186,11 +213,10 @@ categories:
     components: [cluster-api-provider-aws]
     name: CAPA E2E STG
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-e2e-main_capa-e2e*"
-    team:
-      id: "47afa339-b9ce-44bc-bd25-3e5b7e0808dd"
-      name: "[ROSA] CAPA"
-      slack_channel: team-rosa-capa
-      slack_alias: rosa-capa-team
+    gating: false
+    team: rosa_svc_capa
+    slack_channel: team-rosa-capa
+    slack_alias: rosa-capa-team
     labels: [ci-failure, capa-e2e]
     jobs:
       - name: CAPA E2E Smoke
@@ -213,11 +239,10 @@ categories:
   - id: rosa-gap-analysis
     scope: platform
     name: GAP E2E
-    team:
-      id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
-      name: ROSA CI
-      slack_channel: wg-rosa-cicd
-      slack_alias: rosa-release-assurance-team
+    gating: false
+    team: rosa_trust_release_assurance
+    slack_channel: wg-rosa-cicd
+    slack_alias: rosa-release-assurance-team
     labels: [ci-failure, gap-analysis]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*rosa-gap-analysis-main-periodics*"
     jobs:
@@ -237,11 +262,9 @@ categories:
     components: [clusters-service]
     name: OCM FVT HCP STG
     gating: true
-    team:
-      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
-      name: ROSA Coffee Focaccia
-      slack_channel: rosa-coffee-focaccia
-      slack_alias: team-rosa-coffee
+    team: rosa_svc_focaccia
+    slack_channel: rosa-coffee-focaccia
+    slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-staging*"
     jobs:
@@ -325,11 +348,10 @@ categories:
     scope: component
     components: [clusters-service]
     name: OCM FVT HCP INT
-    team:
-      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
-      name: ROSA Coffee Focaccia
-      slack_channel: rosa-coffee-focaccia
-      slack_alias: team-rosa-coffee
+    gating: false
+    team: rosa_svc_focaccia
+    slack_channel: rosa-coffee-focaccia
+    slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-integration*"
     jobs:
@@ -356,11 +378,10 @@ categories:
     scope: component
     components: [clusters-service]
     name: OCM FVT HCP PROD
-    team:
-      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
-      name: ROSA Coffee Focaccia
-      slack_channel: rosa-coffee-focaccia
-      slack_alias: team-rosa-coffee
+    gating: false
+    team: rosa_svc_focaccia
+    slack_channel: rosa-coffee-focaccia
+    slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-hcp-production*"
     jobs:
@@ -372,11 +393,9 @@ categories:
     components: [clusters-service]
     name: OCM FVT Classic STG
     gating: true
-    team:
-      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
-      name: ROSA Coffee Focaccia
-      slack_channel: rosa-coffee-focaccia
-      slack_alias: team-rosa-coffee
+    team: rosa_svc_focaccia
+    slack_channel: rosa-coffee-focaccia
+    slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-classic-staging*"
     jobs:
@@ -403,11 +422,10 @@ categories:
     scope: component
     components: [clusters-service]
     name: OCM FVT Classic INT
-    team:
-      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
-      name: ROSA Coffee Focaccia
-      slack_channel: rosa-coffee-focaccia
-      slack_alias: team-rosa-coffee
+    gating: false
+    team: rosa_svc_focaccia
+    slack_channel: rosa-coffee-focaccia
+    slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-rosa-classic-integration*,*ocm-fvt-osd-aws-integration*"
     jobs:
@@ -426,11 +444,9 @@ categories:
     components: [clusters-service]
     name: OCM FVT GCP STG
     gating: true
-    team:
-      id: "461df7eb-f4e2-4492-84f4-b24ad53f3201"
-      name: ROSA Coffee Focaccia
-      slack_channel: rosa-coffee-focaccia
-      slack_alias: team-rosa-coffee
+    team: rosa_svc_focaccia
+    slack_channel: rosa-coffee-focaccia
+    slack_alias: team-rosa-coffee
     labels: [ci-failure, ocm-fvt, clusters-service]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osd-gcp-staging*"
     jobs:
@@ -458,11 +474,10 @@ categories:
     scope: component
     components: [osd-fleet-manager]
     name: OCM FVT OSDFM INT
-    team:
-      id: "bd8a0aae-863d-4ea3-a697-028b5043fc08"
-      name: ROSA Fleet Manager
-      slack_channel: team-rosa-fleet-manager
-      slack_alias: team-rosa-fleet-manager
+    gating: false
+    team: rosa_svc_fm
+    slack_channel: team-rosa-fleet-manager
+    slack_alias: team-rosa-fleet-manager
     labels: [ci-failure, ocm-fvt, osd-fleet-manager]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm-integration*"
     jobs:
@@ -481,11 +496,9 @@ categories:
     components: [osd-fleet-manager]
     name: OCM FVT OSDFM STG
     gating: true
-    team:
-      id: "bd8a0aae-863d-4ea3-a697-028b5043fc08"
-      name: ROSA Fleet Manager
-      slack_channel: team-rosa-fleet-manager
-      slack_alias: team-rosa-fleet-manager
+    team: rosa_svc_fm
+    slack_channel: team-rosa-fleet-manager
+    slack_alias: team-rosa-fleet-manager
     labels: [ci-failure, ocm-fvt, osd-fleet-manager]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt-osdfm-staging*"
     jobs:
@@ -496,11 +509,10 @@ categories:
     scope: component
     components: [hypershift]
     name: HyperShift CI
-    team:
-      id: "a5267ed5-eaa8-4cd6-90e3-d0ce145dbfbf"
-      name: ROSA HCP Platform
-      slack_channel: team-rosa-hcp-platform
-      slack_alias: team-rosa-hcp-platform
+    gating: false
+    team: rosa_hcp_platform
+    slack_channel: team-rosa-hcp-platform
+    slack_alias: team-rosa-hcp-platform
     labels: [ci-failure, hypershift-ci]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*hypershift-ci*"
     jobs:
@@ -513,11 +525,10 @@ categories:
   - id: hcp-conformance
     scope: upstream
     name: HCP Conformance
-    team:
-      id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
-      name: ROSA CI
-      slack_channel: wg-rosa-cicd
-      slack_alias: rosa-release-assurance-team
+    gating: false
+    team: rosa_trust_release_assurance
+    slack_channel: wg-rosa-cicd
+    slack_alias: rosa-release-assurance-team
     labels: [ci-failure, conformance]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-hcp-ovn"
     jobs:
@@ -537,11 +548,10 @@ categories:
   - id: classic-conformance
     scope: upstream
     name: Classic STS Conformance
-    team:
-      id: "97412673-7d28-430b-bdee-ce3d1eb702b2"
-      name: ROSA CI
-      slack_channel: wg-rosa-cicd
-      slack_alias: rosa-release-assurance-team
+    gating: false
+    team: rosa_trust_release_assurance
+    slack_channel: wg-rosa-cicd
+    slack_alias: rosa-release-assurance-team
     labels: [ci-failure, conformance]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-sts-ovn"
     jobs:
@@ -558,11 +568,10 @@ categories:
     scope: component
     components: [rosa-cli]
     name: ROSA CLI E2E
-    team:
-      id: "a23288d3-e663-4c68-8580-ce719fc78cfc"
-      name: ROSA CLI/Terraform
-      slack_channel: ocm-qe-prow-ci-jobs
-      slack_alias: rosa-cli-tf-team
+    gating: false
+    team: rosa_svc_cli_terraform
+    slack_channel: ocm-qe-prow-ci-jobs
+    slack_alias: rosa-cli-tf-team
     labels: [ci-failure, rosa-cli]
     prow_filter: "https://prow.ci.openshift.org/?repo=openshift%2Frosa&type=periodic"
     jobs:
@@ -612,11 +621,10 @@ categories:
     scope: component
     components: [certman-operator, cloud-ingress-operator, rbac-permissions-operator, route-monitor-operator, configure-alertmanager-operator, aws-vpce-operator, managed-upgrade-operator, ocm-agent-operator, osd-metrics-exporter, splunk-forwarder-operator, aws-account-operator, managed-cluster-validating-webhooks]
     name: SRE Operator E2E
-    team:
-      id: "a0f44498-f22b-4cd4-a98f-f298cc375a94"
-      name: ROSA Rocket
-      slack_channel: wg-rosa-cicd
-      slack_alias: rosa-release-assurance-team
+    gating: false
+    team: mcs_rocket
+    slack_channel: wg-rosa-cicd
+    slack_alias: rosa-release-assurance-team
     labels: [ci-failure, sre-operator]
     prow_filter: "https://prow.ci.openshift.org/?type=periodic&job=*operator*e2e*promotion*"
     jobs:
@@ -756,11 +764,10 @@ categories:
     scope: component
     components: [terraform-provider-rhcs]
     name: ROSA TF E2E
-    team:
-      id: "a23288d3-e663-4c68-8580-ce719fc78cfc"
-      name: ROSA CLI/Terraform
-      slack_channel: ocm-qe-prow-ci-jobs
-      slack_alias: rosa-cli-tf-team
+    gating: false
+    team: rosa_svc_cli_terraform
+    slack_channel: ocm-qe-prow-ci-jobs
+    slack_alias: rosa-cli-tf-team
     labels: [ci-failure, terraform-provider-rhcs]
     prow_filter: "https://prow.ci.openshift.org/?repo=terraform-redhat%2Fterraform-provider-rhcs&type=periodic"
     jobs:

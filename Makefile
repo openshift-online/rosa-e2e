@@ -1,8 +1,15 @@
-.PHONY: build test dry-run unit-test lint image clean
+.PHONY: build test dry-run unit-test lint image clean configs configs-snapshot
 
 GINKGO = go run github.com/onsi/ginkgo/v2/ginkgo
 LABEL_FILTER ?=
 GOLANGCI_LINT = $(shell go env GOPATH)/bin/golangci-lint
+ORG_REPO ?= ../org
+
+configs:
+	go run ./cmd/configgen resolve
+
+configs-snapshot:
+	go run ./cmd/configgen snapshot -org $(ORG_REPO)
 
 build:
 	$(GINKGO) build --tags E2Etests ./test/e2e/

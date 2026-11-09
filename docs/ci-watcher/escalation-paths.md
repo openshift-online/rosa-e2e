@@ -87,3 +87,19 @@ TRT reports ROSA conformance failures by pinging `@rosa-ci-watcher` in [#wg-hcm-
 - **Watcher rotation issues**: [ROSAENG-394](https://redhat.atlassian.net/browse/ROSAENG-394) (CI Watcher Role)
 - Include the job name, build ID, Prow link, and failure classification in every Jira story
 - Assign to the owning team based on the classification matrix above
+
+## CI job category ownership
+
+Category ownership is registry data, not a person table: each category in `configs/ci-status-jobs.yaml` references a team in the hybrid-platforms/org repo, and the vendored snapshot `configs/generated/org-teams.yaml` carries the Jira team ID, Slack channel, and escalation contact (team lead, else manager). The permafail ladder pings that escalation contact automatically when a team misses its clocks.
+
+## Build-farm / Prow infrastructure issues -> DPTP
+
+Not every CI failure is a ROSA-side problem. Build-farm/Prow infrastructure issues - `initializing_namespace` races, build0N cluster auth outages, DNS/proxy failures reaching backplane, ci-operator namespace/lease contention - are owned by DPTP (Developer Productivity Test Platform), not any ROSA team.
+
+**Don't just write these off as "transient, no action."** They recur, and without a tracked DPTP issue there's no owner and no way to distinguish a one-off blip from a systemic build-farm regression. When you hit one:
+
+1. Ask `@chai-bot` in the relevant thread to search for an existing DPTP issue for the same failure signature, and open one if none exists.
+2. If it's urgent (broad job impact, not just one PR), escalate directly in `#forum-ocp-testplatform` and ping `@dptp-triage`.
+3. Note the DPTP ticket in whatever Jira you filed on the ROSA side so the two are cross-linked.
+
+DPTP response times for helpdesk pings are not fast, so file/link the Jira regardless of whether a human has replied yet.
