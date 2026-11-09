@@ -89,6 +89,46 @@ func VerifyNodePoolHealthy(ctx context.Context, dynamicClient dynamic.Interface,
 	return nil
 }
 
+// VerifyNodePoolAutoScaling verifies that the NodePool CR for the given node
+// pool has autoscaling configured with the expected min and max bounds.
+// Accepts both the minSize/maxSize and min/max spec spellings used across
+// hypershift versions.
+func VerifyNodePoolAutoScaling(ctx context.Context, dynamicClient dynamic.Interface, namespace, nodePoolID string, minReplicas, maxReplicas int) error {
+	np, err := dynamicClient.Resource(nodePoolGVR).Namespace(namespace).Get(ctx, nodePoolID, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("getting NodePool %s/%s: %w", namespace, nodePoolID, err)
+	}
+
+	min, found, err := unstructured.NestedInt64(np.Object, "spec", "autoScaling", "minSize")
+	if !found {
+		min, found, err = unstructured.NestedInt64(np.Object, "spec", "autoScaling", "min")
+	}
+	if err != nil {
+		return fmt.Errorf("reading autoScaling min of NodePool %s/%s: %w", namespace, nodePoolID, err)
+	}
+	if !found {
+		return fmt.Errorf("NodePool %s/%s has no autoScaling in spec", namespace, nodePoolID)
+	}
+
+	max, found, err := unstructured.NestedInt64(np.Object, "spec", "autoScaling", "maxSize")
+	if !found {
+		max, found, err = unstructured.NestedInt64(np.Object, "spec", "autoScaling", "max")
+	}
+	if err != nil {
+		return fmt.Errorf("reading autoScaling max of NodePool %s/%s: %w", namespace, nodePoolID, err)
+	}
+	if !found {
+		return fmt.Errorf("NodePool %s/%s has no autoScaling in spec", namespace, nodePoolID)
+	}
+
+	if min != int64(minReplicas) || max != int64(maxReplicas) {
+		return fmt.Errorf("NodePool %s/%s autoScaling bounds (min=%d, max=%d) do not match expected (min=%d, max=%d)",
+			namespace, nodePoolID, min, max, minReplicas, maxReplicas)
+	}
+
+	return nil
+}
+
 func verifyConditions(obj *unstructured.Unstructured, kind, namespace, name string) error {
 	conditions, found, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
 	if err != nil {

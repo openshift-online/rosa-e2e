@@ -19,6 +19,7 @@ import (
 
 	"github.com/openshift-online/rosa-e2e/pkg/framework"
 	"github.com/openshift-online/rosa-e2e/pkg/labels"
+	"github.com/openshift-online/rosa-e2e/pkg/verifiers"
 )
 
 const (
@@ -86,6 +87,19 @@ var _ = Describe("Customer Features: HCP Node Pool Autoscaling",
 				return np.Status().CurrentReplicas()
 			}).WithContext(ctx).WithTimeout(20 * time.Minute).WithPolling(30 * time.Second).
 				Should(Equal(autoscalingMinNodes))
+
+			if tc.HasMCAccess() {
+				By("Verifying autoscaling bounds on the NodePool CR in the management cluster")
+				Expect(tc.InitMCClients()).To(Succeed())
+				ns := tc.HCPNamespaces()
+				Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+				Expect(verifiers.VerifyNodePoolAutoScaling(ctx, tc.MCDynamicClient(), ns.HCNamespace,
+					created.ID(), autoscalingMinNodes, autoscalingMaxNodes)).To(Succeed())
+				GinkgoWriter.Printf("NodePool %s/%s has autoScaling min=%d max=%d\n",
+					ns.HCNamespace, created.ID(), autoscalingMinNodes, autoscalingMaxNodes)
+			} else {
+				GinkgoWriter.Println("MANAGEMENT_CLUSTER_ID not configured, skipping NodePool CR verification")
+			}
 
 			By("Initializing hosted cluster clients")
 			Expect(tc.InitHCClients()).To(Succeed())
