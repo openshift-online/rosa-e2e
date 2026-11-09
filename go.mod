@@ -6,9 +6,9 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.47.7
 	github.com/aws/aws-sdk-go-v2/config v1.33.15
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.65.10
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.343.0
-	github.com/aws/aws-sdk-go-v2/service/kms v1.44.0
-	github.com/onsi/ginkgo/v2 v2.33.1
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.344.1
+	github.com/aws/aws-sdk-go-v2/service/kms v1.62.4
+	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/openshift-eng/openshift-tests-extension v0.0.0-20261026111431-8782e72e5a1f
 	github.com/openshift-online/ocm-sdk-go v0.1.520
