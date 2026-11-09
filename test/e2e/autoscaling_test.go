@@ -77,6 +77,11 @@ var _ = Describe("HCP Node Pool Autoscaling",
 			DeferCleanup(func(ctx context.Context) {
 				By("Deleting the autoscaling node pool")
 				Expect(framework.DeleteNodePool(ctx, tc.Connection(), cfg.ClusterID, created.ID())).To(Succeed())
+				// Wait until the pool is actually gone: the delete request
+				// returns before deletion completes, and a later run reusing
+				// the pool ID would fail with a conflict.
+				Expect(framework.WaitForNodePoolDeleted(ctx, tc.Connection(), cfg.ClusterID,
+					created.ID(), 20*time.Minute)).To(Succeed())
 			})
 
 			currentReplicas := func() int {
