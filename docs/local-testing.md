@@ -186,6 +186,16 @@ LABEL_FILTER="Feature:Autoscaling" make test
 LABEL_FILTER="!Feature:Autoscaling" make test
 ```
 
+The autoscaling spec validates the cluster's **default node pool**, so the
+cluster must be provisioned with autoscaling enabled on it (the dedicated CI
+job sets `ENABLE_AUTOSCALING=true`); against any other cluster the spec
+skips. To provision such a cluster locally:
+
+```bash
+ENABLE_AUTOSCALING=true MIN_REPLICAS=2 MAX_REPLICAS=4 ./scripts/provision-e2e-cluster.sh
+```
+```
+
 ## Adding Management Cluster Access
 
 Some tests (HCP namespace health, HostedCluster CR, managed operators) need access to the management cluster. This requires backplane.
