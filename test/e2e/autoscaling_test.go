@@ -44,8 +44,13 @@ func setupAutoscaling() *framework.TestContext {
 	return tc
 }
 
-var _ = Describe("Customer Features: HCP Node Pool Autoscaling",
-	labels.Medium, labels.Positive, labels.HCP, labels.CustomerFeatures, labels.Autoscaling,
+// The spec deliberately carries no Area or Platform label: it is slow and
+// provisions extra nodes, so it must only be selected by the dedicated
+// Feature:Autoscaling job rather than the general matrix filters
+// (Area:DataPlane || Area:CustomerFeatures, Platform:HCP). Non-HCP clusters
+// are guarded by the topology skip in setupAutoscaling.
+var _ = Describe("HCP Node Pool Autoscaling",
+	labels.Medium, labels.Positive, labels.Autoscaling,
 	func() {
 		It("should scale a node pool up to max and back down to min based on workload demand", labels.Slow, func(ctx context.Context) {
 			if cfg.ClusterID == "" {
