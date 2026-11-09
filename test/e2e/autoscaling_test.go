@@ -184,7 +184,7 @@ var _ = Describe("Customer Features: HCP Node Pool Autoscaling",
 				np, err := framework.GetNodePool(ctx, tc.Connection(), cfg.ClusterID, created.ID())
 				g.Expect(err).NotTo(HaveOccurred())
 				return np.Status().CurrentReplicas()
-			}).WithContext(ctx).WithTimeout(40 * time.Minute).WithPolling(30 * time.Second).
+			}).WithContext(ctx).WithTimeout(60 * time.Minute).WithPolling(30 * time.Second).
 				Should(Equal(autoscalingMinNodes))
 			GinkgoWriter.Printf("Node pool %s scaled back down to %d replicas\n", created.ID(), currentReplicas())
 		})
