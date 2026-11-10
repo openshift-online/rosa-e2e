@@ -233,6 +233,8 @@ categories:
         labels:
           - "ci-failure"
           - "rosa-hcp"
+        components:
+          - "rosa-cli"
 ```
 
 **Field notes:**
@@ -246,6 +248,7 @@ categories:
 - `failure_summary`: one-line human-readable summary of the failure diagnosis from step 5. Empty string if the job is passing.
 - `diagnosis`: structured diagnostic evidence including error messages, cs-telemetry findings, or log excerpts. Empty string if the job is passing.
 - `team` and `labels`: from the job registry (`configs/generated/ci-status-jobs.yaml`, generated from the lean source plus the org snapshot). Include them verbatim. If a job overrides the category-level team/labels, use the job-level values.
+- `components`: from the job registry, verbatim (empty list for platform/upstream-scope categories). The Jira remediation follow-up uses it to set the Jira component on filed tickets.
 - If a job had a fetch error in step 2, set `pass_count` and `fail_count` to -1, `total` to 0, `pass_rate` to -1, `consecutive_failures` to 0, and `failure_classification` to "fetch_error". This signals that no valid data was retrieved — remediation follow-ups must skip these jobs entirely (they are not real failures).
 
 ### 7. Remediation — shared drift/failure PR budget
