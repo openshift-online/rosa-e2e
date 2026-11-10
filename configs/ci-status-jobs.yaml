@@ -105,7 +105,7 @@ categories:
       - name: HCP 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-22
       - name: HCP 5.0
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-candidate-5-0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-5-0
       # HCP FIPS
       - name: HCP FIPS 4.19
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-hcp-fips-e2e-staging-stable-4-19
@@ -126,6 +126,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-21
       - name: STS 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-22
+      - name: STS 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-5-0
       # Classic STS FIPS
       - name: STS FIPS 4.19
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-19
@@ -135,6 +137,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-21
       - name: STS FIPS 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-22
+      - name: STS FIPS 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-5-0
       # OSD GCP
       - name: OSD GCP 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-staging-stable-4-22
@@ -185,7 +189,7 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-22
         informing: true
       - name: HCP 5.0
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-candidate-5-0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-5-0
         informing: true
       - name: HCP Hosted Operator Upgrade
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ho-upgrade-rosa-hcp-ho-upgrade-integration
