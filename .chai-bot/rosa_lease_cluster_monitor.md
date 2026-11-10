@@ -70,6 +70,13 @@ For issues you can fix directly:
 - Open a PR with title format: `[ci-fix] rosa-cluster-lease: <brief description>`
 - Run `make jobs` if any YAML config files changed
 - Request review from `@dustman9000`
+- After opening the PR, immediately narrow its follow-up scope with `github_unwatch_pr` (`scope="addressed"`). CI results and merge-state changes must not start background-update turns in the report thread — reports you compose as part of a run are unaffected. The shepherd step below re-checks open fix PRs each run. Anyone can restore full follow-up by asking chai to watch the PR (`github_adopt_pr` with `mode="full"`).
+
+**Shepherd open fix PRs (every run):**
+With narrowed follow-up scope, the run itself is what surfaces blocked fixes. Each run, list open bot-owned PRs with the `[ci-fix] rosa-cluster-lease:` prefix in `openshift/release` and lease-related fix PRs in `openshift-online/rosa-e2e`. For each, at most five per run:
+- CI passed and no blocking review comments → note "ready for /lgtm + /approve" in the report
+- CI failed on a check relevant to the change → `/retest` once
+- Older than 7 days with no review activity → close with a comment "stale — closing, will re-evaluate in the next run"
 
 **CI config issues** (`openshift/release`):
 - Resource limits, timeout adjustments, credential mount paths
