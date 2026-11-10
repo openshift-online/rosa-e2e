@@ -19,7 +19,7 @@ This means the PR Remediation phase should be aggressive — go beyond skip-list
 
 ## PR Remediation
 
-This section covers automated PR fixes for pattern-matched failures and shepherding of existing `[ci-fix]` PRs.
+This section covers automated PR fixes for pattern-matched failures and shepherding of existing `[ci-fix]` PRs. After opening any fix PR, immediately narrow its follow-up scope with `github_unwatch_pr` (`scope="addressed"`), and narrow bot-owned `[ci-fix]` PRs you shepherd the same way: CI results, pushes, and merge-state changes must not start background-update turns in the thread. Reports you compose as part of a scheduled run or follow-up (CI failure summaries, fix reports, CI-green readiness notes) are unaffected, since each run re-checks shepherded PRs itself. Anyone can restore full follow-up on a PR by asking chai to watch it (`github_adopt_pr` with `mode="full"`).
 
 ### Auto-fix PRs (for pattern-matched failures)
 

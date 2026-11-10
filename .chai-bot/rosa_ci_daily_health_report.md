@@ -295,13 +295,14 @@ After composing the health report and writing the artifact, rank the verified st
 - Maximum **ONE newly opened remediation PR per invocation**, total across drift, failure fixes and fallback. Selecting/updating a reconciliation PR does not enable an additional failure fix in the same invocation; record lower-priority work as deferred.
 - Never modify production configs (`app-interface`)
 - PRs require human `/lgtm` and `/approve` before merge
+- After opening a remediation PR, immediately narrow its follow-up scope with `github_unwatch_pr` (`scope="addressed"`), and narrow bot-owned `[rosa-ci-fix]` PRs you shepherd the same way. CI results, pushes, and merge-state changes must not start background-update turns in this thread — reports you compose as part of a scheduled run are unaffected. Shepherding happens on each daily run. Anyone can restore full follow-up on a PR by asking chai to watch it (`github_adopt_pr` with `mode="full"`).
 - Newly opened remediation PR titles must start with `[rosa-ci-fix]` for tracking; reuse an existing matching reconciliation PR even if its title differs.
 - Broad duplicate lookup includes human-authored PRs, but automatic updates, retests, comments or closure are restricted to bot-owned PRs or explicitly authorized work. Link and report other human-authored matching PRs without modification or a duplicate PR; defer any change requiring their owner's authorization. Apply this ownership rule to both failure and reconciliation PRs, regardless of title.
 - Public commits, PR text and reports must use public-source evidence only; do not copy secrets, private/internal source content, internal discussion, personal names/handles or attribution into them. Unavailable authoritative evidence is a pending choice, not permission to expose confidential material or weaken policy.
 - Before proposing a new Jira ticket, search for existing open ROSAENG issues for the same job or error pattern — skip duplicates
 
 **Shepherd existing `[rosa-ci-fix]` PRs:**
-On runs with health failures, after the selected remediation attempt, check existing `[rosa-ci-fix]` PRs and any matching reconciliation PR. On all-green runs, limit this to reconciliation PRs; do not run failure remediation/shepherding. Within the existing grants, for each:
+On runs with health failures, after the selected remediation attempt, check existing `[rosa-ci-fix]` PRs and any matching reconciliation PR. On all-green runs, do not run failure remediation, but still check the CI and review state of open bot-owned `[rosa-ci-fix]` PRs — with their follow-up scope narrowed, this daily check is what surfaces blocked fixes. Within the existing grants, for each:
 - If CI passed and no blocking review comments: note "ready for /lgtm + /approve" in the report
 - If CI failed on a check relevant to the change: `/retest` once
 - If PR is older than 7 days with no review activity: close with a comment "stale — closing, will re-evaluate in next daily run"

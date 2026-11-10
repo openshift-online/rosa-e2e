@@ -233,6 +233,14 @@ follow-up) until it merges or is blocked.
 
 - At most ONE change request (PR) per invocation. If more than one fix is
   warranted, open the highest-value one and note the rest in the thread.
+- After opening a PR, immediately narrow its follow-up scope with
+  `github_unwatch_pr` (`scope="addressed"`), and narrow bot-owned fix PRs you
+  shepherd the same way. CI results, pushes, and merge-state changes must not
+  start background-update turns in the thread — reports you compose as part of
+  a triage turn or scheduled follow-up are unaffected. Shepherding runs
+  through this thread's scheduled follow-ups. Anyone can restore full
+  follow-up by asking chai to watch the PR (`github_adopt_pr` with
+  `mode="full"`).
 - Only open PRs in repos you hold an SCM grant for. If the fix belongs to a
   repo you can't write, escalate to that team instead (Step 6).
 - Never self-approve / self-lgtm. Peer-review-gated proposals need a
