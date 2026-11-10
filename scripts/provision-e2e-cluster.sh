@@ -22,6 +22,13 @@ CLUSTER_NAME="${CLUSTER_NAME:-rosa-e2e-$(date +%m%d)}"
 OCM_ENV="${OCM_ENV:-staging}"
 REGION="${REGION:-${AWS_REGION:-us-east-2}}"
 COMPUTE_NODES="${COMPUTE_NODES:-2}"
+# Default node pool autoscaling (day-1 feature): set ENABLE_AUTOSCALING=true to
+# create the cluster with the default pool autoscaling between MIN_REPLICAS and
+# MAX_REPLICAS instead of a fixed COMPUTE_NODES count. Required by the
+# Feature:Autoscaling spec, which validates scale-up/down on the default pool.
+ENABLE_AUTOSCALING="${ENABLE_AUTOSCALING:-false}"
+MIN_REPLICAS="${MIN_REPLICAS:-2}"
+MAX_REPLICAS="${MAX_REPLICAS:-4}"
 COMPUTE_MACHINE_TYPE="${COMPUTE_MACHINE_TYPE:-m5.xlarge}"
 OIDC_CONFIG_ID="${OIDC_CONFIG_ID:-}"
 CLUSTER_SECTOR="${CLUSTER_SECTOR:-}"
@@ -237,13 +244,17 @@ fi
 # Step 5: Create cluster
 echo ""
 echo "--- Creating ROSA HCP cluster ---"
+COMPUTE_NODES_ARGS="--replicas ${COMPUTE_NODES}"
+if [[ "${ENABLE_AUTOSCALING}" == "true" ]]; then
+  COMPUTE_NODES_ARGS="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+fi
 rosa create cluster \
   --cluster-name "${CLUSTER_NAME}" \
   --hosted-cp \
   --sts \
   --mode auto \
   --region "${REGION}" \
-  --replicas "${COMPUTE_NODES}" \
+  ${COMPUTE_NODES_ARGS} \
   --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
   --billing-account "${BILLING_ACCOUNT}" \
   --oidc-config-id "${OIDC_CONFIG_ID}" \

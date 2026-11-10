@@ -170,6 +170,32 @@ LABEL_FILTER="Importance:Critical" make test
 LABEL_FILTER="Area:ManagedService" make dry-run
 ```
 
+### Feature-only tests (autoscaling)
+
+Some slow, resource-heavy specs are excluded from the general Area/Platform
+filters and run only in their dedicated CI job; locally they need an explicit
+opt-in via their feature label. The HCP node pool autoscaling spec is one: it
+runs ~30-60 minutes and provisions extra nodes, so an unfiltered
+`make test` against an HCP cluster will pick it up unless you scope it:
+
+```bash
+# Only the autoscaling spec (dedicated CI job runs exactly this filter)
+LABEL_FILTER="Feature:Autoscaling" make test
+
+# Everything except autoscaling
+LABEL_FILTER="!Feature:Autoscaling" make test
+```
+
+The autoscaling spec validates the cluster's **default node pool**, so the
+cluster must be provisioned with autoscaling enabled on it (the dedicated CI
+job sets `ENABLE_AUTOSCALING=true`); against any other cluster the spec
+skips. To provision such a cluster locally:
+
+```bash
+ENABLE_AUTOSCALING=true MIN_REPLICAS=2 MAX_REPLICAS=4 ./scripts/provision-e2e-cluster.sh
+```
+```
+
 ## Adding Management Cluster Access
 
 Some tests (HCP namespace health, HostedCluster CR, managed operators) need access to the management cluster. This requires backplane.

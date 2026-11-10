@@ -89,6 +89,63 @@ func VerifyNodePoolHealthy(ctx context.Context, dynamicClient dynamic.Interface,
 	return nil
 }
 
+// VerifyNodePoolAutoScaling verifies that the NodePool CR for the given node
+// pool has autoscaling configured with the expected min and max bounds.
+// OCM node pool IDs map to NodePool CRs named <cluster-name>-<pool-id> (or the
+// bare pool ID on some hypershift versions), so the CR is matched by name
+// suffix. Accepts both the minSize/maxSize and min/max spec spellings used
+// across hypershift versions.
+func VerifyNodePoolAutoScaling(ctx context.Context, dynamicClient dynamic.Interface, namespace, nodePoolID string, minReplicas, maxReplicas int) error {
+	list, err := dynamicClient.Resource(nodePoolGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing NodePools in %s: %w", namespace, err)
+	}
+
+	var np *unstructured.Unstructured
+	var names []string
+	for i := range list.Items {
+		name := list.Items[i].GetName()
+		names = append(names, name)
+		if name == nodePoolID || strings.HasSuffix(name, "-"+nodePoolID) {
+			np = &list.Items[i]
+			break
+		}
+	}
+	if np == nil {
+		return fmt.Errorf("no NodePool in %s matches pool ID %s (found: %s)",
+			namespace, nodePoolID, strings.Join(names, ", "))
+	}
+
+	min, found, err := unstructured.NestedInt64(np.Object, "spec", "autoScaling", "minSize")
+	if !found {
+		min, found, err = unstructured.NestedInt64(np.Object, "spec", "autoScaling", "min")
+	}
+	if err != nil {
+		return fmt.Errorf("reading autoScaling min of NodePool %s/%s: %w", namespace, np.GetName(), err)
+	}
+	if !found {
+		return fmt.Errorf("NodePool %s/%s has no autoScaling in spec", namespace, np.GetName())
+	}
+
+	max, found, err := unstructured.NestedInt64(np.Object, "spec", "autoScaling", "maxSize")
+	if !found {
+		max, found, err = unstructured.NestedInt64(np.Object, "spec", "autoScaling", "max")
+	}
+	if err != nil {
+		return fmt.Errorf("reading autoScaling max of NodePool %s/%s: %w", namespace, np.GetName(), err)
+	}
+	if !found {
+		return fmt.Errorf("NodePool %s/%s has no autoScaling in spec", namespace, np.GetName())
+	}
+
+	if min != int64(minReplicas) || max != int64(maxReplicas) {
+		return fmt.Errorf("NodePool %s/%s autoScaling bounds (min=%d, max=%d) do not match expected (min=%d, max=%d)",
+			namespace, np.GetName(), min, max, minReplicas, maxReplicas)
+	}
+
+	return nil
+}
+
 func verifyConditions(obj *unstructured.Unstructured, kind, namespace, name string) error {
 	conditions, found, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
 	if err != nil {
