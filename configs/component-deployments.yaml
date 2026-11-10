@@ -59,9 +59,6 @@ components:
     saas_name: saas-sfo-pko
     strategy: hive
     e2e_saas: saas-sfo-prow-e2e
-    canary_targets:
-      - sfo-hivep03uw1
-      - sfo-hivep04ew2
   - key: osd-metrics-exporter
     saas_name: saas-ome-pko
     strategy: hive

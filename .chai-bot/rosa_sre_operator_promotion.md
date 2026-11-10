@@ -136,7 +136,7 @@ For each operator discovered from `component-deployments.yaml`:
 2. **Find the stage targets**: Search for targets that have `auto: true` in their promotion block and subscribe to integration/e2e success channels. These typically have names containing `-stage-` or `-hives0` patterns. Each operator typically has two stage targets (one per hive shard).
 
 3. **Find the prod-canary targets**: Use one of the following methods, in priority order:
-   - If the component has `canary_targets` in `component-deployments.yaml`, use those exact target names (e.g. `sfo-hivep03uw1`, `sfo-hivep04ew2` for `splunk-forwarder-operator`).
+   - If the component has `canary_targets` in `component-deployments.yaml`, use those exact target names.
    - If the component has `canary_namespaces`, find targets whose namespace `$ref` path contains any of the specified cluster names (e.g. targets referencing `rhobsp01ue1` or `backplanep05ue1` for `rhobs-synthetics-agent`).
    - Otherwise, search for target names containing `prod-canary` (default behavior). Each operator typically has two:
      - `<prefix>-hivep03uw1-prod-canary`
@@ -262,5 +262,5 @@ The summary statistics are included directly in the parent message (see Delivery
 - The stage targets represent shas that have passed through the full promotion pipeline (integration deployment → promotion-int e2e → stage deployment → promotion-stage e2e). There is no need to independently check Prow CI health — the pipeline already gates everything.
 - Stage targets typically have `auto: true` in their promotion block and subscribe to integration/e2e success channels.
 - **`saas_dir` override**: Some operators have their saas files outside the default `data/services/osd-operators/cicd/saas/` directory. When `saas_dir` is set on a component, search that directory instead. Currently applies to `rhobs-synthetics-agent` and `rhobs-synthetics-api` (at `data/services/rhobs/rhobs/cicd`).
-- **`canary_targets` override**: Some operators' prod-canary targets don't follow the `*-prod-canary` naming convention. When `canary_targets` is set, use those exact target names instead of searching for the `prod-canary` suffix. Currently applies to `splunk-forwarder-operator` (targets `sfo-hivep03uw1` and `sfo-hivep04ew2`).
+- **`canary_targets` override**: Some operators' prod-canary targets don't follow the `*-prod-canary` naming convention. When `canary_targets` is set, use those exact target names instead of searching for the `prod-canary` suffix. No component currently sets this override.
 - **`canary_namespaces` override**: Some operators identify canary targets by the cluster name in the namespace `$ref` path rather than by target name. When `canary_namespaces` is set, find targets whose namespace reference contains any of the listed cluster names. Currently applies to `rhobs-synthetics-agent` and `rhobs-synthetics-api` (clusters `rhobsp01ue1` and `backplanep05ue1`).
