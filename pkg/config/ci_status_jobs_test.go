@@ -12,7 +12,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const ciStatusJobsPath = "../../configs/ci-status-jobs.yaml"
+// The schema tests run against the generated registry (resolved from the
+// lean source plus the org snapshot), since that is what consumers read.
+const ciStatusJobsPath = "../../configs/generated/ci-status-jobs.yaml"
 
 func loadCIStatusConfig(t *testing.T) CIStatusConfig {
 	t.Helper()

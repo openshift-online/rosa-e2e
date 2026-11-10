@@ -81,7 +81,7 @@ Keep to the most impactful 5-8 PRs. Skip dependency bumps and unrelated changes.
 
 Before composing the message, check the current CI health data using the same approach as the daily health report:
 
-Fetch the job registry from `https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/ci-status-jobs.yaml` and query Prow for the latest pass rates per category. Use the same parameters as the daily health report: exclude pending builds from totals, distinguish jobs that returned a fetch error from jobs with zero runs (the former is an infrastructure issue, the latter means the job hasn't been triggered), and exclude jobs marked `informing: true` from pass rates and health indicators — they are pre-GA project validation, not release signal. Compute per-category health indicators using the same thresholds as the daily report:
+Fetch the job registry from `https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/generated/ci-status-jobs.yaml` and query Prow for the latest pass rates per category. Use the same parameters as the daily health report: exclude pending builds from totals, distinguish jobs that returned a fetch error from jobs with zero runs (the former is an infrastructure issue, the latter means the job hasn't been triggered), and exclude jobs marked `informing: true` from pass rates and health indicators — they are pre-GA project validation, not release signal. Compute per-category health indicators using the same thresholds as the daily report:
 - :large_green_circle: >= 80%
 - :large_yellow_circle: >= 40% and < 80%
 - :red_circle: < 40%

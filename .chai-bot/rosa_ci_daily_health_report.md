@@ -10,8 +10,8 @@ Check the pass/fail history (last completed builds over 7 days per job) for all 
 
 ### 1. Load job registry
 
-Fetch the job registry from the single source of truth:
-`https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/ci-status-jobs.yaml`
+Fetch the job registry (generated from the lean source plus the org team snapshot):
+`https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/generated/ci-status-jobs.yaml`
 
 Use `fetch_web_content` to retrieve this YAML file. It defines all jobs organized into categories. Each category has an `id`, `name`, and list of `jobs` with `name` (display name) and `prow_job` (full Prow job name). There is also a top-level `sippy_url` for the dashboard link.
 
@@ -201,7 +201,7 @@ generated_at: "2026-07-25T14:45:00Z"
 overall_pass_rate: 66
 gating_pass_rate: 90
 non_gating_pass_rate: 72
-job_registry_url: "https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/ci-status-jobs.yaml"
+job_registry_url: "https://raw.githubusercontent.com/openshift-online/rosa-e2e/main/configs/generated/ci-status-jobs.yaml"
 categories:
   - id: "rosa-hcp-e2e"
     name: "ROSA HCP E2E"
@@ -245,7 +245,7 @@ categories:
 - `failing_tests`: list of specific test names or step names that are failing. Empty list if the job is passing. The remediation follow-up uses these to create skip-list PRs and accurate Jira ticket descriptions.
 - `failure_summary`: one-line human-readable summary of the failure diagnosis from step 5. Empty string if the job is passing.
 - `diagnosis`: structured diagnostic evidence including error messages, cs-telemetry findings, or log excerpts. Empty string if the job is passing.
-- `team` and `labels`: from the job registry (`ci-status-jobs.yaml`). Include them verbatim. If a job overrides the category-level team/labels, use the job-level values.
+- `team` and `labels`: from the job registry (`configs/generated/ci-status-jobs.yaml`, generated from the lean source plus the org snapshot). Include them verbatim. If a job overrides the category-level team/labels, use the job-level values.
 - If a job had a fetch error in step 2, set `pass_count` and `fail_count` to -1, `total` to 0, `pass_rate` to -1, `consecutive_failures` to 0, and `failure_classification` to "fetch_error". This signals that no valid data was retrieved — remediation follow-ups must skip these jobs entirely (they are not real failures).
 
 ### 7. Remediation — shared drift/failure PR budget
