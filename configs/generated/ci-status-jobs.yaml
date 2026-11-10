@@ -121,7 +121,7 @@ categories:
   - id: rosa-cx-e2e
     name: ROSA CX E2E
     scope: platform
-    prow_filter: https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp-external-oidc-e2e-staging*,*rosa-hcp-e2e-aws-vpc-cni-staging*,*rosa-hcp-kms-e2e-staging*
+    prow_filter: https://prow.ci.openshift.org/?repo=openshift-online%2Frosa-e2e&type=periodic&job=*rosa-hcp-external-oidc-e2e-staging*,*rosa-hcp-e2e-aws-vpc-cni-staging*,*rosa-hcp-kms-e2e-staging*,*rosa-hcp-autoscaling-e2e-staging*
     team:
       id: 97412673-7d28-430b-bdee-ce3d1eb702b2
       name: ROSA CI
@@ -137,6 +137,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-aws-vpc-cni-staging
       - name: HCP KMS Encryption
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-kms-e2e-staging
+      - name: HCP Autoscaling
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-autoscaling-e2e-staging
   - id: capa-e2e-stg
     name: CAPA E2E STG
     scope: component
