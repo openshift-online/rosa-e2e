@@ -48,8 +48,11 @@ var _ = Describe("Data Plane: Networking", labels.High, labels.Positive, labels.
 
 		By("Creating test namespace")
 		cleanup, err := framework.CreateTestNamespace(ctx, tc.HCKubeClient(), namespace)
+		if cleanup != nil {
+			DeferCleanup(cleanup)
+		}
+		registerDNSFailureDiagnostics(tc.HCKubeClient(), namespace)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(cleanup)
 
 		By("Creating DNS test pod")
 		podName := "dns-test-pod"
