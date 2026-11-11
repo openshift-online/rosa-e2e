@@ -35,7 +35,7 @@ RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/op
 # binary and its libraries on one version.
 FROM registry.access.redhat.com/hi/jq:1.8@sha256:6d1c63481a7520d203f6e993c82be4d114cefebcf32b604a405c7d99c1cc314d AS jq
 
-FROM registry.access.redhat.com/hi/core-runtime:2.43@sha256:4163796d8b7f28021178093d31cb97c05336fd3f3a4d7006603a7fef29e997e7
+FROM registry.access.redhat.com/hi/core-runtime:2.43@sha256:81280d7fd6afa7a3d2a6da2e90e545cf8e5d187c80a69b2a1c875fdcd731aaed
 
 LABEL com.redhat.component="rosa-e2e" \
       name="rosa-e2e" \
