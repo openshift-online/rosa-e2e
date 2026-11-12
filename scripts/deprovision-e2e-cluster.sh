@@ -177,6 +177,51 @@ if [[ "${KMS_KEY_CREATED}" == "true" && -n "${KMS_KEY_ARN}" ]]; then
     --region "${REGION}" 2>/dev/null || true
 fi
 
+# Step 6: Clean up the shared VPC DNS infrastructure (PHZ, role, policy) created by
+# the provision script. The PHZ must be emptied first: the cluster's records are
+# removed during cluster deletion, so this runs after it (mirrors the CI orphan
+# gate rosa-e2e-validate-shared-vpc-teardown).
+SHARED_VPC_ENABLED="${SHARED_VPC_ENABLED:-false}"
+if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
+  SHARED_VPC_HOSTED_ZONE_ID="${SHARED_VPC_HOSTED_ZONE_ID:-}"
+  SHARED_VPC_ROLE_ARN="${SHARED_VPC_ROLE_ARN:-}"
+  SHARED_VPC_POLICY_ARN="${SHARED_VPC_POLICY_ARN:-}"
+  if [[ -n "${SHARED_VPC_HOSTED_ZONE_ID}" ]]; then
+    echo ""
+    echo "--- Deleting shared VPC private hosted zone ${SHARED_VPC_HOSTED_ZONE_ID} ---"
+    LEFTOVER_RECORDS=$(aws route53 list-resource-record-sets \
+      --hosted-zone-id "${SHARED_VPC_HOSTED_ZONE_ID}" \
+      --query 'ResourceRecordSets[?Type!=`NS` && Type!=`SOA`]' \
+      --output json --region "${REGION}" 2>/dev/null || echo "[]")
+    if [[ "$(jq length <<<"${LEFTOVER_RECORDS}")" != "0" ]]; then
+      echo "WARNING: hosted zone still has records, deleting them:"
+      jq -r '.[].Name' <<<"${LEFTOVER_RECORDS}"
+      CHANGE_FILE=$(mktemp)
+      jq '{Changes: [.[] | {Action: "DELETE", ResourceRecordSet: .}]}' <<<"${LEFTOVER_RECORDS}" > "${CHANGE_FILE}"
+      aws route53 change-resource-record-sets \
+        --hosted-zone-id "${SHARED_VPC_HOSTED_ZONE_ID}" \
+        --change-batch "file://${CHANGE_FILE}" --region "${REGION}" 2>/dev/null || true
+      rm -f "${CHANGE_FILE}"
+    fi
+    aws route53 delete-hosted-zone --id "${SHARED_VPC_HOSTED_ZONE_ID}" --region "${REGION}" 2>/dev/null \
+      || echo "WARNING: failed to delete hosted zone ${SHARED_VPC_HOSTED_ZONE_ID}"
+  fi
+  if [[ -n "${SHARED_VPC_ROLE_ARN}" ]]; then
+    SHARED_ROLE_NAME="${SHARED_VPC_ROLE_ARN##*/}"
+    echo "--- Deleting shared VPC role ${SHARED_ROLE_NAME} ---"
+    if [[ -n "${SHARED_VPC_POLICY_ARN}" ]]; then
+      aws iam detach-role-policy --role-name "${SHARED_ROLE_NAME}" --policy-arn "${SHARED_VPC_POLICY_ARN}" 2>/dev/null || true
+    fi
+    aws iam delete-role --role-name "${SHARED_ROLE_NAME}" 2>/dev/null \
+      || echo "WARNING: failed to delete role ${SHARED_ROLE_NAME}"
+  fi
+  if [[ -n "${SHARED_VPC_POLICY_ARN}" ]]; then
+    echo "--- Deleting shared VPC policy ${SHARED_VPC_POLICY_ARN} ---"
+    aws iam delete-policy --policy-arn "${SHARED_VPC_POLICY_ARN}" 2>/dev/null \
+      || echo "WARNING: failed to delete policy ${SHARED_VPC_POLICY_ARN}"
+  fi
+fi
+
 # Clean up env file
 rm -f "${ENV_FILE}"
 

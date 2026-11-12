@@ -42,6 +42,15 @@ EXTERNAL_AUTH_ENABLED="${EXTERNAL_AUTH_ENABLED:-false}"
 # an existing key. Enables both EBS storage encryption and etcd encryption.
 KMS_ENABLED="${KMS_ENABLED:-false}"
 KMS_KEY_ARN="${KMS_KEY_ARN:-}"
+# Shared VPC is a day-1 feature: the cluster's DNS records are served from a private
+# hosted zone reachable through a dedicated IAM role (--route53-role-arn). Set
+# SHARED_VPC_ENABLED=true to create the PHZ, shared role and policy, pre-create the
+# operator roles (so the ingress-operator role can be granted the shared role), and
+# create the cluster with the shared VPC flags. Required by the Feature:SharedVPC
+# specs. Locally everything is created in your own AWS account (CI uses a second
+# account); pass SHARED_VPC_BASE_DOMAIN to reuse an existing rosa dnsdomain.
+SHARED_VPC_ENABLED="${SHARED_VPC_ENABLED:-false}"
+SHARED_VPC_BASE_DOMAIN="${SHARED_VPC_BASE_DOMAIN:-}"
 
 # AWS payer/billing account per OCM environment
 # integration/staging: 277304166082 (osd-staging-1) or 811685182089 (osd-staging-2)
@@ -57,6 +66,7 @@ echo "Region: ${REGION}"
 echo "Compute: ${COMPUTE_NODES}x ${COMPUTE_MACHINE_TYPE}"
 echo "External auth: ${EXTERNAL_AUTH_ENABLED}"
 echo "KMS encryption: ${KMS_ENABLED}"
+echo "Shared VPC: ${SHARED_VPC_ENABLED}"
 echo ""
 
 # Verify prerequisites
@@ -241,6 +251,123 @@ if [[ "${KMS_ENABLED}" == "true" ]]; then
   KMS_ARGS="--enable-customer-managed-key --kms-key-arn ${KMS_KEY_ARN} --etcd-encryption-kms-arn ${KMS_KEY_ARN}"
 fi
 
+# Step 4d: Create the shared VPC DNS infrastructure if requested (day-1, immutable)
+# Mirrors the CI steps aws-provision-route53-private-hosted-zone (ENABLE_SHARED_PHZ)
+# and rosa-conf-shared-vpc-update-trust-policy: a private hosted zone named
+# <cluster>.<dnsdomain> associated with the cluster VPC, plus a policy and role the
+# installer and ingress operator assume to manage records in it. Locally these live
+# in the same AWS account (CI provisions them in a second account).
+SHARED_VPC_ARGS=""
+SHARED_VPC_PHZ_ID=""
+SHARED_VPC_ROLE_ARN=""
+SHARED_VPC_POLICY_ARN=""
+SHARED_VPC_INSTALLER_ROLE_ARN=""
+SHARED_VPC_OPERATOR_ROLES_CREATED="false"
+
+if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
+  echo ""
+  echo "--- Shared VPC enabled: creating DNS infrastructure ---"
+
+  # Base domain: an unreserved HCP dnsdomain owned by the org (or create one)
+  if [[ -z "${SHARED_VPC_BASE_DOMAIN}" ]]; then
+    SHARED_VPC_BASE_DOMAIN=$(rosa list dnsdomain -o json 2>/dev/null |
+      jq -r '[.[] | select(.cluster_arch=="hcp")][0].id // empty')
+    if [[ -z "${SHARED_VPC_BASE_DOMAIN}" ]]; then
+      echo "No unreserved HCP dnsdomain found, creating one..."
+      SHARED_VPC_BASE_DOMAIN=$(rosa create dnsdomain 2>/dev/null | grep -oE "[0-9A-Za-z]{4}\.[0-9A-Za-z.]+")
+    fi
+  fi
+  if [[ -z "${SHARED_VPC_BASE_DOMAIN}" ]]; then
+    echo "ERROR: could not resolve a base domain for the shared VPC cluster"
+    exit 1
+  fi
+  echo "Base domain: ${SHARED_VPC_BASE_DOMAIN}"
+
+  # The installer account role (ManagedOpenShift-HCP-ROSA-Installer-Role) the
+  # cluster will be created with; also determines the operator policy set.
+  SHARED_VPC_INSTALLER_ROLE_ARN=$(rosa list account-roles -o json 2>/dev/null |
+    jq -r '[.[] | select(.RoleName | contains("HCP-ROSA") and contains("Installer-Role"))][0].RoleARN // empty')
+  if [[ -z "${SHARED_VPC_INSTALLER_ROLE_ARN}" ]]; then
+    echo "ERROR: no HCP-ROSA installer account role found (run rosa create account-roles --hosted-cp first)"
+    exit 1
+  fi
+
+  # Pre-create the operator roles so the ingress-operator role exists before the
+  # shared role's trust policy is written (mirrors the rosa-sts-oidc-config-create
+  # chain in CI; rosa create cluster reuses them via --operator-roles-prefix).
+  if ! aws iam get-role --role-name "${CLUSTER_NAME}-openshift-ingress-operator" &>/dev/null; then
+    echo "Creating operator roles with prefix ${CLUSTER_NAME}..."
+    rosa create operator-roles \
+      --hosted-cp \
+      --prefix "${CLUSTER_NAME}" \
+      --oidc-config-id "${OIDC_CONFIG_ID}" \
+      --role-arn "${SHARED_VPC_INSTALLER_ROLE_ARN}" \
+      --mode auto \
+      --yes
+    SHARED_VPC_OPERATOR_ROLES_CREATED="true"
+  else
+    echo "Operator roles with prefix ${CLUSTER_NAME} exist"
+  fi
+  INGRESS_OPERATOR_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${CLUSTER_NAME}-openshift-ingress-operator"
+
+  # Private hosted zone for <cluster-name>.<base-domain>, associated with the VPC
+  PHZ_NAME="${CLUSTER_NAME}.${SHARED_VPC_BASE_DOMAIN}"
+  HOSTED_ZONE_CREATION=$(aws --region "${REGION}" route53 create-hosted-zone \
+    --name "${PHZ_NAME}" \
+    --vpc "VPCRegion=${REGION},VPCId=${VPC_ID}" \
+    --caller-reference "${PHZ_NAME}-$(date +%s)")
+  SHARED_VPC_PHZ_ID=$(jq -r '.HostedZone.Id' <<<"${HOSTED_ZONE_CREATION}" | awk -F / '{printf $3}')
+  echo "Private hosted zone: ${SHARED_VPC_PHZ_ID} (${PHZ_NAME})"
+
+  # Shared policy (route53 + ec2:DeleteTags on the VPC, mirrors the CI step)
+  SHARED_VPC_POLICY_ARN=$(aws --region "${REGION}" iam create-policy \
+    --policy-name "${CLUSTER_NAME}-shared-policy" \
+    --policy-document "{
+      \"Version\": \"2012-10-17\",
+      \"Statement\": [
+        {
+          \"Effect\": \"Allow\",
+          \"Action\": \"ec2:DeleteTags\",
+          \"Resource\": \"arn:aws:ec2:${REGION}:${AWS_ACCOUNT_ID}:vpc/${VPC_ID}\"
+        },
+        {
+          \"Effect\": \"Allow\",
+          \"Action\": [
+            \"route53:ChangeResourceRecordSets\", \"route53:ListHostedZones\",
+            \"route53:ListHostedZonesByName\", \"route53:ListResourceRecordSets\",
+            \"route53:ChangeTagsForResource\", \"route53:GetAccountLimit\",
+            \"route53:GetChange\", \"route53:GetHostedZone\",
+            \"route53:ListTagsForResource\", \"route53:UpdateHostedZoneComment\",
+            \"tag:GetResources\", \"tag:UntagResources\"
+          ],
+          \"Resource\": \"*\"
+        }
+      ]
+    }" --query 'Policy.Arn' --output text)
+  echo "Shared policy: ${SHARED_VPC_POLICY_ARN}"
+
+  # Shared role trusting the installer and ingress-operator roles
+  SHARED_VPC_ROLE_ARN=$(aws --region "${REGION}" iam create-role \
+    --role-name "${CLUSTER_NAME}-shared-role" \
+    --assume-role-policy-document "{
+      \"Version\": \"2012-10-17\",
+      \"Statement\": [
+        {
+          \"Effect\": \"Allow\",
+          \"Principal\": {\"AWS\": [\"${SHARED_VPC_INSTALLER_ROLE_ARN}\", \"${INGRESS_OPERATOR_ROLE_ARN}\"]},
+          \"Action\": \"sts:AssumeRole\",
+          \"Condition\": {}
+        }
+      ]
+    }" --query 'Role.Arn' --output text)
+  aws --region "${REGION}" iam attach-role-policy \
+    --role-name "${CLUSTER_NAME}-shared-role" \
+    --policy-arn "${SHARED_VPC_POLICY_ARN}"
+  echo "Shared role: ${SHARED_VPC_ROLE_ARN}"
+
+  SHARED_VPC_ARGS="--base-domain ${SHARED_VPC_BASE_DOMAIN} --ingress-private-hosted-zone-id ${SHARED_VPC_PHZ_ID} --route53-role-arn ${SHARED_VPC_ROLE_ARN} --operator-roles-prefix ${CLUSTER_NAME} --role-arn ${SHARED_VPC_INSTALLER_ROLE_ARN}"
+fi
+
 # Step 5: Create cluster
 echo ""
 echo "--- Creating ROSA HCP cluster ---"
@@ -262,6 +389,7 @@ rosa create cluster \
   ${SECTOR_ARGS} \
   ${EXTERNAL_AUTH_ARGS} \
   ${KMS_ARGS} \
+  ${SHARED_VPC_ARGS} \
   --yes
 
 CLUSTER_ID=$(rosa describe cluster -c "${CLUSTER_NAME}" -o json | jq -r '.id')
@@ -301,6 +429,14 @@ export EXTERNAL_AUTH_ENABLED=${EXTERNAL_AUTH_ENABLED}
 export KMS_ENABLED=${KMS_ENABLED}
 export KMS_KEY_ARN=${KMS_KEY_ARN}
 export KMS_KEY_CREATED=${KMS_KEY_CREATED}
+export SHARED_VPC_ENABLED=${SHARED_VPC_ENABLED}
+export SHARED_VPC_BASE_DOMAIN=${SHARED_VPC_BASE_DOMAIN}
+export SHARED_VPC_HOSTED_ZONE_ID=${SHARED_VPC_PHZ_ID}
+export SHARED_VPC_ROLE_ARN=${SHARED_VPC_ROLE_ARN}
+export SHARED_VPC_POLICY_ARN=${SHARED_VPC_POLICY_ARN}
+export SHARED_VPC_INSTALLER_ROLE_ARN=${SHARED_VPC_INSTALLER_ROLE_ARN}
+export SHARED_VPC_OPERATOR_ROLES_CREATED=${SHARED_VPC_OPERATOR_ROLES_CREATED}
+export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE:-${HOME}/.aws/credentials}
 EOF
 
 echo ""
@@ -319,6 +455,12 @@ fi
 echo "Run tests after ready:"
 echo "  source /tmp/rosa-e2e-cluster.env"
 echo "  OCM_TOKEN=\$(ocm token) make test"
+if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
+  echo ""
+  echo "The env file pre-sets the SHARED_VPC_* variables the Feature:SharedVPC specs need."
+  echo "Run only the shared VPC specs:"
+  echo "  OCM_TOKEN=\$(ocm token) LABEL_FILTER=\"Feature:SharedVPC\" make test"
+fi
 echo ""
 echo "Clean up:"
 echo "  source /tmp/rosa-e2e-cluster.env"

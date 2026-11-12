@@ -115,6 +115,40 @@ OCM_TOKEN=$(ocm token) LABEL_FILTER="Feature:KMS" make test
 Cleanup via `./scripts/deprovision-e2e-cluster.sh` schedules the created KMS key
 for deletion after the cluster is gone.
 
+## Provision a Cluster with Shared VPC
+
+Shared VPC DNS is a **day-1, immutable** HCP feature — the cluster's API and
+ingress records are served from a private hosted zone reached through a dedicated
+IAM role (`--route53-role-arn`). To exercise the shared VPC specs
+(`Feature:SharedVPC`) you need a cluster created with those flags.
+
+```bash
+# Step 1: AWS credentials (same as above)
+eval $(echo "y" | osdctl account cli -i <ACCOUNT_ID> -p osd-staging-2 -r us-east-2 -oenv 2>/dev/null | tr '\n' ' ' | sed 's/.*AWS_ACCESS/AWS_ACCESS/')
+
+# Step 2: Provision WITH shared VPC (creates the private hosted zone, shared
+# role and policy in your account, pre-creates the operator roles, and claims
+# an unreserved HCP dnsdomain as the base domain)
+SHARED_VPC_ENABLED=true ./scripts/provision-e2e-cluster.sh
+
+# To reuse a specific dnsdomain instead of auto-picking one:
+# SHARED_VPC_ENABLED=true SHARED_VPC_BASE_DOMAIN=xxxx.s3.devshift.org ./scripts/provision-e2e-cluster.sh
+
+# Step 3: Wait for the cluster to be ready (~15 min)
+rosa logs install -c rosa-e2e-$(date +%m%d) --watch
+
+# Step 4: Run the shared VPC tests (the cluster env file pre-sets SHARED_VPC_*)
+source /tmp/rosa-e2e-cluster.env
+OCM_TOKEN=$(ocm token) LABEL_FILTER="Feature:SharedVPC" make test
+```
+
+Locally the private hosted zone, shared role and policy are created in your own
+AWS account (CI provisions them in a second account via
+`.awscred_shared_account`), so the cross-account trust mechanics are exercised
+end-to-end only in CI — locally you still get the PHZ record, base-domain and
+role-trust assertions. Cleanup via `./scripts/deprovision-e2e-cluster.sh` also
+deletes the hosted zone, shared role and policy after the cluster is gone.
+
 ## Quick Start: Test Against Any Existing Cluster
 
 The simplest path. The framework auto-detects whether the cluster is HCP or Classic.
