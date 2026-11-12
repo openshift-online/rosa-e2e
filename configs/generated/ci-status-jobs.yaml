@@ -38,7 +38,7 @@ categories:
       - name: HCP 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-22
       - name: HCP 5.0
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-candidate-5-0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-5-0
       - name: HCP FIPS 4.19
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-hcp-fips-e2e-staging-stable-4-19
       - name: HCP FIPS 4.20
@@ -113,7 +113,7 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-4-22
         informing: true
       - name: HCP 5.0
-        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-candidate-5-0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-stable-5-0
         informing: true
       - name: HCP Hosted Operator Upgrade
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ho-upgrade-rosa-hcp-ho-upgrade-integration

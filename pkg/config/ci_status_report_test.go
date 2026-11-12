@@ -16,7 +16,7 @@ func TestCIStatusNewScheduledCoverageIsInformational(t *testing.T) {
 		"periodics-rosa-hcp-e2e-integration-stable-4-20":                                       "rosa-e2e-int",
 		"periodics-rosa-hcp-e2e-integration-stable-4-21":                                       "rosa-e2e-int",
 		"periodics-rosa-hcp-e2e-integration-stable-4-22":                                       "rosa-e2e-int",
-		"periodics-rosa-hcp-e2e-integration-candidate-5-0":                                     "rosa-e2e-int",
+		"periodics-rosa-hcp-e2e-integration-stable-5-0":                                        "rosa-e2e-int",
 		"ho-upgrade-rosa-hcp-ho-upgrade-integration":                                           "rosa-e2e-int",
 		"ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-psc-wif-sv-staging-main":          "ocm-fvt-gcp-stg",
 		"ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-version-pruning-staging-main": "ocm-fvt-gcp-stg",
