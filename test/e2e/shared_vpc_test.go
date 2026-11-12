@@ -155,7 +155,7 @@ var _ = Describe("Shared VPC Cross-Account DNS",
 					"private hosted zone %s should contain the API record", s.hostedZoneID)
 			} else {
 				By("Validating the API endpoint resolves (HCP serves it from the dns domain's parent zone)")
-				_, err := net.LookupHost(apiHost)
+				_, err := net.DefaultResolver.LookupHost(ctx, apiHost)
 				Expect(err).NotTo(HaveOccurred(), "resolving API endpoint %s", apiHost)
 			}
 
@@ -224,6 +224,10 @@ var _ = Describe("Shared VPC Role Trust",
 					Expect(json.Unmarshal(stmt.Action, &actions)).To(Succeed())
 				}
 				if stmt.Effect != "Allow" || !slices.Contains(actions, "sts:AssumeRole") {
+					continue
+				}
+				// Service-principal statements carry no Principal.AWS to decode.
+				if len(stmt.Principal.AWS) == 0 {
 					continue
 				}
 				var single string

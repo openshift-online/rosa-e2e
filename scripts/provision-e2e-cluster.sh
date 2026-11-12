@@ -355,14 +355,30 @@ if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
     exit 1
   fi
 
+  # Reuse an existing zone only when it is private and associated with the
+  # cluster VPC: a name match alone could pick a public zone or a zone
+  # associated with another VPC, and OCM requires the VPC association.
+  find_reusable_zone() {
+    local zone_name="$1" zone_id
+    for zone_id in $(aws --region "${REGION}" route53 list-hosted-zones-by-name \
+      --dns-name "${zone_name}" --output json |
+      jq -r --arg name "${zone_name}." \
+        '.HostedZones[] | select(.Name == $name and .Config.PrivateZone == true) | .Id' |
+      awk -F / '{print $NF}'); do
+      if aws --region "${REGION}" route53 get-hosted-zone --id "${zone_id}" --output json |
+        jq -e --arg vpc "${VPC_ID}" 'any(.VPCs[]?; .VPCId == $vpc)' >/dev/null; then
+        echo "${zone_id}"
+        return
+      fi
+    done
+  }
+
   # Private hosted zone for the cluster's records, associated with the VPC
   # (reuse an existing zone on re-run). HCP requires the 'rosa.' prefix:
   # OCM validates the zone name against 'cluster_domain_prefix.base_domain'
   # and the ingress records live under rosa.<cluster>.<base-domain>.
   PHZ_NAME="rosa.${CLUSTER_NAME}.${SHARED_VPC_BASE_DOMAIN}"
-  SHARED_VPC_PHZ_ID=$(aws --region "${REGION}" route53 list-hosted-zones-by-name \
-    --dns-name "${PHZ_NAME}" \
-    --query "HostedZones[?Name=='${PHZ_NAME}.'].Id" --output text | awk -F / '{printf $NF}')
+  SHARED_VPC_PHZ_ID=$(find_reusable_zone "${PHZ_NAME}")
   if [[ -z "${SHARED_VPC_PHZ_ID}" ]]; then
     HOSTED_ZONE_CREATION=$(aws --region "${REGION}" route53 create-hosted-zone \
       --name "${PHZ_NAME}" \
@@ -437,16 +453,14 @@ if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
     }"
   aws --region "${REGION}" iam attach-role-policy \
     --role-name "${CLUSTER_NAME}-shared-role" \
-    --policy-arn "${SHARED_VPC_POLICY_ARN}" 2>/dev/null || true
+    --policy-arn "${SHARED_VPC_POLICY_ARN}"
   echo "Shared role: ${SHARED_VPC_ROLE_ARN}"
 
   # Internal-communication PHZ (<cluster>.hypershift.local) associated with the
   # VPC, required by --hcp-internal-communication-hosted-zone-id (reuse on re-run)
   INTERNAL_PHZ_NAME="${CLUSTER_NAME}.hypershift.local"
-  SHARED_VPC_INTERNAL_PHZ_ID=$(aws --region "${REGION}" route53 list-hosted-zones-by-name \
-    --dns-name "${INTERNAL_PHZ_NAME}" \
-    --query "HostedZones[?Name=='${INTERNAL_PHZ_NAME}.'].Id" --output text | awk -F / '{printf $NF}')
-  if [[ -z "${SHARED_VPC_INTERNAL_PHZ_ID}" || "${SHARED_VPC_INTERNAL_PHZ_ID}" == "None" ]]; then
+  SHARED_VPC_INTERNAL_PHZ_ID=$(find_reusable_zone "${INTERNAL_PHZ_NAME}")
+  if [[ -z "${SHARED_VPC_INTERNAL_PHZ_ID}" ]]; then
     INTERNAL_ZONE_CREATION=$(aws --region "${REGION}" route53 create-hosted-zone \
       --name "${INTERNAL_PHZ_NAME}" \
       --vpc "VPCRegion=${REGION},VPCId=${VPC_ID}" \
@@ -515,7 +529,7 @@ if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
     }"
   aws --region "${REGION}" iam attach-role-policy \
     --role-name "${CLUSTER_NAME}-shared-vpcendpoint-role" \
-    --policy-arn "${SHARED_VPC_VPC_ENDPOINT_POLICY_ARN}" 2>/dev/null || true
+    --policy-arn "${SHARED_VPC_VPC_ENDPOINT_POLICY_ARN}"
   echo "VPC endpoint role: ${SHARED_VPC_VPC_ENDPOINT_ROLE_ARN}"
 
   # Assume-role permission policies: IAM needs both the trust on the shared
@@ -542,7 +556,7 @@ if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
     fi
     aws --region "${REGION}" iam attach-role-policy \
       --role-name "${target_role_name}" \
-      --policy-arn "${policy_arn}" 2>/dev/null || true
+      --policy-arn "${policy_arn}"
   }
   for principal in "${SHARED_VPC_INSTALLER_ROLE_ARN}" "${INGRESS_OPERATOR_ROLE_ARN}" "${CONTROL_PLANE_OPERATOR_ROLE_ARN}"; do
     ensure_assume_role_policy "${principal}" "${SHARED_VPC_ROLE_ARN}"
