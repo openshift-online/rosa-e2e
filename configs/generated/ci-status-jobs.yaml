@@ -371,6 +371,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-ocm-resources-staging-main
       - name: OSD RH AWS
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-osd-rh-aws-staging-main
+      - name: STS AD OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-ad-ocp5-latest-rc-staging-main
   - id: ocm-fvt-classic-int
     name: OCM FVT Classic INT
     scope: component
