@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -125,14 +126,32 @@ var _ = Describe("Shared VPC Cross-Account DNS",
 			clusterName := resp.Body().Name()
 			apiHost := hostOf(resp.Body().API().URL())
 			consoleHost := hostOf(resp.Body().Console().URL())
-			ingressSuffix := "apps." + clusterName + "." + s.baseDomain + "."
+
+			// Record layout differs by topology: Classic serves the whole
+			// <cluster>.<base-domain> tree (API record included) from the
+			// shared private hosted zone. HCP serves only the ingress tree
+			// from it, under the 'rosa.' cluster domain prefix - the API
+			// record lives in the dns domain's parent (public) zone.
+			var ingressSuffix, apiRecord string
+			if s.tc.IsHCP() {
+				ingressSuffix = "apps.rosa." + clusterName + "." + s.baseDomain + "."
+			} else {
+				ingressSuffix = "apps." + clusterName + "." + s.baseDomain + "."
+				apiRecord = apiHost + "."
+			}
 
 			By("Listing record sets in the shared account private hosted zone")
 			names := s.phzRecordNames(ctx)
 
-			By("Validating the API endpoint record exists in the shared private hosted zone")
-			Expect(names).To(ContainElement(apiHost+"."),
-				"private hosted zone %s should contain the API record", s.hostedZoneID)
+			if apiRecord != "" {
+				By("Validating the API endpoint record exists in the shared private hosted zone")
+				Expect(names).To(ContainElement(apiRecord),
+					"private hosted zone %s should contain the API record", s.hostedZoneID)
+			} else {
+				By("Validating the API endpoint resolves (HCP serves it from the dns domain's parent zone)")
+				_, err := net.LookupHost(apiHost)
+				Expect(err).NotTo(HaveOccurred(), "resolving API endpoint %s", apiHost)
+			}
 
 			By("Validating the wildcard ingress record exists in the shared private hosted zone")
 			var foundIngress bool
@@ -144,6 +163,10 @@ var _ = Describe("Shared VPC Cross-Account DNS",
 			}
 			Expect(foundIngress).To(BeTrue(),
 				"private hosted zone %s should contain a wildcard record for %s", s.hostedZoneID, ingressSuffix)
+
+			By("Validating the console endpoint is served by the shared private hosted zone")
+			Expect(consoleHost).To(HaveSuffix(strings.TrimSuffix(ingressSuffix, ".")),
+				"console endpoint should live under the shared zone's ingress domain %s", ingressSuffix)
 			GinkgoWriter.Printf("Ingress records serve %s (console: %s)\n", ingressSuffix, consoleHost)
 		})
 	})
@@ -165,6 +188,10 @@ var _ = Describe("Shared VPC Role Trust",
 			out, err := client.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String(roleName)})
 			Expect(err).NotTo(HaveOccurred(), "getting shared VPC role %s", roleName)
 
+			// IAM returns the trust policy document URL-encoded.
+			trustPolicy, err := url.QueryUnescape(aws.ToString(out.Role.AssumeRolePolicyDocument))
+			Expect(err).NotTo(HaveOccurred(), "unescaping the trust policy of %s", roleName)
+
 			var policy struct {
 				Statement []struct {
 					Effect    string `json:"Effect"`
@@ -174,7 +201,7 @@ var _ = Describe("Shared VPC Role Trust",
 					} `json:"Principal"`
 				} `json:"Statement"`
 			}
-			Expect(json.Unmarshal([]byte(aws.ToString(out.Role.AssumeRolePolicyDocument)), &policy)).To(Succeed())
+			Expect(json.Unmarshal([]byte(trustPolicy), &policy)).To(Succeed())
 
 			By("Validating the installer role is a trusted principal")
 			var principals []string

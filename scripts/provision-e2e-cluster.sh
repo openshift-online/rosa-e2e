@@ -101,11 +101,32 @@ fi
 # Prefer a managed OIDC config: unmanaged configs store their private key in AWS
 # Secrets Manager, and a deleted/inaccessible secret leaves a dangling config that
 # breaks cluster creation with "Failed to get secret value from '<arn>'".
+# When operator roles for this cluster already exist (shared VPC re-runs
+# pre-create them), pick the config whose issuer they trust instead of the
+# first managed config: rosa create cluster rejects operator roles whose trust
+# policy names a different issuer.
 OIDC_CONFIG_CREATED="false"
 if [[ -z "${OIDC_CONFIG_ID}" ]]; then
   echo ""
   echo "--- Getting OIDC config ---"
-  OIDC_CONFIG_ID=$(rosa list oidc-config -o json 2>/dev/null | jq -r '[.[] | select(.managed==true)][0].id // empty')
+  EXISTING_INGRESS_ROLE_NAME=$(aws iam list-roles \
+    --query "Roles[?starts_with(RoleName,'${CLUSTER_NAME}-openshift-ingress-operator')].RoleName" \
+    --output text | awk '{print $1}')
+  if [[ -n "${EXISTING_INGRESS_ROLE_NAME}" ]]; then
+    TRUSTED_OIDC_CONFIG_ID=$(aws iam get-role --role-name "${EXISTING_INGRESS_ROLE_NAME}" \
+      --query 'Role.AssumeRolePolicyDocument.Statement[0].Principal.Federated' \
+      --output text 2>/dev/null | grep -oE '[A-Za-z0-9]+$' || true)
+    if [[ -n "${TRUSTED_OIDC_CONFIG_ID}" ]]; then
+      OIDC_CONFIG_ID=$(rosa list oidc-config -o json 2>/dev/null |
+        jq -r --arg id "${TRUSTED_OIDC_CONFIG_ID}" '[.[] | select(.id == $id)][0].id // empty')
+      if [[ -n "${OIDC_CONFIG_ID}" ]]; then
+        echo "Using OIDC config ${OIDC_CONFIG_ID} trusted by the existing operator roles"
+      fi
+    fi
+  fi
+  if [[ -z "${OIDC_CONFIG_ID}" ]]; then
+    OIDC_CONFIG_ID=$(rosa list oidc-config -o json 2>/dev/null | jq -r '[.[] | select(.managed==true)][0].id // empty')
+  fi
   if [[ -z "${OIDC_CONFIG_ID}" ]]; then
     echo "Creating managed OIDC config..."
     OIDC_CONFIG_ID=$(rosa create oidc-config --managed --mode auto --yes -o json | jq -r '.id')
@@ -114,18 +135,22 @@ if [[ -z "${OIDC_CONFIG_ID}" ]]; then
 fi
 echo "OIDC Config: ${OIDC_CONFIG_ID}"
 
-# Step 3: Create VPC using ROSA network template
+# Step 3: Create VPC using ROSA network template (adopt an existing stack on re-run)
 echo ""
 echo "--- Creating VPC ---"
 STACK_NAME="${CLUSTER_NAME}-vpc"
 
-rosa create network rosa-quickstart-default-vpc \
-  --mode auto \
-  --param Region="${REGION}" \
-  --param Name="${STACK_NAME}" \
-  --param AvailabilityZoneCount=2 \
-  --param VpcCidr=10.0.0.0/16 \
-  --yes
+if ! aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --region "${REGION}" &>/dev/null; then
+  rosa create network rosa-quickstart-default-vpc \
+    --mode auto \
+    --param Region="${REGION}" \
+    --param Name="${STACK_NAME}" \
+    --param AvailabilityZoneCount=2 \
+    --param VpcCidr=10.0.0.0/16 \
+    --yes
+else
+  echo "VPC stack ${STACK_NAME} already exists, adopting it"
+fi
 
 # Wait for stack creation
 echo "Waiting for VPC stack creation..."
@@ -259,8 +284,11 @@ fi
 # in the same AWS account (CI provisions them in a second account).
 SHARED_VPC_ARGS=""
 SHARED_VPC_PHZ_ID=""
+SHARED_VPC_INTERNAL_PHZ_ID=""
 SHARED_VPC_ROLE_ARN=""
 SHARED_VPC_POLICY_ARN=""
+SHARED_VPC_VPC_ENDPOINT_ROLE_ARN=""
+SHARED_VPC_VPC_ENDPOINT_POLICY_ARN=""
 SHARED_VPC_INSTALLER_ROLE_ARN=""
 SHARED_VPC_OPERATOR_ROLES_CREATED="false"
 
@@ -295,7 +323,7 @@ if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
   # Pre-create the operator roles so the ingress-operator role exists before the
   # shared role's trust policy is written (mirrors the rosa-sts-oidc-config-create
   # chain in CI; rosa create cluster reuses them via --operator-roles-prefix).
-  if ! aws iam get-role --role-name "${CLUSTER_NAME}-openshift-ingress-operator" &>/dev/null; then
+  if ! aws iam list-roles --query "Roles[?starts_with(RoleName,'${CLUSTER_NAME}-openshift-ingress-operator')].Arn" --output text | grep -q arn; then
     echo "Creating operator roles with prefix ${CLUSTER_NAME}..."
     rosa create operator-roles \
       --hosted-cp \
@@ -308,64 +336,234 @@ if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
   else
     echo "Operator roles with prefix ${CLUSTER_NAME} exist"
   fi
-  INGRESS_OPERATOR_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${CLUSTER_NAME}-openshift-ingress-operator"
+  # rosa generates the ingress-operator role name from the prefix; resolve the
+  # actual ARN (AWS rejects unresolvable principals in the trust policy below).
+  INGRESS_OPERATOR_ROLE_ARN=$(aws iam list-roles \
+    --query "Roles[?starts_with(RoleName,'${CLUSTER_NAME}-openshift-ingress-operator')].Arn" \
+    --output text | awk '{print $1}')
+  if [[ -z "${INGRESS_OPERATOR_ROLE_ARN}" ]]; then
+    echo "ERROR: could not resolve the ingress-operator role ARN"
+    exit 1
+  fi
+  # The control-plane operator role is the third principal in the HCP shared
+  # role trust policies (see rosa's PrepareSharedRoute53RoleForHostedCP).
+  CONTROL_PLANE_OPERATOR_ROLE_ARN=$(aws iam list-roles \
+    --query "Roles[?starts_with(RoleName,'${CLUSTER_NAME}-kube-system-control-plane-operator')].Arn" \
+    --output text | awk '{print $1}')
+  if [[ -z "${CONTROL_PLANE_OPERATOR_ROLE_ARN}" ]]; then
+    echo "ERROR: could not resolve the control-plane-operator role ARN"
+    exit 1
+  fi
 
-  # Private hosted zone for <cluster-name>.<base-domain>, associated with the VPC
-  PHZ_NAME="${CLUSTER_NAME}.${SHARED_VPC_BASE_DOMAIN}"
-  HOSTED_ZONE_CREATION=$(aws --region "${REGION}" route53 create-hosted-zone \
-    --name "${PHZ_NAME}" \
-    --vpc "VPCRegion=${REGION},VPCId=${VPC_ID}" \
-    --caller-reference "${PHZ_NAME}-$(date +%s)")
-  SHARED_VPC_PHZ_ID=$(jq -r '.HostedZone.Id' <<<"${HOSTED_ZONE_CREATION}" | awk -F / '{printf $3}')
+  # Private hosted zone for the cluster's records, associated with the VPC
+  # (reuse an existing zone on re-run). HCP requires the 'rosa.' prefix:
+  # OCM validates the zone name against 'cluster_domain_prefix.base_domain'
+  # and the ingress records live under rosa.<cluster>.<base-domain>.
+  PHZ_NAME="rosa.${CLUSTER_NAME}.${SHARED_VPC_BASE_DOMAIN}"
+  SHARED_VPC_PHZ_ID=$(aws --region "${REGION}" route53 list-hosted-zones-by-name \
+    --dns-name "${PHZ_NAME}" \
+    --query "HostedZones[?Name=='${PHZ_NAME}.'].Id" --output text | awk -F / '{printf $NF}')
+  if [[ -z "${SHARED_VPC_PHZ_ID}" ]]; then
+    HOSTED_ZONE_CREATION=$(aws --region "${REGION}" route53 create-hosted-zone \
+      --name "${PHZ_NAME}" \
+      --vpc "VPCRegion=${REGION},VPCId=${VPC_ID}" \
+      --caller-reference "${PHZ_NAME}-$(date +%s)")
+    SHARED_VPC_PHZ_ID=$(jq -r '.HostedZone.Id' <<<"${HOSTED_ZONE_CREATION}" | awk -F / '{printf $3}')
+  fi
   echo "Private hosted zone: ${SHARED_VPC_PHZ_ID} (${PHZ_NAME})"
 
-  # Shared policy (route53 + ec2:DeleteTags on the VPC, mirrors the CI step)
-  SHARED_VPC_POLICY_ARN=$(aws --region "${REGION}" iam create-policy \
-    --policy-name "${CLUSTER_NAME}-shared-policy" \
+  # Shared policy (route53 + ec2:DeleteTags on the VPC, mirrors the CI step;
+  # reuse an existing policy on re-run)
+  SHARED_VPC_POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${CLUSTER_NAME}-shared-policy"
+  if ! aws iam get-policy --policy-arn "${SHARED_VPC_POLICY_ARN}" &>/dev/null; then
+    SHARED_VPC_POLICY_ARN=$(aws --region "${REGION}" iam create-policy \
+      --policy-name "${CLUSTER_NAME}-shared-policy" \
+      --policy-document "{
+        \"Version\": \"2012-10-17\",
+        \"Statement\": [
+          {
+            \"Effect\": \"Allow\",
+            \"Action\": \"ec2:DeleteTags\",
+            \"Resource\": \"arn:aws:ec2:${REGION}:${AWS_ACCOUNT_ID}:vpc/${VPC_ID}\"
+          },
+          {
+            \"Effect\": \"Allow\",
+            \"Action\": [
+              \"route53:ChangeResourceRecordSets\", \"route53:ListHostedZones\",
+              \"route53:ListHostedZonesByName\", \"route53:ListResourceRecordSets\",
+              \"route53:ChangeTagsForResource\", \"route53:GetAccountLimit\",
+              \"route53:GetChange\", \"route53:GetHostedZone\",
+              \"route53:ListTagsForResource\", \"route53:UpdateHostedZoneComment\",
+              \"tag:GetResources\", \"tag:UntagResources\"
+            ],
+            \"Resource\": \"*\"
+          }
+        ]
+      }" --query 'Policy.Arn' --output text)
+  fi
+  echo "Shared policy: ${SHARED_VPC_POLICY_ARN}"
+
+  # Shared (route53) role trusting the installer, ingress-operator and
+  # control-plane-operator roles (reuse and re-trust an existing role on re-run)
+  if ! aws iam get-role --role-name "${CLUSTER_NAME}-shared-role" &>/dev/null; then
+    SHARED_VPC_ROLE_ARN=$(aws --region "${REGION}" iam create-role \
+      --role-name "${CLUSTER_NAME}-shared-role" \
+      --assume-role-policy-document "{
+        \"Version\": \"2012-10-17\",
+        \"Statement\": [
+          {
+            \"Effect\": \"Allow\",
+            \"Principal\": {\"AWS\": [\"${SHARED_VPC_INSTALLER_ROLE_ARN}\", \"${INGRESS_OPERATOR_ROLE_ARN}\", \"${CONTROL_PLANE_OPERATOR_ROLE_ARN}\"]},
+            \"Action\": \"sts:AssumeRole\",
+            \"Condition\": {}
+          }
+        ]
+      }" --query 'Role.Arn' --output text)
+  else
+    SHARED_VPC_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${CLUSTER_NAME}-shared-role"
+  fi
+  aws --region "${REGION}" iam update-assume-role-policy \
+    --role-name "${CLUSTER_NAME}-shared-role" \
     --policy-document "{
       \"Version\": \"2012-10-17\",
       \"Statement\": [
         {
           \"Effect\": \"Allow\",
-          \"Action\": \"ec2:DeleteTags\",
-          \"Resource\": \"arn:aws:ec2:${REGION}:${AWS_ACCOUNT_ID}:vpc/${VPC_ID}\"
-        },
-        {
-          \"Effect\": \"Allow\",
-          \"Action\": [
-            \"route53:ChangeResourceRecordSets\", \"route53:ListHostedZones\",
-            \"route53:ListHostedZonesByName\", \"route53:ListResourceRecordSets\",
-            \"route53:ChangeTagsForResource\", \"route53:GetAccountLimit\",
-            \"route53:GetChange\", \"route53:GetHostedZone\",
-            \"route53:ListTagsForResource\", \"route53:UpdateHostedZoneComment\",
-            \"tag:GetResources\", \"tag:UntagResources\"
-          ],
-          \"Resource\": \"*\"
-        }
-      ]
-    }" --query 'Policy.Arn' --output text)
-  echo "Shared policy: ${SHARED_VPC_POLICY_ARN}"
-
-  # Shared role trusting the installer and ingress-operator roles
-  SHARED_VPC_ROLE_ARN=$(aws --region "${REGION}" iam create-role \
-    --role-name "${CLUSTER_NAME}-shared-role" \
-    --assume-role-policy-document "{
-      \"Version\": \"2012-10-17\",
-      \"Statement\": [
-        {
-          \"Effect\": \"Allow\",
-          \"Principal\": {\"AWS\": [\"${SHARED_VPC_INSTALLER_ROLE_ARN}\", \"${INGRESS_OPERATOR_ROLE_ARN}\"]},
+          \"Principal\": {\"AWS\": [\"${SHARED_VPC_INSTALLER_ROLE_ARN}\", \"${INGRESS_OPERATOR_ROLE_ARN}\", \"${CONTROL_PLANE_OPERATOR_ROLE_ARN}\"]},
           \"Action\": \"sts:AssumeRole\",
           \"Condition\": {}
         }
       ]
-    }" --query 'Role.Arn' --output text)
+    }"
   aws --region "${REGION}" iam attach-role-policy \
     --role-name "${CLUSTER_NAME}-shared-role" \
-    --policy-arn "${SHARED_VPC_POLICY_ARN}"
+    --policy-arn "${SHARED_VPC_POLICY_ARN}" 2>/dev/null || true
   echo "Shared role: ${SHARED_VPC_ROLE_ARN}"
 
-  SHARED_VPC_ARGS="--base-domain ${SHARED_VPC_BASE_DOMAIN} --ingress-private-hosted-zone-id ${SHARED_VPC_PHZ_ID} --route53-role-arn ${SHARED_VPC_ROLE_ARN} --operator-roles-prefix ${CLUSTER_NAME} --role-arn ${SHARED_VPC_INSTALLER_ROLE_ARN}"
+  # Internal-communication PHZ (<cluster>.hypershift.local) associated with the
+  # VPC, required by --hcp-internal-communication-hosted-zone-id (reuse on re-run)
+  INTERNAL_PHZ_NAME="${CLUSTER_NAME}.hypershift.local"
+  SHARED_VPC_INTERNAL_PHZ_ID=$(aws --region "${REGION}" route53 list-hosted-zones-by-name \
+    --dns-name "${INTERNAL_PHZ_NAME}" \
+    --query "HostedZones[?Name=='${INTERNAL_PHZ_NAME}.'].Id" --output text | awk -F / '{printf $NF}')
+  if [[ -z "${SHARED_VPC_INTERNAL_PHZ_ID}" || "${SHARED_VPC_INTERNAL_PHZ_ID}" == "None" ]]; then
+    INTERNAL_ZONE_CREATION=$(aws --region "${REGION}" route53 create-hosted-zone \
+      --name "${INTERNAL_PHZ_NAME}" \
+      --vpc "VPCRegion=${REGION},VPCId=${VPC_ID}" \
+      --caller-reference "${INTERNAL_PHZ_NAME}-$(date +%s)")
+    SHARED_VPC_INTERNAL_PHZ_ID=$(jq -r '.HostedZone.Id' <<<"${INTERNAL_ZONE_CREATION}" | awk -F / '{printf $3}')
+  fi
+  echo "Internal communication hosted zone: ${SHARED_VPC_INTERNAL_PHZ_ID} (${INTERNAL_PHZ_NAME})"
+
+  # VPC endpoint policy + role: grants the ec2 VPC-endpoint / security-group and
+  # route53 record permissions the control plane needs to wire up the
+  # cross-account VPC (mirrors rosa's PrepareSharedVPCEndPointRoleForHostedCP)
+  SHARED_VPC_VPC_ENDPOINT_POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${CLUSTER_NAME}-sharedvpc-vpc-endpoint-policy"
+  if ! aws iam get-policy --policy-arn "${SHARED_VPC_VPC_ENDPOINT_POLICY_ARN}" &>/dev/null; then
+    SHARED_VPC_VPC_ENDPOINT_POLICY_ARN=$(aws --region "${REGION}" iam create-policy \
+      --policy-name "${CLUSTER_NAME}-sharedvpc-vpc-endpoint-policy" \
+      --policy-document "{
+        \"Version\": \"2012-10-17\",
+        \"Statement\": [
+          {
+            \"Effect\": \"Allow\",
+            \"Action\": [
+              \"ec2:CreateVpcEndpoint\", \"ec2:DescribeVpcEndpoints\", \"ec2:ModifyVpcEndpoint\",
+              \"ec2:DeleteVpcEndpoints\", \"ec2:CreateTags\", \"ec2:CreateSecurityGroup\",
+              \"ec2:AuthorizeSecurityGroupIngress\", \"ec2:AuthorizeSecurityGroupEgress\",
+              \"ec2:DeleteSecurityGroup\", \"ec2:RevokeSecurityGroupIngress\",
+              \"ec2:RevokeSecurityGroupEgress\", \"ec2:DescribeSecurityGroups\",
+              \"ec2:DescribeVpcs\", \"route53:ListHostedZones\",
+              \"route53:ChangeResourceRecordSets\", \"route53:ListResourceRecordSets\"
+            ],
+            \"Resource\": \"*\"
+          }
+        ]
+      }" --query 'Policy.Arn' --output text)
+  fi
+  echo "VPC endpoint policy: ${SHARED_VPC_VPC_ENDPOINT_POLICY_ARN}"
+
+  if ! aws iam get-role --role-name "${CLUSTER_NAME}-shared-vpcendpoint-role" &>/dev/null; then
+    SHARED_VPC_VPC_ENDPOINT_ROLE_ARN=$(aws --region "${REGION}" iam create-role \
+      --role-name "${CLUSTER_NAME}-shared-vpcendpoint-role" \
+      --assume-role-policy-document "{
+        \"Version\": \"2012-10-17\",
+        \"Statement\": [
+          {
+            \"Effect\": \"Allow\",
+            \"Principal\": {\"AWS\": [\"${SHARED_VPC_INSTALLER_ROLE_ARN}\", \"${CONTROL_PLANE_OPERATOR_ROLE_ARN}\"]},
+            \"Action\": \"sts:AssumeRole\",
+            \"Condition\": {}
+          }
+        ]
+      }" --query 'Role.Arn' --output text)
+  else
+    SHARED_VPC_VPC_ENDPOINT_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${CLUSTER_NAME}-shared-vpcendpoint-role"
+  fi
+  aws --region "${REGION}" iam update-assume-role-policy \
+    --role-name "${CLUSTER_NAME}-shared-vpcendpoint-role" \
+    --policy-document "{
+      \"Version\": \"2012-10-17\",
+      \"Statement\": [
+        {
+          \"Effect\": \"Allow\",
+          \"Principal\": {\"AWS\": [\"${SHARED_VPC_INSTALLER_ROLE_ARN}\", \"${CONTROL_PLANE_OPERATOR_ROLE_ARN}\"]},
+          \"Action\": \"sts:AssumeRole\",
+          \"Condition\": {}
+        }
+      ]
+    }"
+  aws --region "${REGION}" iam attach-role-policy \
+    --role-name "${CLUSTER_NAME}-shared-vpcendpoint-role" \
+    --policy-arn "${SHARED_VPC_VPC_ENDPOINT_POLICY_ARN}" 2>/dev/null || true
+  echo "VPC endpoint role: ${SHARED_VPC_VPC_ENDPOINT_ROLE_ARN}"
+
+  # Assume-role permission policies: IAM needs both the trust on the shared
+  # roles and an sts:AssumeRole grant on the assuming side. rosa create
+  # account-roles/operator-roles attaches these when run with the shared VPC
+  # flags; with pre-existing org account roles we attach them directly
+  # (naming mirrors rosa's AssumeRolePolicyPrefix: <role-name>-assume-role).
+  ensure_assume_role_policy() {
+    local target_role_arn="$1" shared_role_arn="$2"
+    local target_role_name="${target_role_arn##*/}"
+    local shared_role_name="${shared_role_arn##*/}"
+    local policy_arn="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${shared_role_name}-assume-role"
+    if ! aws iam get-policy --policy-arn "${policy_arn}" &>/dev/null; then
+      policy_arn=$(aws --region "${REGION}" iam create-policy \
+        --policy-name "${shared_role_name}-assume-role" \
+        --policy-document "{
+          \"Version\": \"2012-10-17\",
+          \"Statement\": {
+            \"Effect\": \"Allow\",
+            \"Action\": \"sts:AssumeRole\",
+            \"Resource\": \"${shared_role_arn}\"
+          }
+        }" --query 'Policy.Arn' --output text)
+    fi
+    aws --region "${REGION}" iam attach-role-policy \
+      --role-name "${target_role_name}" \
+      --policy-arn "${policy_arn}" 2>/dev/null || true
+  }
+  for principal in "${SHARED_VPC_INSTALLER_ROLE_ARN}" "${INGRESS_OPERATOR_ROLE_ARN}" "${CONTROL_PLANE_OPERATOR_ROLE_ARN}"; do
+    ensure_assume_role_policy "${principal}" "${SHARED_VPC_ROLE_ARN}"
+  done
+  for principal in "${SHARED_VPC_INSTALLER_ROLE_ARN}" "${CONTROL_PLANE_OPERATOR_ROLE_ARN}"; do
+    ensure_assume_role_policy "${principal}" "${SHARED_VPC_VPC_ENDPOINT_ROLE_ARN}"
+  done
+
+  SHARED_VPC_ARGS="--base-domain ${SHARED_VPC_BASE_DOMAIN} --ingress-private-hosted-zone-id ${SHARED_VPC_PHZ_ID} --hcp-internal-communication-hosted-zone-id ${SHARED_VPC_INTERNAL_PHZ_ID} --route53-role-arn ${SHARED_VPC_ROLE_ARN} --vpc-endpoint-role-arn ${SHARED_VPC_VPC_ENDPOINT_ROLE_ARN} --additional-allowed-principals ${SHARED_VPC_ROLE_ARN},${SHARED_VPC_VPC_ENDPOINT_ROLE_ARN} --operator-roles-prefix ${CLUSTER_NAME} --role-arn ${SHARED_VPC_INSTALLER_ROLE_ARN}"
+  # Passing --role-arn explicitly makes rosa ask for the full account-role set;
+  # resolve the matching support and worker roles so creation stays non-interactive.
+  SHARED_VPC_SUPPORT_ROLE_ARN=$(rosa list account-roles -o json 2>/dev/null |
+    jq -r '[.[] | select(.RoleName | contains("HCP-ROSA") and contains("Support-Role"))][0].RoleARN // empty')
+  SHARED_VPC_WORKER_ROLE_ARN=$(rosa list account-roles -o json 2>/dev/null |
+    jq -r '[.[] | select(.RoleName | contains("HCP-ROSA") and contains("Worker-Role"))][0].RoleARN // empty')
+  if [[ -n "${SHARED_VPC_SUPPORT_ROLE_ARN}" ]]; then
+    SHARED_VPC_ARGS+=" --support-role-arn ${SHARED_VPC_SUPPORT_ROLE_ARN}"
+  fi
+  if [[ -n "${SHARED_VPC_WORKER_ROLE_ARN}" ]]; then
+    SHARED_VPC_ARGS+=" --worker-iam-role-arn ${SHARED_VPC_WORKER_ROLE_ARN}"
+  fi
 fi
 
 # Step 5: Create cluster
@@ -432,8 +630,11 @@ export KMS_KEY_CREATED=${KMS_KEY_CREATED}
 export SHARED_VPC_ENABLED=${SHARED_VPC_ENABLED}
 export SHARED_VPC_BASE_DOMAIN=${SHARED_VPC_BASE_DOMAIN}
 export SHARED_VPC_HOSTED_ZONE_ID=${SHARED_VPC_PHZ_ID}
+export SHARED_VPC_INTERNAL_PHZ_ID=${SHARED_VPC_INTERNAL_PHZ_ID}
 export SHARED_VPC_ROLE_ARN=${SHARED_VPC_ROLE_ARN}
 export SHARED_VPC_POLICY_ARN=${SHARED_VPC_POLICY_ARN}
+export SHARED_VPC_VPC_ENDPOINT_ROLE_ARN=${SHARED_VPC_VPC_ENDPOINT_ROLE_ARN}
+export SHARED_VPC_VPC_ENDPOINT_POLICY_ARN=${SHARED_VPC_VPC_ENDPOINT_POLICY_ARN}
 export SHARED_VPC_INSTALLER_ROLE_ARN=${SHARED_VPC_INSTALLER_ROLE_ARN}
 export SHARED_VPC_OPERATOR_ROLES_CREATED=${SHARED_VPC_OPERATOR_ROLES_CREATED}
 export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE:-${HOME}/.aws/credentials}
