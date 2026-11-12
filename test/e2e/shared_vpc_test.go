@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -74,9 +75,14 @@ func (s *sharedVPCTestContext) sharedAccountConfig(ctx context.Context) aws.Conf
 	region := resp.Body().Region().ID()
 	Expect(region).NotTo(BeEmpty(), "cluster region not reported by OCM")
 
+	// WithSharedConfigFiles alone does not replace the credentials chain:
+	// the default credentials file (and any ambient environment credentials)
+	// would still win, querying the cluster account instead of the shared
+	// account. Pin both slots to the shared-account file.
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion(region),
 		awsconfig.WithSharedConfigFiles([]string{s.sharedCredsFile}),
+		awsconfig.WithSharedCredentialsFiles([]string{s.sharedCredsFile}),
 	)
 	Expect(err).NotTo(HaveOccurred(), "loading shared VPC account AWS config")
 	return awsCfg
@@ -154,15 +160,18 @@ var _ = Describe("Shared VPC Cross-Account DNS",
 			}
 
 			By("Validating the wildcard ingress record exists in the shared private hosted zone")
+			// Route 53 escapes the wildcard label as \052; normalize before
+			// comparing so only the exact wildcard record matches.
+			wildcardName := "*." + ingressSuffix
 			var foundIngress bool
 			for _, name := range names {
-				if strings.HasSuffix(name, ingressSuffix) {
+				if strings.ReplaceAll(name, `\052`, "*") == wildcardName {
 					foundIngress = true
 					break
 				}
 			}
 			Expect(foundIngress).To(BeTrue(),
-				"private hosted zone %s should contain a wildcard record for %s", s.hostedZoneID, ingressSuffix)
+				"private hosted zone %s should contain the wildcard record %s", s.hostedZoneID, wildcardName)
 
 			By("Validating the console endpoint is served by the shared private hosted zone")
 			Expect(consoleHost).To(HaveSuffix(strings.TrimSuffix(ingressSuffix, ".")),
@@ -194,8 +203,8 @@ var _ = Describe("Shared VPC Role Trust",
 
 			var policy struct {
 				Statement []struct {
-					Effect    string `json:"Effect"`
-					Action    string `json:"Action"`
+					Effect    string          `json:"Effect"`
+					Action    json.RawMessage `json:"Action"`
 					Principal struct {
 						AWS   json.RawMessage `json:"AWS"`
 					} `json:"Principal"`
@@ -206,7 +215,15 @@ var _ = Describe("Shared VPC Role Trust",
 			By("Validating the installer role is a trusted principal")
 			var principals []string
 			for _, stmt := range policy.Statement {
-				if stmt.Effect != "Allow" || !strings.Contains(stmt.Action, "sts:AssumeRole") {
+				// The IAM grammar allows Action as a string or an array.
+				var actions []string
+				var singleAction string
+				if json.Unmarshal(stmt.Action, &singleAction) == nil {
+					actions = append(actions, singleAction)
+				} else {
+					Expect(json.Unmarshal(stmt.Action, &actions)).To(Succeed())
+				}
+				if stmt.Effect != "Allow" || !slices.Contains(actions, "sts:AssumeRole") {
 					continue
 				}
 				var single string
