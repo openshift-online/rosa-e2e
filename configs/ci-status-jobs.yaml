@@ -424,8 +424,23 @@ categories:
       - name: OSD RH AWS
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-osd-rh-aws-staging-main
       # OCP5
+      - name: OSD RH AWS OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-osd-rh-aws-ocp5-latest-rc-staging-main
+        gating: false  # informational until production gating is verified
+      - name: ROSA AD OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-ad-ocp5-latest-rc-staging-main
+        gating: false  # informational until production gating is verified
       - name: STS AD OCP5
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-ad-ocp5-latest-rc-staging-main
+      - name: STS n-X Y-Upgrade OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-nx-y-upg-ocp5-lt-rc-staging-main
+        gating: false  # informational until production gating is verified
+      - name: STS PL OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-pl-ocp5-latest-rc-staging-main
+        gating: false  # informational until production gating is verified
+      - name: STS Shared VPC OCP5
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-shvpc-ocp5-lt-rc-staging-main
+        gating: false  # informational until production gating is verified
 
   - id: ocm-fvt-classic-int
     scope: component
