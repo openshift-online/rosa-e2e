@@ -44,14 +44,22 @@ func TestCIStatusNewScheduledCoverageIsInformational(t *testing.T) {
 
 func TestCIStatusRetiredJobsAbsent(t *testing.T) {
 	retired := map[string]bool{
-		"periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-nightly-5-0": true,
-		"periodic-ci-openshift-aws-vpce-operator-main-rosa-sts-e2e-promotion-int":               true,
-		"periodic-ci-openshift-aws-vpce-operator-main-rosa-sts-e2e-promotion-stage":             true,
+		"periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-nightly-5-0":                     true,
+		"periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-candidate-5-0":                   true,
+		"periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-integration-candidate-5-0":               true,
+		"periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-candidate-5-0":           true,
+		"periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-candidate-5-0": true,
+		"periodic-ci-openshift-aws-vpce-operator-main-rosa-sts-e2e-promotion-int":                                   true,
+		"periodic-ci-openshift-aws-vpce-operator-main-rosa-sts-e2e-promotion-stage":                                 true,
 	}
 	for _, category := range loadCIStatusConfig(t).Categories {
 		for _, job := range category.Jobs {
 			if retired[job.ProwJob] {
 				t.Errorf("category %s contains retired job %s", category.ID, job.ProwJob)
+			}
+			if strings.Contains(job.ProwJob, "main-periodics-rosa-hcp-fips-") ||
+				strings.Contains(job.ProwJob, "main-periodics-rosa-classic-sts-fips-") {
+				t.Errorf("category %s contains pre-split FIPS job %s", category.ID, job.ProwJob)
 			}
 		}
 	}

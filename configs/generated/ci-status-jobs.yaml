@@ -57,6 +57,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-21
       - name: STS 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-22
+      - name: STS 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-5-0
       - name: STS FIPS 4.19
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-19
       - name: STS FIPS 4.20
@@ -65,6 +67,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-21
       - name: STS FIPS 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-4-22
+      - name: STS FIPS 5.0
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-fips-rosa-classic-sts-fips-e2e-staging-stable-5-0
       - name: OSD GCP 4.22
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-staging-stable-4-22
       - name: OSD GCP FIPS 4.22
