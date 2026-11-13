@@ -1,4 +1,4 @@
-.PHONY: build test dry-run unit-test lint image clean configs configs-snapshot
+.PHONY: build test dry-run min-version-test min-version-test-hcp unit-test lint image clean configs configs-snapshot
 
 GINKGO = go run github.com/onsi/ginkgo/v2/ginkgo
 LABEL_FILTER ?=
@@ -28,6 +28,28 @@ else
 	$(GINKGO) run --tags E2Etests --dry-run -v ./test/e2e/
 endif
 
+# Run minimum OCP version coverage tests (targets prod:canary sector with MinVersion label)
+# Timeout is 3h (45m provision + 15m delete + 30m cleanup buffer per 2h spec timeout)
+min-version-test:
+	$(GINKGO) run --tags E2Etests \
+		--label-filter="Area:MinVersion" \
+		--junit-report junit-min-version-report.xml \
+		--timeout=3h \
+		-v ./test/e2e/
+
+# Run min-version tests for HCP topology only
+# Timeout is 3h (45m provision + 15m delete + 30m cleanup buffer per 2h spec timeout)
+min-version-test-hcp:
+	@if [ -z "$(CLUSTER_ID)" ]; then \
+		echo "Error: CLUSTER_ID is required for min-version-test-hcp"; \
+		exit 1; \
+	fi
+	$(GINKGO) run --tags E2Etests \
+		--label-filter="Area:MinVersion && Platform:HCP" \
+		--junit-report junit-min-version-hcp-report.xml \
+		--timeout=3h \
+		-v ./test/e2e/
+
 unit-test:
 	go test -mod=mod ./pkg/...
 
@@ -42,3 +64,5 @@ image:
 clean:
 	rm -f test/e2e/e2e.test
 	rm -f junit-report.xml
+	rm -f junit-min-version-report.xml
+	rm -f junit-min-version-hcp-report.xml
