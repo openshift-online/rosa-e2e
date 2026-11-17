@@ -181,6 +181,26 @@ func TestDescribeOCMResponseRejectsUnsafeInput(t *testing.T) {
 			wantCode: "unavailable", wantOperationID: "unavailable",
 		},
 		{
+			// The SDK parser stops at the end of the first JSON value and reports no error, so
+			// without a whole-document check both identifiers here would be emitted.
+			name:     "complete object followed by trailing garbage yields no identifiers",
+			endpoint: managementClusters,
+			status:   401,
+			body:     []byte(`{"code":"OSDFM-401","operation_id":"123"}garbage`),
+
+			wantEndpoint: managementClusters, wantStatus: "401",
+			wantCode: "unavailable", wantOperationID: "unavailable",
+		},
+		{
+			name:     "two concatenated documents yield no identifiers",
+			endpoint: managementClusters,
+			status:   401,
+			body:     []byte(`{"code":"OSDFM-401","operation_id":"123"} {"code":"OSDFM-500"}`),
+
+			wantEndpoint: managementClusters, wantStatus: "401",
+			wantCode: "unavailable", wantOperationID: "unavailable",
+		},
+		{
 			name:     "empty body yields no identifiers",
 			endpoint: serviceClusters,
 			status:   504,

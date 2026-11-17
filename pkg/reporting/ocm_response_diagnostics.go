@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -117,6 +118,13 @@ func ocmErrorIdentifiers(body []byte) (code, operationID string) {
 	}
 	// Only a JSON object can be an OCM error document, so anything else is not parsed.
 	if trimmed[0] != '{' {
+		return "", ""
+	}
+	// ocmerrors.UnmarshalError reads the first JSON value and returns, so it never inspects what
+	// follows it: `{"code":"X-1","operation_id":"1"}garbage` parses without error and yields both
+	// identifiers. Validate the whole document first so only a body that is entirely one JSON
+	// value reaches the parser, which is what the contract above promises.
+	if !json.Valid(trimmed) {
 		return "", ""
 	}
 	parsed, err := ocmerrors.UnmarshalError(trimmed)
