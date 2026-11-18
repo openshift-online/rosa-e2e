@@ -69,11 +69,23 @@ collateral from a known outage:
 
 - Search open issues across the relevant Jira projects (not just one), and
   open remediation PRs in every relevant repository. In each repository,
-  search both the `rosa-ci-fix` label and the related Jira key and/or
-  `[rosa-ci-fix]` title marker. A zero-result label search is not sufficient
-  to conclude that no fix PR exists. Search all open matches, not just recent
-  ones -- an older open fix PR still counts. Which project depends on the
-  owning component:
+  search by the `[rosa-ci-fix]` title marker and the related Jira key (fix
+  PRs carry no `rosa-ci-fix` GitHub label). A marker/Jira search can miss a
+  matching PR whose title carries neither, so also search open PRs by
+  repository, head branch, and fix purpose, and reuse or update a matching
+  bot-owned or explicitly authorized PR on its existing branch instead of
+  opening a duplicate. Link and report human-authored matches in the
+  thread without modifying them or opening a duplicate; defer any change
+  requiring their owner's authorization. When you reuse a bot-owned PR
+  whose title lacks the `[rosa-ci-fix]` marker, add the prefix to its
+  title as part of the update if your grants allow retitling, so the daily
+  all-green check keeps selecting it; if you cannot retitle it, note the
+  PR in the thread and keep shepherding it from this thread's scheduled
+  follow-ups. Search all open
+  matches, not just recent ones -- an older open fix PR still counts. If a
+  PR listing is incomplete or forbidden, do not open a new PR for that
+  search; note the gap in the thread. Which
+  project depends on the owning component:
   - `ROSAENG` -- ROSA-specific bugs and CI issues.
   - `OCPBUGS` -- OpenShift product bugs (OCP components).
   - `DPTP` -- Test Platform / build-farm / Prow infra.
@@ -218,16 +230,20 @@ concrete outcome for the bucket:
   team, the filed+owned ticket alone reaches `Tracked`; say so in the thread.
 - **Test bug / resilience**: if the analysis yields a concrete fix
   (`Eventually()`, wait-for-annotation, longer timeout), open a PR with it
-  via `priv_scm_ensure_fork` + `scm_create_change_request`, labeled
-  `[rosa-ci-fix]`. If a PR already exists, shepherd it (note what's blocking:
-  missing lgtm, stale, needs rebase) instead of leaving a dangling ref.
+  via `priv_scm_ensure_fork` + `scm_create_change_request`, with the
+  `[rosa-ci-fix]` prefix in the PR title. Do not add a `rosa-ci-fix` GitHub
+  label; the title prefix is the only tracking signal. If a PR already
+  exists, shepherd it if it is bot-owned or explicitly authorized (note
+  what's blocking: missing lgtm, stale, needs rebase) instead of leaving a
+  dangling ref; for a human-authored match, link it and defer to its
+  owner.
 - **Incomplete artifacts**: open a PR adding the missing gather step to the
   step-registry ref or harness failure path. Not optional cleanup -- a
   blocker for the job being trustworthy.
 
-Shepherd any open fix: check CI status and review state, reply to
-unaddressed review comments, retest failures, and re-poll (via a scheduled
-follow-up) until it merges or is blocked.
+Shepherd any open bot-owned or explicitly authorized fix: check CI status
+and review state, reply to unaddressed review comments, retest failures,
+and re-poll (via a scheduled follow-up) until it merges or is blocked.
 
 **Limits (guardrails):**
 
