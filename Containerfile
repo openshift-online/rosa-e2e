@@ -33,7 +33,7 @@ RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/op
 
 # jq is only useful with libjq and libonig, so it is a named stage to keep the
 # binary and its libraries on one version.
-FROM registry.access.redhat.com/hi/jq:1.8@sha256:6d1c63481a7520d203f6e993c82be4d114cefebcf32b604a405c7d99c1cc314d AS jq
+FROM registry.access.redhat.com/hi/jq:1.8@sha256:7e7bb5a7441020cc41650ca55a1ccda3c9031191ed6f4a969dd038ecea1cfc5a AS jq
 
 FROM registry.access.redhat.com/hi/core-runtime:2.43@sha256:81280d7fd6afa7a3d2a6da2e90e545cf8e5d187c80a69b2a1c875fdcd731aaed
 
