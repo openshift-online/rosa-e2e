@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	leanRegistryPath     = "../../configs/ci-status-jobs.yaml"
-	orgSnapshotPath      = "../../configs/generated/org-teams.yaml"
+	leanRegistryPath      = "../../configs/ci-status-jobs.yaml"
+	orgSnapshotPath       = "../../configs/generated/org-teams.yaml"
 	generatedRegistryPath = "../../configs/generated/ci-status-jobs.yaml"
-	chaiBotDir           = "../../.chai-bot"
+	chaiBotDir            = "../../.chai-bot"
 
 	// The lean raw URL must not appear in chai-bot tasks: they must fetch the
 	// generated output, which carries the org team identity.
@@ -79,6 +79,25 @@ func TestGeneratedRegistryIsUpToDate(t *testing.T) {
 	}
 	if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(want)) {
 		t.Errorf("committed generated registry is stale: run `make configs` and commit configs/generated/ci-status-jobs.yaml")
+	}
+}
+
+// TestEmbeddedRegistryMatchesGenerated asserts the copy embedded in pkg/config
+// (consumed via the Go module) matches the committed generated registry.
+func TestEmbeddedRegistryMatchesGenerated(t *testing.T) {
+	committed, err := os.ReadFile(generatedRegistryPath)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", generatedRegistryPath, err)
+	}
+	if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(GeneratedCIStatusJobsYAML())) {
+		t.Errorf("embedded registry is stale: run `make configs` and commit pkg/config/generated/ci-status-jobs.yaml")
+	}
+	cfg, err := ParseGeneratedCIStatusConfig()
+	if err != nil {
+		t.Fatalf("failed to parse embedded registry: %v", err)
+	}
+	if len(cfg.Categories) == 0 {
+		t.Error("embedded registry has no categories")
 	}
 }
 
