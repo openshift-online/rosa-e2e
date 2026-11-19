@@ -49,6 +49,7 @@ var (
 	KMS         = ginkgo.Label("Feature:KMS")
 	Autoscaling = ginkgo.Label("Feature:Autoscaling")
 	SharedVPC   = ginkgo.Label("Feature:SharedVPC")
+	ZeroEgress  = ginkgo.Label("Feature:ZeroEgress")
 )
 
 // Test area categories
