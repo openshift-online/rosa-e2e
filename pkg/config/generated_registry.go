@@ -16,9 +16,10 @@ import (
 var generatedCIStatusJobsYAML []byte
 
 // GeneratedCIStatusJobsYAML returns the generated CI status registry as raw
-// yaml, for consumers that parse it into their own types.
+// yaml, for consumers that parse it into their own types. Returns a copy so
+// a consumer mutating the bytes cannot corrupt the registry for others.
 func GeneratedCIStatusJobsYAML() []byte {
-	return generatedCIStatusJobsYAML
+	return append([]byte(nil), generatedCIStatusJobsYAML...)
 }
 
 // ParseGeneratedCIStatusConfig parses the embedded generated registry.
