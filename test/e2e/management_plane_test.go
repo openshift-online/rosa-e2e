@@ -11,9 +11,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	sdk "github.com/openshift-online/ocm-sdk-go"
 
 	"github.com/openshift-online/rosa-e2e/pkg/framework"
 	"github.com/openshift-online/rosa-e2e/pkg/labels"
+	"github.com/openshift-online/rosa-e2e/pkg/reporting"
 )
 
 var _ = Describe("Management Plane: OCM API Health", labels.Critical, labels.Positive, labels.HCP, labels.Classic, labels.OSDGCP, labels.ManagementPlane, func() {
@@ -82,20 +84,49 @@ var _ = Describe("Management Plane: OCM API Health", labels.Critical, labels.Pos
 	})
 })
 
+// OSDFM is reached through the SDK's generic request API, which has no typed client, so the
+// request paths are declared as constants: the failure diagnostics may then name the endpoint
+// without ever echoing a caller-built URL or its query string.
+const (
+	osdfmServiceClustersPath    = "/api/osd_fleet_mgmt/v1/service_clusters"
+	osdfmManagementClustersPath = "/api/osd_fleet_mgmt/v1/management_clusters"
+)
+
+// expectOSDFMHealthy asserts that an OSDFM query returned HTTP 200, keeping the existing skip for
+// 403 (the suite runs with credentials that are not always entitled to OSDFM).
+//
+// sdk.Response reports any HTTP status as success, so an unexpected status would otherwise fail
+// with nothing but the numeric code. Both failure paths are annotated instead: the response path
+// adds the endpoint plus the two allowlisted identifiers the body carries, and the transport path
+// adds the endpoint plus a fixed failure class rather than the raw SDK error. See pkg/reporting
+// for exactly what each helper emits and what the allowlists do and do not guarantee. The
+// response description is deferred so the body is only parsed on failure.
+func expectOSDFMHealthy(endpoint string, resp *sdk.Response, err error) {
+	GinkgoHelper()
+	if err != nil {
+		Fail(reporting.DescribeOCMTransportError(endpoint, err))
+	}
+	if resp == nil {
+		Fail(fmt.Sprintf("OCM API returned no response and no error: endpoint=%s", endpoint))
+	}
+	if resp.Status() == http.StatusForbidden {
+		Skip("OSDFM access not available with current credentials (403)")
+	}
+	Expect(resp.Status()).To(Equal(http.StatusOK), func() string {
+		return reporting.DescribeOCMResponse(endpoint, resp.Status(), resp.Bytes())
+	})
+}
+
 var _ = Describe("Management Plane: OSDFM Health", labels.Critical, labels.Positive, labels.HCP, labels.ManagementPlane, func() {
 	It("should list service clusters", func(ctx context.Context) {
 		tc := framework.NewTestContext(cfg, conn)
 
 		By("Querying OSDFM for service clusters")
 		resp, err := tc.Connection().Get().
-			Path("/api/osd_fleet_mgmt/v1/service_clusters").
+			Path(osdfmServiceClustersPath).
 			Parameter("size", 1).
 			SendContext(ctx)
-		Expect(err).NotTo(HaveOccurred())
-		if resp.Status() == http.StatusForbidden {
-			Skip("OSDFM access not available with current credentials (403)")
-		}
-		Expect(resp.Status()).To(Equal(http.StatusOK))
+		expectOSDFMHealthy(osdfmServiceClustersPath, resp, err)
 	})
 
 	It("should list management clusters", func(ctx context.Context) {
@@ -103,14 +134,10 @@ var _ = Describe("Management Plane: OSDFM Health", labels.Critical, labels.Posit
 
 		By("Querying OSDFM for management clusters")
 		resp, err := tc.Connection().Get().
-			Path("/api/osd_fleet_mgmt/v1/management_clusters").
+			Path(osdfmManagementClustersPath).
 			Parameter("size", 1).
 			SendContext(ctx)
-		Expect(err).NotTo(HaveOccurred())
-		if resp.Status() == http.StatusForbidden {
-			Skip("OSDFM access not available with current credentials (403)")
-		}
-		Expect(resp.Status()).To(Equal(http.StatusOK))
+		expectOSDFMHealthy(osdfmManagementClustersPath, resp, err)
 	})
 
 	It("should report management clusters as ready in test region", func(ctx context.Context) {
@@ -119,14 +146,10 @@ var _ = Describe("Management Plane: OSDFM Health", labels.Critical, labels.Posit
 
 		By(fmt.Sprintf("Querying OSDFM for ready MCs in %s", region))
 		resp, err := tc.Connection().Get().
-			Path("/api/osd_fleet_mgmt/v1/management_clusters").
+			Path(osdfmManagementClustersPath).
 			Parameter("search", fmt.Sprintf("status='ready' AND region='%s'", region)).
 			SendContext(ctx)
-		Expect(err).NotTo(HaveOccurred())
-		if resp.Status() == http.StatusForbidden {
-			Skip("OSDFM access not available with current credentials (403)")
-		}
-		Expect(resp.Status()).To(Equal(http.StatusOK))
+		expectOSDFMHealthy(osdfmManagementClustersPath, resp, err)
 	})
 })
 
