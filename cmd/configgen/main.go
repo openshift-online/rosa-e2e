@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/openshift-online/rosa-e2e/pkg/config"
 )
@@ -49,6 +50,7 @@ func runResolve(args []string) error {
 	leanPath := fs.String("lean", "configs/ci-status-jobs.yaml", "lean registry path")
 	snapshotPath := fs.String("snapshot", "configs/generated/org-teams.yaml", "org snapshot path")
 	outPath := fs.String("out", "configs/generated/ci-status-jobs.yaml", "output path")
+	embedOutPath := fs.String("embed-out", "pkg/config/generated/ci-status-jobs.yaml", "embedded copy consumed via pkg/config")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -69,7 +71,13 @@ func runResolve(args []string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(*outPath, out, 0o644)
+	if err := os.WriteFile(*outPath, out, 0o644); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(*embedOutPath), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(*embedOutPath, out, 0o644)
 }
 
 func runSnapshot(args []string) error {
