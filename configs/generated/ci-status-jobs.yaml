@@ -637,7 +637,7 @@ categories:
       - splunk-forwarder-operator
       - aws-account-operator
       - managed-cluster-validating-webhooks
-    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*operator*e2e*promotion*
+    prow_filter: https://prow.ci.openshift.org/?type=periodic&job=*operator*e2e*promotion*,*osd-metrics-exporter*e2e*promotion*,*managed-cluster-validating-webhooks*rosa-sts-e2e*promotion*
     team:
       id: a0f44498-f22b-4cd4-a98f-f298cc375a94
       name: MCS Rocket
