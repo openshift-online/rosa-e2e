@@ -1,6 +1,6 @@
 # Scheduled report: ROSA CI daily health report
 
-You are running a **cron** scheduled task that produces a daily CI health report for ROSA (Red Hat OpenShift Service on AWS) jobs. Keep the report **as concise as possible** to minimize channel noise. When everything is healthy, a one-liner is fine. Only expand into detail when something needs attention.
+You are running a **cron** scheduled task that produces a daily CI health report for ROSA (Red Hat OpenShift Service on AWS) jobs. Keep the report **as concise as possible** to minimize channel noise. The choice on each run is between staying silent and posting the required summary — never between the required summary and an abbreviated one. When a report is delivered, the header line plus the `*Gating:*` and `*Non-gating:*` rollup lines are the floor it may shrink to (see step 4); brevity drops optional detail, never those lines. Only expand into detail when something needs attention. When nothing merits a report at all, retain scheduled silence (see step 7 and Constraints) rather than shrinking the report below that floor.
 
 ## Goal
 
@@ -39,7 +39,7 @@ Run this source/config audit on every scheduled invocation, including all-green 
 
 ### 2. Collect build history
 
-For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prowjobs`, etc.) to find the **last completed builds over 7 days** (exclude PENDING). Record pass count, fail count, and build timestamps.
+For each job in the registry, use Prow CI tools (`search_prow_jobs`, `query_prowjobs`, etc.) to find the **last completed builds over 7 days** (exclude PENDING). Record pass count, fail count, and build timestamps. Retrieve enough history to cover the **previous** 7-day window as well (14 days in total, paging the history source as needed): step 3's trend needs both windows. Record, per job and per window, whether the retrieval was exhaustive — see "Window completeness" in step 3.
 
 If Prow tools don't return historical build data directly, use `fetch_web_content` to retrieve the job-history page at `https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{JOB_NAME}`. The HTML contains `var allBuilds = [{ID, Result, Started, Duration}];`.
 
@@ -62,11 +62,22 @@ If Prow tools don't return historical build data directly, use `fetch_web_conten
 - :chart_with_downwards_trend: degrading (10+ percentage points lower)
 - :left_right_arrow: stable
 
+**Window completeness**: a job's window (current or previous) is **complete** when the retrieval demonstrably reached past its start — the oldest returned build is older than the window start, pagination ran out, or the source explicitly bounds its coverage. A quiet job with zero builds over an exhausted source therefore has a complete window; returning fewer or older builds than 14 days is not by itself incomplete. A window is **incomplete** when the response was capped, truncated, denied or errored with none of those proofs. Record completeness per job and per window.
+
+**Trend availability**: emit a trend emoji only when **both** windows are complete for **every** non-informing registry job of the line, **and** each window holds at least one completed build — two rates are needed to compare. Otherwise emit the literal text `trend unavailable` where the emoji would go, and leave the rest of the line unchanged. Never substitute :left_right_arrow: (or any other emoji) for an unmeasured trend: "stable" is a measured result.
+
+**Rate availability**: a rate and its counts need a complete **current** window for every non-informing registry job of the line. Print, by what is actually known:
+- complete current window with at least one completed build → the percentage and its `({pass}/{total})` counts;
+- complete current window with no completed build anywhere in the population → `N/A (0/0)` — never `0%`, which asserts measured and all-failing;
+- incomplete current window → the figures cover the retrieved subset only and the run is flagged as partial coverage (step 4). Print the qualified form `{rate}% ({pass}/{total}, incomplete)` when that subset has builds, and `N/A (data unavailable)` when it does not. Never print `0/0` for an incomplete window: zero builds *retrieved* is not zero builds *run*.
+
+The header carries no counts, so when the overall current window is incomplete it is the footer's partial-data clause that qualifies it. Trend and rate availability are decided separately: an incomplete previous window degrades only the trend field. All four forms — `trend unavailable`, `N/A (0/0)`, `N/A (data unavailable)` and the `, incomplete` qualifier — apply wherever a trend or a rate is printed, in the summary and in the threaded replies alike.
+
 **Consecutive failures**: For each job, examine the build history in reverse chronological order (most recent first). Count how many builds failed consecutively from the most recent build backward until a passing build is found. This count is `consecutive_failures`. If the most recent build passed, `consecutive_failures` is 0. If all builds in the window failed, `consecutive_failures` equals the total number of builds. Example: builds [FAIL, FAIL, FAIL, PASS, FAIL, PASS, PASS] → consecutive_failures = 3 (the three most recent are failures).
 
-**Gating vs non-gating pass rate**: The registry marks production release-gating jobs with a `gating` field (see the header doc in `ci-status-jobs.yaml`). A job gates if its category sets `gating: true`, unless the job sets its own `gating` value, which overrides the category default (so a job-level `gating: false` opts that single job out of a gating category). Aggregate two separate weighted pass rates across all jobs with data: one for gating jobs, one for non-gating jobs (total passes / total builds each, rounded to nearest integer). Jobs with no data are excluded from both, same as the overall rate.
+**Gating vs non-gating pass rate**: The registry marks production release-gating jobs with a `gating` field (see the header doc in `ci-status-jobs.yaml`). A job gates if its category sets `gating: true`, unless the job sets its own `gating` value, which overrides the category default (so a job-level `gating: false` opts that single job out of a gating category). Aggregate two separate weighted pass rates across all jobs with data: one for gating jobs, one for non-gating jobs (total passes / total builds each, rounded to nearest integer). Jobs with no data are excluded from both, same as the overall rate; see "Rate availability" above for when that exclusion must be qualified as incomplete rather than reported as a confirmed count.
 
-**Informing jobs (excluded from pass rates)**: The registry marks pre-GA project-validation jobs with a job-level `informing: true` (blocking vs informing, OCP CI vocabulary; see the header doc in `ci-status-jobs.yaml`). Their failures are expected project noise for the owning project team, not release signal. Still collect their build history and still list them in the step 6 artifact (with `informing: true`), but exclude them from the overall rate, from the gating and non-gating rates, and from per-category pass rates and health indicators. A category is not red or yellow because of its informing jobs: compute category health from non-informing jobs only.
+**Informing jobs (excluded from pass rates)**: The registry marks pre-GA project-validation jobs with a job-level `informing: true` (blocking vs informing, OCP CI vocabulary; see the header doc in `ci-status-jobs.yaml`). Their failures are expected project noise for the owning project team, not release signal. Still collect their build history and still list them in the step 6 artifact (with `informing: true`), but exclude them from the overall rate, from the gating and non-gating rates, and from per-category pass rates and health indicators. A category is not red or yellow because of its informing jobs: compute category health from non-informing jobs only. Exclude them from **both** comparison windows of every trend as well (current and previous), so no trend measures a population different from the rate it annotates. Their only appearance in the summary is the count-only `*Informing:*` rollup in step 4.
 
 ### 4. Channel response (top-level summary)
 
@@ -97,17 +108,92 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 ```
 
 **Rules:**
-- `{overall_rate}` is the weighted pass rate across all jobs with data (total passes / total builds, rounded to nearest integer).
-- The two-line gating rollup goes directly under the header, before the per-category list. `{gating_rate}` is the weighted pass rate across gating jobs with data; `{non_gating_rate}` across non-gating jobs with data (see "Gating vs non-gating pass rate" in step 3). Always include both lines. Add the same 7-day trend emoji used for categories.
+- **Mandatory headline block — never omit.** Every delivered report opens with exactly these three lines, in this order and adjacent: the `*ROSA CI Daily Health -- {DATE} -- {overall_rate}%*` header, then `*Gating:*`, then `*Non-gating:*`. Emit all three on every delivered report — all-green, mixed, drift-only, zero-denominator and trend-unavailable runs alike. Their presence never depends on trend availability, on how many categories have data, or on how healthy the run is. When a field cannot be filled, degrade the **field** (`N/A (0/0)`, `N/A (data unavailable)`, `trend unavailable`) — never the line. The only alternative to this block is scheduled silence, not a shorter report. Exactly one optional `:warning:` line may precede the header — the Prow/GCS no-data warning (Constraints) and the step 6 artifact-failure warning share that single line when both apply. Nothing else may appear above the header.
+- `{overall_rate}` is the weighted pass rate across all jobs with data (total passes / total builds, rounded to nearest integer). Its `N/A (0/0)` and `N/A (data unavailable)` forms replace the whole `{overall_rate}%` token including the percent sign — never render `N/A (0/0)%`.
+- The two-line gating rollup goes directly under the header, before the per-category list. `{gating_rate}` is the weighted pass rate across gating jobs with data; `{non_gating_rate}` across non-gating jobs with data (see "Gating vs non-gating pass rate" in step 3). Each line keeps its rate and its `({pass}/{total})` counts, qualified `, incomplete` when its current window is; an `N/A` form replaces that whole span, percent sign included, rather than only the percentage.
+- `{gating_trend}` / `{non_gating_trend}` use the same 7-day trend emoji as categories, or the literal `trend unavailable` when either of that population's windows is incomplete (see "Trend availability" in step 3). The same applies to the per-category `{trend}` field.
+- **Partial coverage.** If any registry job's current window is incomplete in step 2 — fetch error, denial, truncation, or a cap with no proof of exhaustion — the printed rates cover only the retrieved subset: append a short `partial data ({N} jobs unavailable)` clause to the footer line, separated by ` · `, where N counts the jobs whose current window is incomplete. This is distinct from the no-run category count, and distinct from the more-than-half-missing warning in Constraints. Canonical footer clause order: skipped-category count · partial data · overflow count · Sippy · Prow · Dashboard · `Registry drift:`.
 - `*Informing:*` is a count-only rollup for `informing: true` jobs with data ({passing}/{total}, no percentage, no trend — they are excluded from every rate). Omit the line entirely when no informing jobs have data.
-- List categories with data, sorted by pass rate descending. **One category per line.** Never combine multiple categories on the same line with `·` separators. Every category gets its own line with its own emoji, pass rate, trend, and (jobs) link, even green categories.
-- For yellow/red categories, add a **short** inline note after the trend emoji (e.g., `-- AMD64 & E2E at 40%`, `-- stale since Jun 17`, `-- 1 run in 30d`). Keep notes under 40 characters.
-- If any categories had zero Prow run data, mention the count in the footer line (e.g., `2 categories skipped (no runs)`). Omit this part if all categories have data.
+- List categories with data, sorted by pass rate descending. **One category per line.** Never combine multiple categories on the same line with `·` separators. Every category gets its own line with its own emoji, pass rate, trend field, and (jobs) link, even green categories — subject only to the overflow rule in the pre-delivery checklist.
+- For yellow/red categories, add a **short** inline note after the trend field (e.g., `-- AMD64 & E2E at 40%`, `-- stale since Jun 17`, `-- 1 run in 30d`). Keep notes under 40 characters.
+- If any categories had zero Prow run data over a complete window, mention the count in the footer line (e.g., `2 categories skipped (no runs)`). A category whose current window is merely incomplete is not "no runs": it counts toward partial data instead. Omit this part if all categories have data.
 - Combine Sippy, Prow, and Dashboard links on the footer line separated by ` · `. Only when step 1b warrants attention, append one concise `Registry drift: {result / PR link / material gap}` clause to that same footer; details belong in the threaded drift reply. Stay within the summary limit and do not add a drift section below category lines.
 - Append a small `(<prow_filter_url|jobs>)` link at the end of each category line using the `prow_filter` URL from ci-status-jobs.yaml. This lets readers click through to the Prow job-history for that category.
 - Do NOT repeat category details in a separate section below the list.
 
-**Threading gate:** Before proceeding, check: does your summary contain any :red_circle: or :large_yellow_circle: categories? If yes, step 5 is **mandatory** — do not call `send_response()` until threaded replies are composed. If all categories are :large_green_circle:, skip step 5 and proceed directly to step 6 (write handoff artifact).
+**Pre-delivery structural checklist (summary):** run this immediately before composing the response element. It applies only to a *delivered* report; a run that qualifies for scheduled silence (step 7 / Constraints) skips it, because silence is not a report.
+
+1. Line 1 is the `*ROSA CI Daily Health -- {DATE} -- ...*` header, carrying the date and the overall current-period rate (or its `N/A` form), optionally preceded by the single `:warning:` line.
+2. Line 2 is `*Gating:*` and line 3 is `*Non-gating:*`, in that order, directly under the header, with no other line between them.
+3. Each of those two lines carries a rate with its `({pass}/{total})` counts — qualified `, incomplete` for an incomplete current window — or `N/A (0/0)` / `N/A (data unavailable)`, plus either a trend emoji or the literal `trend unavailable`.
+4. `*Informing:*` is present immediately after `*Non-gating:*` if and only if at least one informing job has data; it is count-only, with no percentage and no trend field.
+5. No percentage anywhere includes informing jobs, and every trend excludes them from both comparison windows.
+6. No `0%` stands in for a zero denominator, no `0/0` stands in for an incomplete window, and no trend emoji is printed unless both windows are complete.
+7. Every category with data has its own line with its own emoji, rate, trend field and `(jobs)` link, subject to the overflow rule; the footer is the last line.
+8. The summary is under the character limit in Constraints. If it is not, apply the overflow rule below.
+
+Never satisfy a failing item by deleting a required line. **Overflow rule:** when the summary still exceeds the limit after shortening the inline notes to their 40-character cap, keep the headline block and the footer, list only the worst-performing categories that fit, and append a `+{N} more categories` clause to the footer in its canonical position. Dropping a category *line* never drops that category's step 5 analysis — the threading gate follows the computed health, not the emitted lines. The headline block is never dropped, shortened, merged onto one line, or traded against the character limit.
+
+**Scenario examples** (illustrative values only). Except where a footer is shown, these are headline fragments: the category lines and the footer are omitted for brevity, and a delivered report always ends with the footer.
+
+*Trends available, informing jobs with data:*
+
+```
+*ROSA CI Daily Health -- 2026-07-25 -- 85%*
+*Gating:* 94% (47/50) -- :left_right_arrow:
+*Non-gating:* 71% (22/31) -- :chart_with_downwards_trend:
+*Informing:* 3/9 passing (excluded from pass rates)
+```
+
+*Comparison history capped, truncated or missing:*
+
+```
+*ROSA CI Daily Health -- 2026-07-25 -- 85%*
+*Gating:* 94% (47/50) -- trend unavailable
+*Non-gating:* 71% (22/31) -- trend unavailable
+```
+
+Here the current window is complete for every job and only the previous window was capped, so the rates and counts stand and only the trend field degrades. The overall rate is the two rollups combined: (47+22)/(50+31) = 69/81 = 85%.
+
+*No informing job has data:* omit only the `*Informing:*` line. The header and both rollup lines are still emitted.
+
+*Zero denominator in one population:*
+
+```
+*ROSA CI Daily Health -- 2026-07-25 -- 71%*
+*Gating:* N/A (0/0) -- trend unavailable
+*Non-gating:* 71% (22/31) -- :left_right_arrow:
+```
+
+The gating population's current window is complete and genuinely held no completed build, so `N/A (0/0)` is honest and `0%` would not be; its trend is unavailable by definition. The overall rate is the non-gating population alone: 22/31 = 71%.
+
+*Partial current-period data (incomplete current history for some jobs):*
+
+```
+*ROSA CI Daily Health -- 2026-07-25 -- 85%*
+*Gating:* 94% (47/50) -- :left_right_arrow:
+*Non-gating:* 71% (22/31, incomplete) -- trend unavailable
+
+:large_green_circle: *ROSA HCP E2E:* 92% (23/25) :left_right_arrow: (<prow_filter|jobs>)
+
+_1 category skipped (no runs) · partial data (4 jobs unavailable) · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow> · <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|Dashboard>_
+```
+
+An incomplete current window reduces coverage, not the pass rate: the unretrieved jobs are excluded from the denominators and never counted as failures. Availability is decided per line: here the four unretrieved jobs are all non-gating and none belongs to the listed category, so the gating rollup and that category keep complete windows, while the non-gating rollup is qualified `, incomplete` and loses its trend. The header carries no counts, so the footer's partial-data clause is what qualifies the 85%.
+
+*Current history unavailable for the whole population:*
+
+```
+*ROSA CI Daily Health -- 2026-07-25 -- N/A (data unavailable)*
+*Gating:* N/A (data unavailable) -- trend unavailable
+*Non-gating:* N/A (data unavailable) -- trend unavailable
+```
+
+Nothing was retrieved, so nothing is known. `N/A (data unavailable)` says exactly that, where `N/A (0/0)` would falsely assert that every job ran nothing. Reserve `N/A (0/0)` for a current window that is complete for the whole population and genuinely held no completed build.
+
+*All categories green and the report is delivered:* the same three-line headline block is emitted, followed by the green category lines and the footer. Healthy is a reason to skip failure analysis, not a reason to skip the headline block.
+
+**Threading gate:** Before proceeding, check: did this run **compute** any :red_circle: or :large_yellow_circle: category, whether or not its line survived the overflow rule? If yes, step 5 is **mandatory** — do not call `send_response()` until threaded replies are composed. If every computed category is :large_green_circle:, or no category had data at all, skip step 5 and proceed directly to step 6 (write handoff artifact).
 
 **Single threading rule:** The first reply uses `---THREAD_DETAILS---`; every subsequent reply uses `---THREAD_BREAK---`, regardless of reply type (failure analysis, registry drift, remediation or phase breakdown). Never emit a second `---THREAD_DETAILS---` in one response. Apply this rule on delivered all-green reports too.
 
@@ -242,6 +328,8 @@ categories:
 - `gating_pass_rate` / `non_gating_pass_rate`: the two weighted pass rates from step 3.
 - `gating`: per-job effective gating value (job-level `gating` overrides the category default). Remediation should prioritize gate failures (`gating: true`) when picking auto-fix targets.
 - `informing`: per-job value from the registry (`informing: true` marks pre-GA project validation, excluded from all pass rates). Failure analysis and remediation must skip these jobs — they are project noise for the owning team, not remediation targets — unless a shared-infrastructure defect is confirmed to also affect release-gating jobs, in which case route the fix to the affected gating job, not the informing job.
+- `trend`: `improving`, `degrading`, `stable`, or `unavailable` when either comparison window was incomplete (step 3). Never record `stable` for a trend that was not measured. This is a value convention on the existing field, not a schema change.
+- `pass_rate` (top-level, category and job): integer percentage, or `null` when a complete current window held no completed build. Never record `0` for a zero denominator — `0` asserts measured and all-failing. The existing `-1` / `fetch_error` convention below covers **any** incomplete current window, not only a fetch error, so a figure from a partly retrieved window is never recorded as a confirmed rate. No new artifact fields are introduced.
 - `consecutive_failures`: count of consecutive recent failed builds (0 if the latest passed).
 - `failure_classification`: short label from your analysis (e.g., "conformance skip list", "STS account-roles crash", "Boskos lease timeout"). Empty string if the job is passing.
 - `failing_tests`: list of specific test names or step names that are failing. Empty list if the job is passing. The remediation follow-up uses these to create skip-list PRs and accurate Jira ticket descriptions.
@@ -320,6 +408,7 @@ On runs with health failures, after the selected remediation attempt, check exis
 ## Constraints
 
 - Keep the top-level summary under 1200 characters. The message should be a scannable scoreboard, not a report. All detailed analysis goes in threaded replies.
+- Every delivered summary contains the mandatory headline block: the header line plus `*Gating:*` and `*Non-gating:*` directly beneath it. Brevity, an all-green run, a zero denominator, missing comparison history and the character limit are all reasons to shorten *fields and notes*, never reasons to omit those lines. Run the pre-delivery structural checklist in step 4 before composing the response.
 - Never add sections, headers, or bullet lists below the category lines. The only thing after the last category line is the footer, which may contain the one concise actionable/materially incomplete drift clause allowed by step 4; detailed drift evidence goes in the existing thread.
 - If more than half the jobs return no data, warn about possible Prow/GCS issues at the top.
 - Before sending: if any category is below 80%, verify your response content contains `---THREAD_DETAILS---` followed by at least one threaded reply section. If these delimiters are missing, your threaded replies will not be posted — go back to step 5.
