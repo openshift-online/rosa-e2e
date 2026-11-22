@@ -685,7 +685,7 @@ if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
   for rt in ${ROUTE_TABLE_IDS}; do
     NAT_ROUTES=$(aws ec2 describe-route-tables --region "${REGION}" \
       --route-table-ids "${rt}" \
-      --query 'RouteTables[0].Routes[?starts_with(GatewayId, `nat-`)].DestinationCidrBlock' \
+      --query 'RouteTables[0].Routes[?NatGatewayId != null].DestinationCidrBlock' \
       --output text)
     for cidr in ${NAT_ROUTES}; do
       aws ec2 delete-route --region "${REGION}" \
