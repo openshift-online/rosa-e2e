@@ -7,6 +7,7 @@ ORG_REPO ?= ../org
 
 configs:
 	go run ./cmd/configgen resolve
+	cp configs/component-deployments.yaml pkg/config/generated/component-deployments.yaml
 
 configs-snapshot:
 	go run ./cmd/configgen snapshot -org $(ORG_REPO)

@@ -1,0 +1,174 @@
+# component-deployments.yaml -- Maps ROSA components to app-interface saas files.
+#
+# The rosa-eng-dashboard fetches this file to extract deployment SHAs
+# for each component across integration, stage, and production.
+#
+# strategy: how targets map to environments
+#   hive:  Cluster name prefix: hivei* = integration, hives*/hive-stage-* = stage, hivep* = production
+#   ocm:   Namespace path contains: integration, stage, or production
+#
+# scope: deployment granularity for change matching (used by change-observability)
+#   environment: component deploys environment-wide (OCM core services)
+#   sector:      component deploys per OSDFM sector
+#   shard:       component deploys per management cluster / hive shard
+#
+# Components not listed here show no deployment data in the catalog.
+
+components:
+  # Core Platform (OCM namespace pattern)
+  - key: clusters-service
+    saas_name: saas-uhc-clusters-service
+    strategy: ocm
+    scope: environment
+  - key: account-manager
+    saas_name: saas-uhc-account-manager
+    strategy: ocm
+    scope: environment
+  - key: osd-fleet-manager
+    saas_name: osd-fleet-manager
+    strategy: ocm
+    scope: environment
+  - key: service-log
+    saas_name: saas-ocm-service-log
+    strategy: ocm
+    scope: environment
+  - key: hive
+    saas_name: saas-hive
+    strategy: hive
+    scope: shard
+
+  # SRE Operators (hive cluster pattern)
+  - key: route-monitor-operator
+    saas_name: saas-route-monitor-operator-pko
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-route-monitor-operator-prow-e2e
+  - key: pagerduty-operator
+    saas_name: saas-pagerduty-operator-pko
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-pagerduty-operator-prow-e2e
+  - key: configure-alertmanager-operator
+    saas_name: saas-configure-am-operator-pko
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-configure-am-operator-prow-e2e
+  - key: ocm-agent-operator
+    saas_name: saas-ocm-agent-operator
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-oao-prow-e2e
+  - key: managed-upgrade-operator
+    saas_name: saas-muo
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-muo-prow-e2e
+  - key: rbac-permissions-operator
+    saas_name: saas-rbac-p-operator
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-rpo-prow-e2e
+  - key: deadmanssnitch-operator
+    saas_name: saas-dms-pko
+    strategy: hive
+    scope: shard
+  - key: splunk-forwarder-operator
+    saas_name: saas-sfo-pko
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-sfo-prow-e2e
+  - key: osd-metrics-exporter
+    saas_name: saas-ome-pko
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-osd-metrics-exporter-e2e
+
+  # Infrastructure (hive cluster pattern)
+  - key: aws-account-operator
+    saas_name: saas-aws-account-operator-pko
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-aao-prow-e2e
+  - key: aws-vpce-operator
+    saas_name: saas-avo-pko
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-avo-prow-e2e
+  - key: certman-operator
+    saas_name: saas-certman-operator
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-certman-operator-prow-e2e
+  - key: cloud-ingress-operator
+    saas_name: saas-cloud-ingress-operator-pko
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-cio-prow-e2e
+  - key: gcp-project-operator
+    saas_name: saas-gcp-project-operator-pko
+    strategy: hive
+    scope: shard
+  - key: managed-cluster-config
+    saas_name: saas-managed-cluster-config
+    strategy: hive
+    scope: shard
+  - key: managed-velero-operator
+    saas_name: saas-mvo
+    strategy: hive
+    scope: shard
+  - key: managed-cluster-validating-webhooks
+    saas_name: saas-mc-validating-webhooks
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-mc-validating-webhooks-prow-e2e
+  - key: managed-node-metadata-operator
+    saas_name: saas-mnmo
+    strategy: hive
+    scope: shard
+    e2e_saas: saas-mnmo-prow-e2e
+
+  # Operational Tooling (dedicated clusters)
+  - key: configuration-anomaly-detection
+    saas_name: saas-configuration-anomaly-detection
+    strategy: ocm
+    scope: environment
+    e2e_saas: saas-cad-e2e
+
+  # Observability (hive cluster pattern)
+  - key: rhobs-synthetics-agent
+    saas_name: rhobs-synthetics-agent
+    strategy: hive
+    scope: shard
+    saas_dir: data/services/rhobs/rhobs/cicd
+    canary_namespaces:
+      - rhobsp01ue1
+      - backplanep05ue1
+  - key: rhobs-synthetics-api
+    saas_name: rhobs-synthetics-api
+    strategy: hive
+    scope: shard
+    saas_dir: data/services/rhobs/rhobs/cicd
+    canary_namespaces:
+      - rhobsp01ue1
+      - backplanep05ue1
+  - key: osd-rhobs-rules-and-dashboards
+    saas_name: saas-osd-rhobs-rules-and-dashboards
+    strategy: hive
+    scope: shard
+
+  # Observability (RHOBS cell pattern)
+  - key: rhobs-hcp-rules
+    saas_name: rhobs-hcp-rules
+    strategy: ocm
+    scope: environment
+    e2e_saas: rhobs-post-deploy-check-rules
+  - key: rhobs-mc-rules
+    saas_name: rhobs-mc-rules
+    strategy: ocm
+    scope: environment
+    e2e_saas: rhobs-post-deploy-check-rules
+  - key: rhobs-sc-rules
+    saas_name: rhobs-sc-rules
+    strategy: ocm
+    scope: environment
+    e2e_saas: rhobs-post-deploy-check-rules
