@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -297,20 +299,44 @@ var _ = Describe("Zero Egress: ECR Mirror Configuration",
 				List(ctx, metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred(), "listing ConfigMaps in the hosted control plane namespace")
 
+			// Decode each mirror set and require that a release payload source
+			// maps to an ECR mirror — not merely that both strings appear
+			// somewhere in the document (which unrelated mappings would satisfy).
+			type mirrorEntry struct {
+				Source  string   `yaml:"source"`
+				Mirrors []string `yaml:"mirrors"`
+			}
+			type mirrorSet struct {
+				Spec struct {
+					ImageDigestMirrors      []mirrorEntry `yaml:"imageDigestMirrors"`
+					RepositoryDigestMirrors []mirrorEntry `yaml:"repositoryDigestMirrors"`
+				} `yaml:"spec"`
+			}
+
 			found := false
 			for _, cm := range cms.Items {
 				if !strings.Contains(cm.Name, "image-content-source") {
 					continue
 				}
 				for _, data := range cm.Data {
-					if strings.Contains(data, ".dkr.ecr.") &&
-						strings.Contains(data, "quay.io/openshift-release-dev/") {
-						found = true
+					var ms mirrorSet
+					if err := yaml.Unmarshal([]byte(data), &ms); err != nil {
+						continue
+					}
+					for _, entry := range append(ms.Spec.ImageDigestMirrors, ms.Spec.RepositoryDigestMirrors...) {
+						if !strings.HasPrefix(entry.Source, "quay.io/openshift-release-dev/") {
+							continue
+						}
+						for _, mirror := range entry.Mirrors {
+							if isECRMirror(mirror) {
+								found = true
+							}
+						}
 					}
 				}
 			}
 			Expect(found).To(BeTrue(),
-				"worker ignition must rewrite payload sources to the ECR mirror")
+				"worker ignition must map release payload sources to the ECR mirror")
 		})
 
 		It("should configure the nodepool kubelet ECR credential provider", func(ctx context.Context) {
