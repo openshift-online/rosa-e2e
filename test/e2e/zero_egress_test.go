@@ -4,12 +4,12 @@ package e2e
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
@@ -36,10 +36,10 @@ var (
 		Version:  "v1beta1",
 		Resource: "hostedclusters",
 	}
-	manifestWorkGVR = schema.GroupVersionResource{
-		Group:    "work.open-cluster-management.io",
-		Version:  "v1",
-		Resource: "manifestworks",
+	nodePoolGVR = schema.GroupVersionResource{
+		Group:    "hypershift.openshift.io",
+		Version:  "v1beta1",
+		Resource: "nodepools",
 	}
 )
 
@@ -71,6 +71,7 @@ var _ = Describe("Zero Egress: Image Pulls",
 			client := tc.HCKubeClient()
 
 			By("Creating test namespace")
+			waitForNamespaceDeleted(ctx, client, zeroEgressNamespace)
 			cleanup, err := framework.CreateTestNamespace(ctx, client, zeroEgressNamespace)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(cleanup)
@@ -120,6 +121,7 @@ var _ = Describe("Zero Egress: Image Pulls",
 			client := tc.HCKubeClient()
 
 			By("Creating test namespace")
+			waitForNamespaceDeleted(ctx, client, zeroEgressNamespace)
 			cleanup, err := framework.CreateTestNamespace(ctx, client, zeroEgressNamespace)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(cleanup)
@@ -264,9 +266,7 @@ var _ = Describe("Zero Egress: ECR Mirror Configuration",
 				}
 				for _, m := range mirrors {
 					mirror, _ := m.(string)
-					if strings.Contains(mirror, ".dkr.ecr.") &&
-						strings.Contains(mirror, ".amazonaws.com") &&
-						strings.Contains(mirror, "/ocm-mirror") {
+					if isECRMirror(mirror) {
 						found = true
 					}
 				}
@@ -275,48 +275,86 @@ var _ = Describe("Zero Egress: ECR Mirror Configuration",
 				"payload sources must be mirrored to the provision shard ECR repository: %v", sources)
 		})
 
-		It("should annotate the HostedCluster with the ECR worker role", func(ctx context.Context) {
+		It("should deliver the ECR mirror configuration to worker nodes via ignition", func(ctx context.Context) {
 			ns := tc.HCPNamespaces()
 			Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
 
-			By("Reading HostedCluster annotations in " + ns.HCNamespace)
-			hc, err := tc.MCDynamicClient().Resource(hostedClusterGVR).
-				Namespace(ns.HCNamespace).Get(ctx, ns.ClusterName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred(), "getting HostedCluster %s", ns.ClusterName)
+			// The control plane operator renders the image content sources as an
+			// ImageDigestMirrorSet into an ignition ConfigMap in the hosted
+			// control plane namespace, so nodes can pull payload images through
+			// the ECR mirror from the very first boot.
+			By("Listing ignition image-content-source ConfigMaps in " + ns.HCPNamespace)
+			cms, err := tc.MCKubeClient().CoreV1().ConfigMaps(ns.HCPNamespace).
+				List(ctx, metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred(), "listing ConfigMaps in the hosted control plane namespace")
 
-			roleARN, ok := hc.GetAnnotations()["api.openshift.com/ecr-worker-role-arn"]
-			Expect(ok).To(BeTrue(), "HostedCluster is missing the api.openshift.com/ecr-worker-role-arn annotation")
-			Expect(roleARN).To(ContainSubstring(":role/"),
-				"ECR worker role annotation should hold an IAM role ARN, got %q", roleARN)
-			Expect(roleARN).To(ContainSubstring("Worker-Role"),
-				"ECR worker role should be the HCP worker role, got %q", roleARN)
+			found := false
+			for _, cm := range cms.Items {
+				if !strings.Contains(cm.Name, "image-content-source") {
+					continue
+				}
+				for _, data := range cm.Data {
+					if strings.Contains(data, ".dkr.ecr.") &&
+						strings.Contains(data, "quay.io/openshift-release-dev/") {
+						found = true
+					}
+				}
+			}
+			Expect(found).To(BeTrue(),
+				"worker ignition must rewrite payload sources to the ECR mirror")
 		})
 
 		It("should configure the nodepool kubelet ECR credential provider", func(ctx context.Context) {
 			ns := tc.HCPNamespaces()
 			Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
 
-			By("Searching nodepool ManifestWorks for the ignition credential provider")
-			// The control plane operator delivers the ECR credential provider
-			// to node pools as a ConfigMap ("ignition-credential-provider"
-			// before 4.19.19, "ignition-credential-provider-aws-api" after)
-			// referenced from the NodePool config.
+			// The ECR credential provider is delivered to node pools as an
+			// ignition config referenced from the NodePool spec ("ignition-
+			// credential-provider" before 4.19.19, "ignition-credential-
+			// provider-aws-api" after).
+			By("Reading NodePools in " + ns.HCNamespace)
+			pools, err := tc.MCDynamicClient().Resource(nodePoolGVR).
+				Namespace(ns.HCNamespace).List(ctx, metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred(), "listing NodePools")
+			Expect(pools.Items).NotTo(BeEmpty(), "no NodePools found for the cluster")
+
 			found := false
-			for _, namespace := range []string{ns.HCNamespace, ns.HCPNamespace} {
-				list, err := tc.MCDynamicClient().Resource(manifestWorkGVR).
-					Namespace(namespace).List(ctx, metav1.ListOptions{})
-				if err != nil {
+			for _, pool := range pools.Items {
+				spec, ok := pool.Object["spec"].(map[string]any)
+				if !ok {
 					continue
 				}
-				for _, item := range list.Items {
-					raw, err := json.Marshal(item.Object)
-					Expect(err).NotTo(HaveOccurred(), "marshalling ManifestWork %s", item.GetName())
-					if strings.Contains(string(raw), "ignition-credential-provider") {
+				configs, _ := spec["config"].([]any)
+				for _, c := range configs {
+					entry, ok := c.(map[string]any)
+					if !ok {
+						continue
+					}
+					name, _ := entry["name"].(string)
+					if strings.HasPrefix(name, "ignition-credential-provider") {
 						found = true
 					}
 				}
 			}
 			Expect(found).To(BeTrue(),
-				"no nodepool ManifestWork carries the ECR ignition credential provider")
+				"no NodePool references the ECR ignition credential provider")
 		})
 	})
+
+// isECRMirror reports whether the registry is a regional ECR mirror endpoint
+// (e.g. <account>.dkr.ecr.<region>.amazonaws.com/ocp-mirror-N).
+func isECRMirror(registry string) bool {
+	return strings.Contains(registry, ".dkr.ecr.") &&
+		strings.Contains(registry, ".amazonaws.com") &&
+		strings.Contains(registry, "mirror")
+}
+
+// waitForNamespaceDeleted blocks until the namespace is gone, so a previous
+// spec's cleanup does not leave the create racing a Terminating namespace.
+func waitForNamespaceDeleted(ctx context.Context, client kubernetes.Interface, namespace string) {
+	Eventually(func() bool {
+		_, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+		return apierrors.IsNotFound(err)
+	}).WithTimeout(3*time.Minute).WithPolling(5*time.Second).Should(BeTrue(),
+		"namespace %s should be removed before the next spec recreates it", namespace)
+}
