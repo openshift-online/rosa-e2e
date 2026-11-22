@@ -207,6 +207,13 @@ if [[ -n "${CLUSTER_SECTOR}" ]]; then
     --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status in ('ready')" \
     | jq -r '.items[].provision_shard_reference.id' | head -1)
   if [[ -z "${PS_ID}" ]]; then
+    # osdfm does not support status in ('ready', 'maintenance'); the CI
+    # rosa-cluster-provision step accepts maintenance shards the same way.
+    PS_ID=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters \
+      --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status in ('maintenance')" \
+      | jq -r '.items[].provision_shard_reference.id' | head -1)
+  fi
+  if [[ -z "${PS_ID}" ]]; then
     echo "ERROR: No provision shard found for sector ${CLUSTER_SECTOR} in ${REGION}"
     exit 1
   fi
@@ -596,37 +603,51 @@ if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
 fi
 
 # Step 4e: Prepare the VPC for zero egress (day-1, immutable cluster property)
-# Mirrors the CI step rosa-e2e-hcp-zero-egress-vpc-prepare: interface endpoints
-# for ecr.api/ecr.dkr in the private subnets, a gateway endpoint for s3, and the
-# private route tables' NAT routes removed so nodes have no internet egress
-# (public subnets keep their IGW routes: the API/ingress load balancers stay
-# reachable). The endpoints must exist before cluster creation because worker
-# nodes pull the payload through the ECR mirror from the first boot. The CFN
-# stack still owns the NAT routes; deleting them out-of-band is a no-op at
-# stack teardown.
+# Mirrors the CI step rosa-e2e-hcp-zero-egress-vpc-prepare: the private subnets
+# must reach the ECR mirror (ecr.api/ecr.dkr interface endpoints) and S3 (s3
+# gateway endpoint), and their route tables' NAT routes are removed so nodes
+# have no internet egress (public subnets keep their IGW routes: the API and
+# ingress load balancers stay reachable). The endpoints must exist before
+# cluster creation because worker nodes pull the payload through the ECR mirror
+# from the first boot. The rosa-quickstart-default-vpc network template already
+# creates all of these endpoints, so creation here is a fallback for other
+# network setups. The CFN stack still owns the NAT routes; deleting them
+# out-of-band is a no-op at stack teardown.
 ZERO_EGRESS_ARGS=""
 ZERO_EGRESS_ENDPOINT_IDS=""
 ZERO_EGRESS_ENDPOINT_SG_ID=""
 
+zero_egress_endpoint_id() {
+  aws ec2 describe-vpc-endpoints --region "${REGION}" \
+    --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.${1}" \
+    --query 'VpcEndpoints[].VpcEndpointId' --output text
+}
+
 if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
   echo ""
-  echo "--- Zero egress enabled: creating VPC endpoints and cutting NAT routes ---"
+  echo "--- Zero egress enabled: ensuring VPC endpoints and cutting NAT routes ---"
 
-  VPC_CIDR=$(aws ec2 describe-vpcs --vpc-ids "${VPC_ID}" --region "${REGION}" \
-    --query 'Vpcs[0].CidrBlock' --output text)
-  ZERO_EGRESS_ENDPOINT_SG_ID=$(aws ec2 create-security-group \
-    --region "${REGION}" \
-    --group-name "${CLUSTER_NAME}-zero-egress-endpoints" \
-    --description "Allow HTTPS to the ECR/S3 VPC endpoints for ${CLUSTER_NAME}" \
-    --vpc-id "${VPC_ID}" \
-    --query 'GroupId' --output text)
-  aws ec2 authorize-security-group-ingress \
-    --region "${REGION}" \
-    --group-id "${ZERO_EGRESS_ENDPOINT_SG_ID}" \
-    --protocol tcp --port 443 --cidr "${VPC_CIDR}"
-
-  for subnet in ${PRIVATE_SUBNET_IDS//,/ }; do
-    for service in ecr.api ecr.dkr; do
+  for service in ecr.api ecr.dkr; do
+    ENDPOINT_ID=$(zero_egress_endpoint_id "${service}")
+    if [[ -n "${ENDPOINT_ID}" ]]; then
+      echo "${service} endpoint already exists: ${ENDPOINT_ID}"
+      continue
+    fi
+    if [[ -z "${ZERO_EGRESS_ENDPOINT_SG_ID}" ]]; then
+      VPC_CIDR=$(aws ec2 describe-vpcs --vpc-ids "${VPC_ID}" --region "${REGION}" \
+        --query 'Vpcs[0].CidrBlock' --output text)
+      ZERO_EGRESS_ENDPOINT_SG_ID=$(aws ec2 create-security-group \
+        --region "${REGION}" \
+        --group-name "${CLUSTER_NAME}-zero-egress-endpoints" \
+        --description "Allow HTTPS to the ECR/S3 VPC endpoints for ${CLUSTER_NAME}" \
+        --vpc-id "${VPC_ID}" \
+        --query 'GroupId' --output text)
+      aws ec2 authorize-security-group-ingress \
+        --region "${REGION}" \
+        --group-id "${ZERO_EGRESS_ENDPOINT_SG_ID}" \
+        --protocol tcp --port 443 --cidr "${VPC_CIDR}"
+    fi
+    for subnet in ${PRIVATE_SUBNET_IDS//,/ }; do
       ENDPOINT_ID=$(aws ec2 create-vpc-endpoint \
         --region "${REGION}" \
         --vpc-id "${VPC_ID}" \
@@ -640,19 +661,27 @@ if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
     done
   done
 
+  S3_ENDPOINT_ID=$(zero_egress_endpoint_id s3)
+  if [[ -n "${S3_ENDPOINT_ID}" ]]; then
+    echo "s3 gateway endpoint already exists: ${S3_ENDPOINT_ID}"
+  else
+    ROUTE_TABLE_IDS=$(aws ec2 describe-route-tables --region "${REGION}" \
+      --filters "Name=vpc-id,Values=${VPC_ID}" \
+      --query 'RouteTables[].RouteTableId' --output text | tr '\t' ' ')
+    S3_ENDPOINT_ID=$(aws ec2 create-vpc-endpoint \
+      --region "${REGION}" \
+      --vpc-id "${VPC_ID}" \
+      --vpc-endpoint-type Gateway \
+      --service-name "com.amazonaws.${REGION}.s3" \
+      --route-table-ids ${ROUTE_TABLE_IDS} \
+      --query 'VpcEndpoint.VpcEndpointId' --output text)
+    ZERO_EGRESS_ENDPOINT_IDS+=" ${S3_ENDPOINT_ID}"
+    echo "Created s3 gateway endpoint ${S3_ENDPOINT_ID}"
+  fi
+
   ROUTE_TABLE_IDS=$(aws ec2 describe-route-tables --region "${REGION}" \
     --filters "Name=vpc-id,Values=${VPC_ID}" \
     --query 'RouteTables[].RouteTableId' --output text | tr '\t' ' ')
-  S3_ENDPOINT_ID=$(aws ec2 create-vpc-endpoint \
-    --region "${REGION}" \
-    --vpc-id "${VPC_ID}" \
-    --vpc-endpoint-type Gateway \
-    --service-name "com.amazonaws.${REGION}.s3" \
-    --route-table-ids ${ROUTE_TABLE_IDS} \
-    --query 'VpcEndpoint.VpcEndpointId' --output text)
-  ZERO_EGRESS_ENDPOINT_IDS+=" ${S3_ENDPOINT_ID}"
-  echo "Created s3 gateway endpoint ${S3_ENDPOINT_ID}"
-
   for rt in ${ROUTE_TABLE_IDS}; do
     NAT_ROUTES=$(aws ec2 describe-route-tables --region "${REGION}" \
       --route-table-ids "${rt}" \
