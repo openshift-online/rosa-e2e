@@ -620,6 +620,7 @@ ZERO_EGRESS_ENDPOINT_SG_ID=""
 zero_egress_endpoint_id() {
   aws ec2 describe-vpc-endpoints --region "${REGION}" \
     --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.${1}" \
+    "Name=vpc-endpoint-state,Values=available" \
     --query 'VpcEndpoints[].VpcEndpointId' --output text
 }
 
@@ -627,25 +628,48 @@ if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
   echo ""
   echo "--- Zero egress enabled: ensuring VPC endpoints and cutting NAT routes ---"
 
+  ROUTE_TABLE_IDS=$(aws ec2 describe-route-tables --region "${REGION}" \
+    --filters "Name=vpc-id,Values=${VPC_ID}" \
+    --query 'RouteTables[].RouteTableId' --output text | tr '\t' ' ')
+
   for service in ecr.api ecr.dkr; do
     ENDPOINT_ID=$(zero_egress_endpoint_id "${service}")
     if [[ -n "${ENDPOINT_ID}" ]]; then
       echo "${service} endpoint already exists: ${ENDPOINT_ID}"
+      # Private DNS is required for ecr.dkr (docker pulls resolve the mirror
+      # host through it); enable it on pre-existing endpoints that lack it.
+      PRIVATE_DNS=$(aws ec2 describe-vpc-endpoints --region "${REGION}" \
+        --vpc-endpoint-ids "${ENDPOINT_ID}" \
+        --query 'VpcEndpoints[0].PrivateDnsEnabled' --output text)
+      if [[ "${PRIVATE_DNS}" != "True" ]]; then
+        aws ec2 modify-vpc-endpoint --region "${REGION}" \
+          --vpc-endpoint-id "${ENDPOINT_ID}" --private-dns-enabled
+        echo "Enabled private DNS on ${service} endpoint ${ENDPOINT_ID}"
+      fi
       continue
     fi
     if [[ -z "${ZERO_EGRESS_ENDPOINT_SG_ID}" ]]; then
-      VPC_CIDR=$(aws ec2 describe-vpcs --vpc-ids "${VPC_ID}" --region "${REGION}" \
-        --query 'Vpcs[0].CidrBlock' --output text)
-      ZERO_EGRESS_ENDPOINT_SG_ID=$(aws ec2 create-security-group \
-        --region "${REGION}" \
-        --group-name "${CLUSTER_NAME}-zero-egress-endpoints" \
-        --description "Allow HTTPS to the ECR/S3 VPC endpoints for ${CLUSTER_NAME}" \
-        --vpc-id "${VPC_ID}" \
-        --query 'GroupId' --output text)
-      aws ec2 authorize-security-group-ingress \
-        --region "${REGION}" \
-        --group-id "${ZERO_EGRESS_ENDPOINT_SG_ID}" \
-        --protocol tcp --port 443 --cidr "${VPC_CIDR}"
+      # Reuse a leftover security group from a previous run of this script
+      # for the same cluster name instead of failing on DuplicateGroup.
+      ZERO_EGRESS_ENDPOINT_SG_ID=$(aws ec2 describe-security-groups --region "${REGION}" \
+        --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${CLUSTER_NAME}-zero-egress-endpoints" \
+        --query 'SecurityGroups[].GroupId' --output text)
+      if [[ -z "${ZERO_EGRESS_ENDPOINT_SG_ID}" || "${ZERO_EGRESS_ENDPOINT_SG_ID}" == "None" ]]; then
+        VPC_CIDR=$(aws ec2 describe-vpcs --vpc-ids "${VPC_ID}" --region "${REGION}" \
+          --query 'Vpcs[0].CidrBlock' --output text)
+        ZERO_EGRESS_ENDPOINT_SG_ID=$(aws ec2 create-security-group \
+          --region "${REGION}" \
+          --group-name "${CLUSTER_NAME}-zero-egress-endpoints" \
+          --description "Allow HTTPS to the ECR/S3 VPC endpoints for ${CLUSTER_NAME}" \
+          --vpc-id "${VPC_ID}" \
+          --query 'GroupId' --output text)
+        aws ec2 authorize-security-group-ingress \
+          --region "${REGION}" \
+          --group-id "${ZERO_EGRESS_ENDPOINT_SG_ID}" \
+          --protocol tcp --port 443 --cidr "${VPC_CIDR}"
+      else
+        echo "Reusing existing endpoint security group ${ZERO_EGRESS_ENDPOINT_SG_ID}"
+      fi
     fi
     for subnet in ${PRIVATE_SUBNET_IDS//,/ }; do
       ENDPOINT_ID=$(aws ec2 create-vpc-endpoint \
@@ -664,10 +688,21 @@ if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
   S3_ENDPOINT_ID=$(zero_egress_endpoint_id s3)
   if [[ -n "${S3_ENDPOINT_ID}" ]]; then
     echo "s3 gateway endpoint already exists: ${S3_ENDPOINT_ID}"
+    # Reconcile route table associations: a pre-existing endpoint may not
+    # cover every route table in the VPC.
+    S3_ROUTE_TABLES=$(aws ec2 describe-vpc-endpoints --region "${REGION}" \
+      --vpc-endpoint-ids "${S3_ENDPOINT_ID}" \
+      --query 'VpcEndpoints[0].RouteTableIds' --output text | tr '\t' ' ')
+    MISSING_ROUTE_TABLES=""
+    for rt in ${ROUTE_TABLE_IDS}; do
+      [[ " ${S3_ROUTE_TABLES} " == *" ${rt} "* ]] || MISSING_ROUTE_TABLES+=" ${rt}"
+    done
+    if [[ -n "${MISSING_ROUTE_TABLES}" ]]; then
+      aws ec2 modify-vpc-endpoint --region "${REGION}" \
+        --vpc-endpoint-id "${S3_ENDPOINT_ID}" --add-route-table-ids ${MISSING_ROUTE_TABLES}
+      echo "Associated s3 endpoint ${S3_ENDPOINT_ID} with route tables:${MISSING_ROUTE_TABLES}"
+    fi
   else
-    ROUTE_TABLE_IDS=$(aws ec2 describe-route-tables --region "${REGION}" \
-      --filters "Name=vpc-id,Values=${VPC_ID}" \
-      --query 'RouteTables[].RouteTableId' --output text | tr '\t' ' ')
     S3_ENDPOINT_ID=$(aws ec2 create-vpc-endpoint \
       --region "${REGION}" \
       --vpc-id "${VPC_ID}" \
@@ -679,9 +714,6 @@ if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
     echo "Created s3 gateway endpoint ${S3_ENDPOINT_ID}"
   fi
 
-  ROUTE_TABLE_IDS=$(aws ec2 describe-route-tables --region "${REGION}" \
-    --filters "Name=vpc-id,Values=${VPC_ID}" \
-    --query 'RouteTables[].RouteTableId' --output text | tr '\t' ' ')
   for rt in ${ROUTE_TABLE_IDS}; do
     NAT_ROUTES=$(aws ec2 describe-route-tables --region "${REGION}" \
       --route-table-ids "${rt}" \
@@ -785,7 +817,9 @@ export SHARED_VPC_INSTALLER_ROLE_ARN=${SHARED_VPC_INSTALLER_ROLE_ARN}
 export SHARED_VPC_OPERATOR_ROLES_CREATED=${SHARED_VPC_OPERATOR_ROLES_CREATED}
 export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE:-${HOME}/.aws/credentials}
 export ZERO_EGRESS_ENABLED=${ZERO_EGRESS_ENABLED}
-export ZERO_EGRESS_ENDPOINT_IDS=${ZERO_EGRESS_ENDPOINT_IDS}
+# The value is a space-prefixed id list; it must be quoted or sourcing the env
+# file breaks (the leading space makes export see a bare word).
+export ZERO_EGRESS_ENDPOINT_IDS="${ZERO_EGRESS_ENDPOINT_IDS}"
 export ZERO_EGRESS_ENDPOINT_SG_ID=${ZERO_EGRESS_ENDPOINT_SG_ID}
 export FEATURE_ZERO_EGRESS=${ZERO_EGRESS_ENABLED}
 EOF

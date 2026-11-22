@@ -75,14 +75,32 @@ if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
   echo ""
   echo "--- Deleting zero egress VPC endpoints ---"
   if [[ -n "${ZERO_EGRESS_ENDPOINT_IDS:-}" ]]; then
-    aws ec2 delete-vpc-endpoints --vpc-endpoint-ids ${ZERO_EGRESS_ENDPOINT_IDS} \
-      --region "${REGION}" 2>/dev/null || true
-    echo "Deleted:${ZERO_EGRESS_ENDPOINT_IDS}"
+    DELETE_RESULT=$(aws ec2 delete-vpc-endpoints --vpc-endpoint-ids ${ZERO_EGRESS_ENDPOINT_IDS} \
+      --region "${REGION}" --output json 2>/dev/null || echo '{"Unsuccessful": []}')
+    UNSUCCESSFUL=$(jq '.Unsuccessful | length' <<<"${DELETE_RESULT}" 2>/dev/null || echo 0)
+    if [[ "${UNSUCCESSFUL}" != "0" ]]; then
+      echo "WARNING: some endpoints were not deleted:"
+      jq -r '.Unsuccessful[] | "  \(.ResourceId): \(.Error.Message)"' <<<"${DELETE_RESULT}"
+    else
+      echo "Deleted:${ZERO_EGRESS_ENDPOINT_IDS}"
+    fi
   fi
   if [[ -n "${ZERO_EGRESS_ENDPOINT_SG_ID:-}" ]]; then
     # Endpoint deletion is asynchronous; the endpoints reference the security
-    # group until they are gone, so wait briefly before deleting it.
-    sleep 30
+    # group until they are gone, so poll for their disappearance before
+    # deleting it.
+    if [[ -n "${ZERO_EGRESS_ENDPOINT_IDS:-}" ]]; then
+      for _ in $(seq 1 30); do
+        REMAINING=$(aws ec2 describe-vpc-endpoints --region "${REGION}" \
+          --vpc-endpoint-ids ${ZERO_EGRESS_ENDPOINT_IDS} \
+          --query 'VpcEndpoints[].VpcEndpointId' --output text 2>/dev/null || echo "")
+        [[ -z "${REMAINING}" ]] && break
+        sleep 10
+      done
+      if [[ -n "${REMAINING:-}" ]]; then
+        echo "WARNING: endpoints still present after 5 minutes:${REMAINING}"
+      fi
+    fi
     aws ec2 delete-security-group --group-id "${ZERO_EGRESS_ENDPOINT_SG_ID}" \
       --region "${REGION}" 2>/dev/null || true
   fi

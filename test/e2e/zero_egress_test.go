@@ -5,11 +5,11 @@ package e2e
 import (
 	"context"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
@@ -27,8 +27,6 @@ import (
 // images are served from the provision shard's regional ECR mirror instead of
 // quay.io, and the kubelet pulls them with credentials from the
 // AmazonEC2ContainerRegistryReadOnly policy attached to the HCP worker role.
-
-const zeroEgressNamespace = "e2e-zero-egress"
 
 var (
 	hostedClusterGVR = schema.GroupVersionResource{
@@ -70,11 +68,16 @@ var _ = Describe("Zero Egress: Image Pulls",
 			Expect(tc.InitHCClients()).To(Succeed())
 			client := tc.HCKubeClient()
 
-			By("Creating test namespace")
-			waitForNamespaceDeleted(ctx, client, zeroEgressNamespace)
-			cleanup, err := framework.CreateTestNamespace(ctx, client, zeroEgressNamespace)
-			Expect(err).NotTo(HaveOccurred())
-			DeferCleanup(cleanup)
+			// A namespace private to this spec: cleanup is asynchronous, so a
+			// shared name would let the next spec race a Terminating namespace.
+			namespace := "e2e-zero-egress-mirror-pull"
+
+			By("Creating test namespace " + namespace)
+			cleanup, err := framework.CreateTestNamespace(ctx, client, namespace)
+			if cleanup != nil {
+				DeferCleanup(cleanup)
+			}
+			Expect(err).NotTo(HaveOccurred(), "creating test namespace")
 
 			// Pick a digest-pinned image that already runs on the cluster: every
 			// payload image is mirrored to the shard ECR repository, and the
@@ -86,7 +89,7 @@ var _ = Describe("Zero Egress: Image Pulls",
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "zero-egress-mirror-pull",
-					Namespace: zeroEgressNamespace,
+					Namespace: namespace,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -99,7 +102,7 @@ var _ = Describe("Zero Egress: Image Pulls",
 					},
 				},
 			}
-			_, err = client.CoreV1().Pods(zeroEgressNamespace).Create(ctx, pod, metav1.CreateOptions{})
+			_, err = client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred(), "creating mirror-pull pod")
 
 			By("Waiting for the pod to be scheduled and its image pulled")
@@ -108,7 +111,7 @@ var _ = Describe("Zero Egress: Image Pulls",
 			// failures, so any state other than ImagePullBackOff/ErrImagePull
 			// proves the mirror path works.
 			Eventually(func() bool {
-				return podProgressedPastPull(ctx, client, zeroEgressNamespace, "zero-egress-mirror-pull")
+				return podProgressedPastPull(ctx, client, namespace, "zero-egress-mirror-pull")
 			}).WithTimeout(6*time.Minute).WithPolling(15*time.Second).Should(BeTrue(),
 				"payload image %s should be pulled through the ECR mirror", image)
 		})
@@ -120,17 +123,22 @@ var _ = Describe("Zero Egress: Image Pulls",
 			Expect(tc.InitHCClients()).To(Succeed())
 			client := tc.HCKubeClient()
 
-			By("Creating test namespace")
-			waitForNamespaceDeleted(ctx, client, zeroEgressNamespace)
-			cleanup, err := framework.CreateTestNamespace(ctx, client, zeroEgressNamespace)
-			Expect(err).NotTo(HaveOccurred())
-			DeferCleanup(cleanup)
+			// A namespace private to this spec: cleanup is asynchronous, so a
+			// shared name would let the next spec race a Terminating namespace.
+			namespace := "e2e-zero-egress-blocked-pull"
+
+			By("Creating test namespace " + namespace)
+			cleanup, err := framework.CreateTestNamespace(ctx, client, namespace)
+			if cleanup != nil {
+				DeferCleanup(cleanup)
+			}
+			Expect(err).NotTo(HaveOccurred(), "creating test namespace")
 
 			By("Creating a pod with a non-mirrored public image")
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "zero-egress-blocked-pull",
-					Namespace: zeroEgressNamespace,
+					Namespace: namespace,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -142,7 +150,7 @@ var _ = Describe("Zero Egress: Image Pulls",
 					},
 				},
 			}
-			_, err = client.CoreV1().Pods(zeroEgressNamespace).Create(ctx, pod, metav1.CreateOptions{})
+			_, err = client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred(), "creating blocked-pull pod")
 
 			By("Waiting for the pull to be rejected")
@@ -151,7 +159,7 @@ var _ = Describe("Zero Egress: Image Pulls",
 			// cluster silently regained egress (or the mirror config grew too
 			// broad).
 			Eventually(func() bool {
-				p, err := client.CoreV1().Pods(zeroEgressNamespace).Get(ctx, "zero-egress-blocked-pull", metav1.GetOptions{})
+				p, err := client.CoreV1().Pods(namespace).Get(ctx, "zero-egress-blocked-pull", metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -213,7 +221,8 @@ func podProgressedPastPull(ctx context.Context, client kubernetes.Interface, nam
 			case "ContainerCreating", "PodInitializing":
 				return false
 			}
-			// CrashLoopBackOff and similar mean the image was pulled.
+			// Any other waiting reason (CrashLoopBackOff, etc.) means the image
+			// was pulled and the container is failing at runtime, not on pulls.
 		}
 		if status.State.Running != nil || status.State.Terminated != nil {
 			return true
@@ -341,20 +350,13 @@ var _ = Describe("Zero Egress: ECR Mirror Configuration",
 		})
 	})
 
-// isECRMirror reports whether the registry is a regional ECR mirror endpoint
-// (e.g. <account>.dkr.ecr.<region>.amazonaws.com/ocp-mirror-N).
-func isECRMirror(registry string) bool {
-	return strings.Contains(registry, ".dkr.ecr.") &&
-		strings.Contains(registry, ".amazonaws.com") &&
-		strings.Contains(registry, "mirror")
-}
+// ecrMirrorHostPattern matches a regional ECR registry hostname, e.g.
+// 122610517469.dkr.ecr.us-west-2.amazonaws.com.
+var ecrMirrorHostPattern = regexp.MustCompile(`^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com$`)
 
-// waitForNamespaceDeleted blocks until the namespace is gone, so a previous
-// spec's cleanup does not leave the create racing a Terminating namespace.
-func waitForNamespaceDeleted(ctx context.Context, client kubernetes.Interface, namespace string) {
-	Eventually(func() bool {
-		_, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
-		return apierrors.IsNotFound(err)
-	}).WithTimeout(3*time.Minute).WithPolling(5*time.Second).Should(BeTrue(),
-		"namespace %s should be removed before the next spec recreates it", namespace)
+// isECRMirror reports whether the registry reference points at a regional ECR
+// mirror host (the repository below it is the shard's ocp-mirror-N).
+func isECRMirror(registry string) bool {
+	host, _, found := strings.Cut(registry, "/")
+	return found && ecrMirrorHostPattern.MatchString(host)
 }
