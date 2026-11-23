@@ -36,8 +36,9 @@ aws sts get-caller-identity >/dev/null 2>&1 && echo "aws: ok" || echo "aws: NO v
 ```
 
 - A missing tool, or a failed `ocm`/`rosa` login, needs interactive action the
-  skill cannot perform: ask the user to run it themselves with the `!` prefix,
-  e.g. `! ocm login --use-auth-code --url stage` or `! rosa login --env staging`.
+  skill cannot perform: ask the user to run the login in their own terminal,
+  e.g. `ocm login --use-auth-code --url stage` or `rosa login --env staging`,
+  then re-check before continuing.
 - If AWS credentials are missing, guide the user through the osdctl flow in
   docs/local-testing.md ("Provision Your Own Cluster", Step 1). Never ask the
   user to paste AWS keys into chat.
