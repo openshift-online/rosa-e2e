@@ -77,14 +77,20 @@ list and docs/local-testing.md for per-feature notes):
 | cluster-type | Environment | Extra notes |
 |---|---|---|
 | `hcp` | *(none)* | Defaults: us-east-2, 2× m5.xlarge |
-| `zero-egress` | `ZERO_EGRESS_ENABLED=true REGION=us-west-2` | us-west-2 required (ECR-enabled shard); needs the zero-egress provision support |
+| `zero-egress` | *(none — do not provision)* | Not available on main: the flag, shard pinning and specs land with #398. Stop and tell the user instead of running the provision script — it ignores `ZERO_EGRESS_ENABLED` today |
 | `kms` | `KMS_ENABLED=true` | Creates a KMS key; deprovision schedules its deletion |
 | `shared-vpc` | `SHARED_VPC_ENABLED=true` | Creates PHZ + shared role in the user's account |
 | `external-auth` | `EXTERNAL_AUTH_ENABLED=true` | After ready, also run `scripts/create-external-auth-provider.sh` |
 | `autoscaling` | `ENABLE_AUTOSCALING=true` | Default pool autoscales 2–4 |
 
-Run in the background with output to a log file, e.g.
-`ZERO_EGRESS_ENABLED=true REGION=us-west-2 ./scripts/provision-e2e-cluster.sh > /tmp/rosa-e2e-provision.log 2>&1`.
+Run in the background with output to a log file, and record the process id
+for the failure path:
+
+```bash
+KMS_ENABLED=true ./scripts/provision-e2e-cluster.sh > /tmp/rosa-e2e-provision.log 2>&1 &
+echo "PROVISION_PID=$!"
+```
+
 The script writes `/tmp/rosa-e2e-cluster.env` — the contract for every later
 step. Do not `cat` the env file or the logs into chat (they contain tokens).
 
@@ -99,7 +105,9 @@ rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r .state
 ```
 
 Treat 60 minutes as the hard timeout. On timeout, an `error` state, or a
-provision failure at any point, clean up and report:
+provision failure at any point, stop the provision process first — `kill
+"${PROVISION_PID}"` if it is still running (the id was recorded at launch)
+and confirm it has exited — then clean up and report:
 
 - If `/tmp/rosa-e2e-cluster.env` exists, deprovision with it (Step 4).
 - If it does not, resources may still have been created — the script writes
@@ -155,10 +163,22 @@ Choose the label filter (ginkgo label expressions are unions with `||`):
     their own)
   - `platform`: `LABEL_FILTER="Area:ManagementPlane"`
 
-For `test-type=platform`, set up management cluster access and run the tests
-**in the same shell invocation** — shell state does not persist between tool
-calls, and sourcing the cluster env file does not restore `MC_KUBECONFIG` or
-`MANAGEMENT_CLUSTER_ID`:
+For `test-type=platform`, first find the management cluster for the region
+and the sector the provision run pinned (`CLUSTER_SECTOR` is empty unless
+the script set one — default to main), and note its cluster id:
+
+```bash
+set -a; source /tmp/rosa-e2e-cluster.env; set +a
+ocm get /api/osd_fleet_mgmt/v1/management_clusters \
+  --parameter search="status='ready' AND region='${AWS_REGION}' AND sector='${CLUSTER_SECTOR:-main}'" \
+  | jq -r '.items[] | .name + "\t" + .cluster_management_reference.cluster_id'
+```
+
+Then set up access and run the tests **in the same shell invocation** —
+shell state does not persist between tool calls, and sourcing the cluster
+env file does not restore `MC_KUBECONFIG` or `MANAGEMENT_CLUSTER_ID`.
+Replace `<mc-cluster-id>` with the id chosen from the query output before
+running the block:
 
 ```bash
 set -a; source /tmp/rosa-e2e-cluster.env; set +a
@@ -171,12 +191,6 @@ MC_KUBECONFIG="$(mktemp /tmp/rosa-e2e-mc-kubeconfig.XXXXXX)"
 chmod 600 "${MC_KUBECONFIG}"
 cp ~/.kube/config "${MC_KUBECONFIG}"
 export MC_KUBECONFIG
-# MC cluster id for the cluster's region and the sector the provision run
-# pinned (CLUSTER_SECTOR is empty unless the script set one, e.g. rosa-e2e
-# for zero-egress — default to main):
-ocm get /api/osd_fleet_mgmt/v1/management_clusters \
-  --parameter search="status='ready' AND region='${AWS_REGION}' AND sector='${CLUSTER_SECTOR:-main}'" \
-  | jq -r '.items[] | .name + "\t" + .cluster_management_reference.cluster_id'
 export MANAGEMENT_CLUSTER_ID=<mc-cluster-id>
 
 # Substitute the feature label for the cluster type (e.g. Feature:KMS for a
@@ -227,8 +241,19 @@ aws cloudformation describe-stacks --stack-name "${VPC_STACK_NAME}" \
 
 Surface any non-removed resource to the user with a retry command built from
 the recorded identifiers instead of reporting "cleanup complete". If the user
-interrupts the session before this step completes, state plainly that a
-cluster is still live and give them the two commands above to clean it up.
+interrupts the session before cleanup completes, state plainly that a cluster
+is still live and give them the actual cleanup commands to run themselves:
+
+```bash
+set -a; source /tmp/rosa-e2e-cluster.env; set +a
+./scripts/deprovision-e2e-cluster.sh
+```
+
+If the env file is already gone, rebuild the equivalent from the recorded
+identifiers: `rosa delete cluster -c <CLUSTER_ID> -y`, then
+`rosa delete operator-roles --prefix <OPERATOR_ROLE_PREFIX> --mode auto
+--yes`, then `aws cloudformation delete-stack --stack-name <VPC_STACK_NAME>
+--region <REGION>`.
 
 ## Final report
 
