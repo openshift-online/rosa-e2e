@@ -33,9 +33,9 @@ RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/op
 
 # jq is only useful with libjq and libonig, so it is a named stage to keep the
 # binary and its libraries on one version.
-FROM registry.access.redhat.com/hi/jq:1.8@sha256:7e7bb5a7441020cc41650ca55a1ccda3c9031191ed6f4a969dd038ecea1cfc5a AS jq
+FROM registry.access.redhat.com/hi/jq:1.8@sha256:3452496dd04b3f19123b60dc5cd74a6c765277ae554dee47ae4bfa441a44edc3 AS jq
 
-FROM registry.access.redhat.com/hi/core-runtime:2.43@sha256:81280d7fd6afa7a3d2a6da2e90e545cf8e5d187c80a69b2a1c875fdcd731aaed
+FROM registry.access.redhat.com/hi/core-runtime:2.43@sha256:33539044661f70521596967ee6581b12cc49c30c9f93bf5c52b622d2e9aa8b01
 
 LABEL com.redhat.component="rosa-e2e" \
       name="rosa-e2e" \
