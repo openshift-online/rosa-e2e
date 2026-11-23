@@ -24,10 +24,12 @@ Cluster") and confirm which cluster to use.
 
 ## Step 1: Preflight — all checks must pass before provisioning
 
-Run these in one shell call (shell state does not persist between calls):
+Run these in one shell call (shell state does not persist between calls). The
+PATH additions cover Linux (`~/.local/bin`) and macOS (Homebrew on both
+architectures); every tool is a Go binary or CLI available on both platforms:
 
 ```bash
-export PATH="${PATH}:${HOME}/.local/bin:${HOME}/.local/bin/backplane/latest"
+export PATH="${PATH}:${HOME}/.local/bin:${HOME}/.local/bin/backplane/latest:/opt/homebrew/bin:/usr/local/bin"
 for tool in ocm rosa osdctl aws jq go; do command -v "${tool}" >/dev/null || echo "MISSING: ${tool}"; done
 ocm token >/dev/null 2>&1 && echo "ocm: logged in" || echo "ocm: NOT logged in"
 rosa whoami >/dev/null 2>&1 && echo "rosa: logged in" || echo "rosa: NOT logged in"
@@ -77,7 +79,7 @@ list and docs/local-testing.md for per-feature notes):
 | cluster-type | Environment | Extra notes |
 |---|---|---|
 | `hcp` | *(none)* | Defaults: us-east-2, 2× m5.xlarge |
-| `zero-egress` | *(none — do not provision)* | Not available on main: the flag, shard pinning and specs land with #398. Stop and tell the user instead of running the provision script — it ignores `ZERO_EGRESS_ENABLED` today |
+| `zero-egress` | `ZERO_EGRESS_ENABLED=true` | Private subnets only: ECR/S3 VPC endpoints, no NAT gateway. The env file exports `FEATURE_ZERO_EGRESS=true` so the specs self-select |
 | `kms` | `KMS_ENABLED=true` | Creates a KMS key; deprovision schedules its deletion |
 | `shared-vpc` | `SHARED_VPC_ENABLED=true` | Creates PHZ + shared role in the user's account |
 | `external-auth` | `EXTERNAL_AUTH_ENABLED=true` | After ready, also run `scripts/create-external-auth-provider.sh` |
@@ -151,9 +153,11 @@ Choose the label filter (ginkgo label expressions are unions with `||`):
   - `platform`: `LABEL_FILTER="Feature:<X> || Area:ManagementPlane"` — a plain
     intersection would drop the management-plane specs that carry no Feature
     label
-- `zero-egress`: the `Feature:ZeroEgress` label and its specs are not on
-  main yet — they land with #398. Do not run this cluster type until that
-  PR merges; until then the filter would silently select nothing.
+- `zero-egress`: the provision script exports `FEATURE_ZERO_EGRESS=true`
+  in the env file, so plain `make test` runs the zero-egress specs (they
+  skip themselves on clusters without the flag). An explicit
+  `LABEL_FILTER="Feature:ZeroEgress"` works too — add
+  `|| Area:ManagementPlane` for platform runs.
 - `external-auth`: the customer-facing spec is labeled
   `Area:CustomerFeatures` (it has no `Feature:` label), so use
   `LABEL_FILTER="Area:CustomerFeatures"` for customer runs (plus
