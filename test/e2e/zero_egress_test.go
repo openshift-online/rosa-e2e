@@ -36,6 +36,11 @@ var (
 		Version:  "v1beta1",
 		Resource: "hostedclusters",
 	}
+	hostedControlPlaneGVR = schema.GroupVersionResource{
+		Group:    "hypershift.openshift.io",
+		Version:  "v1beta1",
+		Resource: "hostedcontrolplanes",
+	}
 	nodePoolGVR = schema.GroupVersionResource{
 		Group:    "hypershift.openshift.io",
 		Version:  "v1beta1",
@@ -248,7 +253,11 @@ var _ = Describe("Zero Egress: ECR Mirror Configuration",
 			Expect(tc.InitMCClients()).To(Succeed())
 		})
 
-		It("should mirror release payload images to the shard ECR repository", func(ctx context.Context) {
+		// The mirroring itself happens out-of-band on the provision shard;
+		// this spec only validates the configuration that points the cluster
+		// at the mirror. The actual pulls are proven by the customer-plane
+		// spec that creates a pod with imagePullPolicy: Always.
+		It("should configure the HostedCluster to use the shard ECR mirror for release payload images", func(ctx context.Context) {
 			ns := tc.HCPNamespaces()
 			Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
 
@@ -263,27 +272,32 @@ var _ = Describe("Zero Egress: ECR Mirror Configuration",
 			Expect(ok).To(BeTrue(), "HostedCluster has no imageContentSources")
 			Expect(sources).NotTo(BeEmpty(), "zero-egress HostedCluster must pin image content sources")
 
-			By("Verifying the release payload source is mirrored to ECR")
-			found := false
-			for _, s := range sources {
-				source, ok := s.(map[string]any)
-				if !ok {
-					continue
-				}
-				srcName, _ := source["source"].(string)
-				mirrors, _ := source["mirrors"].([]any)
-				if srcName != "quay.io/openshift-release-dev/ocp-release" && srcName != "quay.io/openshift-release-dev/ocp-v4.0-art-dev" {
-					continue
-				}
-				for _, m := range mirrors {
-					mirror, _ := m.(string)
-					if isECRMirror(mirror) {
-						found = true
-					}
-				}
-			}
-			Expect(found).To(BeTrue(),
-				"payload sources must be mirrored to the provision shard ECR repository: %v", sources)
+			By("Verifying the HostedCluster maps release payload sources to the ECR mirror")
+			Expect(hasReleaseToECRMirror(sources)).To(BeTrue(),
+				"payload sources must be mapped to the provision shard ECR repository: %v", sources)
+		})
+
+		// The HostedCluster's imageContentSources are propagated to the
+		// HostedControlPlane, whose control plane operator renders them into
+		// node ignition — the hop the ignition spec below consumes.
+		It("should propagate the ECR image content sources to the HostedControlPlane", func(ctx context.Context) {
+			ns := tc.HCPNamespaces()
+			Expect(ns).NotTo(BeNil(), "could not resolve HCP namespaces on MC")
+
+			By("Reading the HostedControlPlane CR in " + ns.HCPNamespace)
+			hcp, err := tc.MCDynamicClient().Resource(hostedControlPlaneGVR).
+				Namespace(ns.HCPNamespace).Get(ctx, ns.ClusterName, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred(), "getting HostedControlPlane %s", ns.ClusterName)
+
+			spec, ok := hcp.Object["spec"].(map[string]any)
+			Expect(ok).To(BeTrue(), "HostedControlPlane has no spec")
+			sources, ok := spec["imageContentSources"].([]any)
+			Expect(ok).To(BeTrue(), "HostedControlPlane has no imageContentSources")
+			Expect(sources).NotTo(BeEmpty(), "HostedControlPlane must pin image content sources")
+
+			By("Verifying the HostedControlPlane maps release payload sources to the ECR mirror")
+			Expect(hasReleaseToECRMirror(sources)).To(BeTrue(),
+				"payload sources must be propagated to the HostedControlPlane ECR mirror: %v", sources)
 		})
 
 		It("should deliver the ECR mirror configuration to worker nodes via ignition", func(ctx context.Context) {
@@ -318,6 +332,12 @@ var _ = Describe("Zero Egress: ECR Mirror Configuration",
 				if !strings.Contains(cm.Name, "image-content-source") {
 					continue
 				}
+				// The NodePool config generator merges ConfigMaps labeled
+				// hypershift.openshift.io/core-ignition-config=true into every
+				// node's ignition — without the label the mirror set is
+				// rendered but never delivered to the nodes.
+				Expect(cm.Labels["hypershift.openshift.io/core-ignition-config"]).To(Equal("true"),
+					"image-content-source ConfigMap %s must carry the core-ignition-config label", cm.Name)
 				for _, data := range cm.Data {
 					var ms mirrorSet
 					if err := yaml.Unmarshal([]byte(data), &ms); err != nil {
@@ -379,6 +399,29 @@ var _ = Describe("Zero Egress: ECR Mirror Configuration",
 // ecrMirrorHostPattern matches a regional ECR registry hostname, e.g.
 // 122610517469.dkr.ecr.us-west-2.amazonaws.com.
 var ecrMirrorHostPattern = regexp.MustCompile(`^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com$`)
+
+// hasReleaseToECRMirror reports whether any release payload source in an
+// imageContentSources list maps to a regional ECR mirror host.
+func hasReleaseToECRMirror(sources []any) bool {
+	for _, s := range sources {
+		source, ok := s.(map[string]any)
+		if !ok {
+			continue
+		}
+		srcName, _ := source["source"].(string)
+		mirrors, _ := source["mirrors"].([]any)
+		if srcName != "quay.io/openshift-release-dev/ocp-release" && srcName != "quay.io/openshift-release-dev/ocp-v4.0-art-dev" {
+			continue
+		}
+		for _, m := range mirrors {
+			mirror, _ := m.(string)
+			if isECRMirror(mirror) {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // isECRMirror reports whether the registry reference points at a regional ECR
 // mirror host (the repository below it is the shard's ocp-mirror-N).
