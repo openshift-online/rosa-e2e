@@ -534,6 +534,44 @@ func TestDailyHealthReportBreakdownRowFields(t *testing.T) {
 	}
 }
 
+// TestDailyHealthReportIncompleteRateKeepsPartialMarker asserts the row
+// markers stay consistent with step 3's Rate availability, which measures a
+// qualified rate from whatever an incomplete window returned -- even when
+// every window of the population is incomplete. Such a row is partial
+// coverage over a measured rate: marking it unavailable would deny figures
+// the report prints, and omitting its marker would hide that the coverage
+// behind them is partial.
+func TestDailyHealthReportIncompleteRateKeepsPartialMarker(t *testing.T) {
+	section := docSection(t, breakdownHeading)
+	required := []struct{ needle, why string }{
+		{"A qualified measured rate `{rate}% ({pass}/{total}, incomplete)` is a " + partialMarker + " row, including when every window is incomplete",
+			"that a measured incomplete rate is partial coverage, whatever share of the population is incomplete"},
+		{"never downgrade it to an `N/A` form because of this marker",
+			"that the marker never changes step 3's computed rate"},
+		{"never omit the marker from a row whose rate carries the `, incomplete` qualifier",
+			"that a qualified rate always keeps its coverage marker"},
+		{"no non-informing window is complete **and** no completed build was retrieved",
+			"the narrowed condition for the nothing-is-known marker"},
+		{"every non-informing window is complete and none held a completed build",
+			"that no runs needs complete windows"},
+		{"every non-informing window is complete and a rate is measured",
+			"the only case that carries no marker"},
+	}
+	for _, r := range required {
+		if !strings.Contains(section, r.needle) {
+			t.Errorf("marker states must pin %s (missing %q)", r.why, r.needle)
+		}
+	}
+	for _, forbidden := range []string{
+		"omit the marker entirely for a category with a measured rate",
+		"`unavailable` when the current window is incomplete for every non-informing job",
+	} {
+		if strings.Contains(section, forbidden) {
+			t.Errorf("a marker rule contradicting step 3's qualified measured rate must not survive (found %q)", forbidden)
+		}
+	}
+}
+
 // TestDailyHealthReportFooterClauseOrder asserts every sample footer carries
 // the three links, orders its clauses canonically, and routes readers to the
 // breakdown rather than counting what it leaves out. The samples are what the
