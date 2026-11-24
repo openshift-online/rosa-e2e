@@ -117,7 +117,7 @@ var _ = Describe("Zero Egress: Image Pulls",
 			// image is cached on the node. Runtime crashes are not pull
 			// failures, so any state other than ImagePullBackOff/ErrImagePull
 			// proves the mirror path works.
-			Eventually(func() bool {
+			Eventually(func() (bool, error) {
 				return podProgressedPastPull(ctx, client, namespace, "zero-egress-mirror-pull")
 			}).WithTimeout(6*time.Minute).WithPolling(15*time.Second).Should(BeTrue(),
 				"payload image %s should be pulled through the ECR mirror", image)
@@ -165,18 +165,21 @@ var _ = Describe("Zero Egress: Image Pulls",
 			// ECR mirror must be unreachable. If this pull ever succeeds, the
 			// cluster silently regained egress (or the mirror config grew too
 			// broad).
-			Eventually(func() bool {
+			// Returning the API error (instead of swallowing it into false)
+			// keeps the poll retrying on transient errors but surfaces the
+			// actual error in the failure message on timeout.
+			Eventually(func() (bool, error) {
 				p, err := client.CoreV1().Pods(namespace).Get(ctx, "zero-egress-blocked-pull", metav1.GetOptions{})
 				if err != nil {
-					return false
+					return false, err
 				}
 				for _, status := range p.Status.ContainerStatuses {
 					if status.State.Waiting != nil &&
 						status.State.Waiting.Reason == "ImagePullBackOff" {
-						return true
+						return true, nil
 					}
 				}
-				return false
+				return false, nil
 			}).WithTimeout(5*time.Minute).WithPolling(15*time.Second).Should(BeTrue(),
 				"non-mirrored image pull should end in ImagePullBackOff on a zero-egress cluster")
 		})
@@ -212,30 +215,31 @@ func payloadImageFromMonitoring(ctx context.Context, client kubernetes.Interface
 // podProgressedPastPull reports whether the pod's container has definitively
 // moved past image pulling (running, crashed after pulling, or terminated) —
 // as opposed to being stuck in ErrImagePull/ImagePullBackOff or not scheduled.
-func podProgressedPastPull(ctx context.Context, client kubernetes.Interface, namespace, name string) bool {
+// API errors are returned so the Eventually caller surfaces them on timeout.
+func podProgressedPastPull(ctx context.Context, client kubernetes.Interface, namespace, name string) (bool, error) {
 	p, err := client.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return false
+		return false, err
 	}
 	if len(p.Status.ContainerStatuses) == 0 {
-		return false
+		return false, nil
 	}
 	for _, status := range p.Status.ContainerStatuses {
 		if status.State.Waiting != nil {
 			switch status.State.Waiting.Reason {
 			case "ErrImagePull", "ImagePullBackOff":
-				return false
+				return false, nil
 			case "ContainerCreating", "PodInitializing":
-				return false
+				return false, nil
 			}
 			// Any other waiting reason (CrashLoopBackOff, etc.) means the image
 			// was pulled and the container is failing at runtime, not on pulls.
 		}
 		if status.State.Running != nil || status.State.Terminated != nil {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // ── Platform plane: ECR mirror wiring on the management cluster ────────────
