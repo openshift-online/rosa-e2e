@@ -617,11 +617,16 @@ ZERO_EGRESS_ARGS=""
 ZERO_EGRESS_ENDPOINT_IDS=""
 ZERO_EGRESS_ENDPOINT_SG_ID=""
 
+# Returns the first available endpoint of the given service and type. Only
+# one ID: several tab-joined IDs passed as a single quoted argument would
+# fail the describe/modify calls below. The type filter matters for s3,
+# which has both Interface and Gateway endpoints and only the Gateway kind
+# accepts route-table associations.
 zero_egress_endpoint_id() {
   aws ec2 describe-vpc-endpoints --region "${REGION}" \
     --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.${1}" \
-    "Name=vpc-endpoint-state,Values=available" \
-    --query 'VpcEndpoints[].VpcEndpointId' --output text
+    "Name=vpc-endpoint-state,Values=available" "Name=vpc-endpoint-type,Values=${2}" \
+    --query 'VpcEndpoints[0].VpcEndpointId' --output text
 }
 
 if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
@@ -633,8 +638,8 @@ if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
     --query 'RouteTables[].RouteTableId' --output text | tr '\t' ' ')
 
   for service in ecr.api ecr.dkr; do
-    ENDPOINT_ID=$(zero_egress_endpoint_id "${service}")
-    if [[ -n "${ENDPOINT_ID}" ]]; then
+    ENDPOINT_ID=$(zero_egress_endpoint_id "${service}" Interface)
+    if [[ -n "${ENDPOINT_ID}" && "${ENDPOINT_ID}" != "None" ]]; then
       echo "${service} endpoint already exists: ${ENDPOINT_ID}"
       # Private DNS is required for ecr.dkr (docker pulls resolve the mirror
       # host through it); enable it on pre-existing endpoints that lack it.
@@ -685,8 +690,8 @@ if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
     done
   done
 
-  S3_ENDPOINT_ID=$(zero_egress_endpoint_id s3)
-  if [[ -n "${S3_ENDPOINT_ID}" ]]; then
+  S3_ENDPOINT_ID=$(zero_egress_endpoint_id s3 Gateway)
+  if [[ -n "${S3_ENDPOINT_ID}" && "${S3_ENDPOINT_ID}" != "None" ]]; then
     echo "s3 gateway endpoint already exists: ${S3_ENDPOINT_ID}"
     # Reconcile route table associations: a pre-existing endpoint may not
     # cover every route table in the VPC.
