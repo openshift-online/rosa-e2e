@@ -1,6 +1,6 @@
 # Scheduled report: ROSA CI daily health report
 
-You are running a **cron** scheduled task that produces a daily CI health report for ROSA (Red Hat OpenShift Service on AWS) jobs. Keep the report **as concise as possible** to minimize channel noise. The choice on each run is between staying silent and posting the required summary — never between the required summary and an abbreviated one. When a report is delivered, the header line plus the `*Gating:*` and `*Non-gating:*` rollup lines are the floor it may shrink to (see step 4); brevity drops optional detail, never those lines. Only expand into detail when something needs attention. When nothing merits a report at all, retain scheduled silence (see step 7 and Constraints) rather than shrinking the report below that floor.
+You are running a **cron** scheduled task that produces a daily CI health report for ROSA (Red Hat OpenShift Service on AWS) jobs. Keep the report **as concise as possible** to minimize channel noise. The choice on each run is between staying silent and posting the required summary — never between the required summary and an abbreviated one. When a report is delivered, the header line plus the `*Gating:*` and `*Non-gating:*` rollup lines are the floor it may shrink to (see step 4); brevity drops optional detail, never those lines. Brevity also never costs a category its figures: when the per-category list does not fit the summary, the complete breakdown moves into the thread rather than losing categories (see step 4's overflow rule and "Additional complete category breakdown"). Only expand into detail when something needs attention. When nothing merits a report at all, retain scheduled silence (see step 7 and Constraints) rather than shrinking the report below that floor.
 
 ## Goal
 
@@ -88,9 +88,9 @@ Post a concise summary as your channel response. This is the top-level message t
 - A `Source:` line referencing ci-status-jobs.yaml
 - A "Key issues needing attention" section
 - Per-job breakdowns or job names (those go in threaded replies)
-- Categories with no Prow run data (no white circle lines)
+- Categories with no Prow run data (no white circle lines) — they appear in the complete category breakdown reply instead, marked `no runs`, `unavailable`, `partial` or `informing only` per that section's state markers
 
-**If all categories >= 80%**: skip failure analysis, not reconciliation. Proceed to step 6 (write handoff artifact), then step 7 (shared drift/failure remediation). If an actionable drift change or materially incomplete check merits delivery, use the same per-category format below with only the relevant drift/phase replies; otherwise retain scheduled silence with `no_action_required()` after required checks and artifact writing. Do not manufacture a no-drift message.
+**If all categories >= 80%**: skip failure analysis, not reconciliation. Proceed to step 6 (write handoff artifact), then step 7 (shared drift/failure remediation). If an actionable drift change or materially incomplete check merits delivery, use the same per-category format below with only the relevant drift, complete-category-breakdown and phase replies; otherwise retain scheduled silence with `no_action_required()` after required checks and artifact writing. Do not manufacture a no-drift message.
 
 **Format** (used for both all-green and mixed reports):
 
@@ -104,17 +104,20 @@ Post a concise summary as your channel response. This is the top-level message t
 {emoji} *{Category}:* {rate}% ({pass}/{total}) {trend} -- {brief inline note} (<prow_filter|jobs>)
 ...
 
-_{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow> · <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|Dashboard>_
+_{N} categories skipped (no runs) · full breakdown in thread ({total} categories) · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow> · <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|Dashboard>_
 ```
+
+Every footer clause other than the three links is conditional — the ones before them and the `Registry drift:` clause after them alike: emit each when its rule below says to, drop it otherwise. The three links are always present.
 
 **Rules:**
 - **Mandatory headline block — never omit.** Every delivered report opens with exactly these three lines, in this order and adjacent: the `*ROSA CI Daily Health -- {DATE} -- {overall_rate}%*` header, then `*Gating:*`, then `*Non-gating:*`. Emit all three on every delivered report — all-green, mixed, drift-only, zero-denominator and trend-unavailable runs alike. Their presence never depends on trend availability, on how many categories have data, or on how healthy the run is. When a field cannot be filled, degrade the **field** (`N/A (0/0)`, `N/A (data unavailable)`, `trend unavailable`) — never the line. The only alternative to this block is scheduled silence, not a shorter report. Exactly one optional `:warning:` line may precede the header — the Prow/GCS no-data warning (Constraints) and the step 6 artifact-failure warning share that single line when both apply. Nothing else may appear above the header.
 - `{overall_rate}` is the weighted pass rate across all jobs with data (total passes / total builds, rounded to nearest integer). Its `N/A (0/0)` and `N/A (data unavailable)` forms replace the whole `{overall_rate}%` token including the percent sign — never render `N/A (0/0)%`.
 - The two-line gating rollup goes directly under the header, before the per-category list. `{gating_rate}` is the weighted pass rate across gating jobs with data; `{non_gating_rate}` across non-gating jobs with data (see "Gating vs non-gating pass rate" in step 3). Each line keeps its rate and its `({pass}/{total})` counts, qualified `, incomplete` when its current window is; an `N/A` form replaces that whole span, percent sign included, rather than only the percentage.
 - `{gating_trend}` / `{non_gating_trend}` use the same 7-day trend emoji as categories, or the literal `trend unavailable` when either of that population's windows is incomplete (see "Trend availability" in step 3). The same applies to the per-category `{trend}` field.
-- **Partial coverage.** If any registry job's current window is incomplete in step 2 — fetch error, denial, truncation, or a cap with no proof of exhaustion — the printed rates cover only the retrieved subset: append a short `partial data ({N} jobs unavailable)` clause to the footer line, separated by ` · `, where N counts the jobs whose current window is incomplete. This is distinct from the no-run category count, and distinct from the more-than-half-missing warning in Constraints. Canonical footer clause order: skipped-category count · partial data · overflow count · Sippy · Prow · Dashboard · `Registry drift:`.
+- **Partial coverage.** If any registry job's current window is incomplete in step 2 — fetch error, denial, truncation, or a cap with no proof of exhaustion — the printed rates cover only the retrieved subset: append a short `partial data ({N} jobs unavailable)` clause to the footer line, separated by ` · `, where N counts the jobs whose current window is incomplete. This is distinct from the no-run category count, and distinct from the more-than-half-missing warning in Constraints. Canonical footer clause order: skipped-category count · partial data · complete-breakdown pointer · Sippy · Prow · Dashboard · `Registry drift:`.
+- **Complete-breakdown pointer.** Whenever the summary's category lines do not carry exactly one line per configured category of the pinned registry — because the overflow rule dropped the list, or because categories with no run data are kept out of the summary, or for any other reason — append `full breakdown in thread ({total} categories)` to the footer in its canonical position, where `{total}` is the number of categories in the pinned registry, and compose the complete category breakdown reply (see "Additional complete category breakdown"). This clause replaces the former `+{N} more categories` clause: a count of what is missing is not a route to it. Omit the clause only when the inline list already is the complete view.
 - `*Informing:*` is a count-only rollup for `informing: true` jobs with data ({passing}/{total}, no percentage, no trend — they are excluded from every rate). Omit the line entirely when no informing jobs have data.
-- List categories with data, sorted by pass rate descending. **One category per line.** Never combine multiple categories on the same line with `·` separators. Every category gets its own line with its own emoji, pass rate, trend field, and (jobs) link, even green categories — subject only to the overflow rule in the pre-delivery checklist.
+- List categories with data, sorted by pass rate descending. **One category per line.** Never combine multiple categories on the same line with `·` separators. Every category gets its own line with its own emoji, pass rate, trend field, and (jobs) link, even green categories — subject only to the all-or-nothing overflow rule in the pre-delivery checklist.
 - For yellow/red categories, add a **short** inline note after the trend field (e.g., `-- AMD64 & E2E at 40%`, `-- stale since Jun 17`, `-- 1 run in 30d`). Keep notes under 40 characters.
 - If any categories had zero Prow run data over a complete window, mention the count in the footer line (e.g., `2 categories skipped (no runs)`). A category whose current window is merely incomplete is not "no runs": it counts toward partial data instead. Omit this part if all categories have data.
 - Combine Sippy, Prow, and Dashboard links on the footer line separated by ` · `. Only when step 1b warrants attention, append one concise `Registry drift: {result / PR link / material gap}` clause to that same footer; details belong in the threaded drift reply. Stay within the summary limit and do not add a drift section below category lines.
@@ -130,11 +133,14 @@ _{N} categories skipped (no runs) · <https://sippy.dptools.openshift.org/sippy-
 5. No percentage anywhere includes informing jobs, and every trend excludes them from both comparison windows.
 6. No `0%` stands in for a zero denominator, no `0/0` stands in for an incomplete window, and no trend emoji is printed unless both windows are complete.
 7. Every category with data has its own line with its own emoji, rate, trend field and `(jobs)` link, subject to the overflow rule; the footer is the last line.
-8. The summary is under the character limit in Constraints. If it is not, apply the overflow rule below.
+8. The summary is under the character limit in Constraints, or has been reduced to the irreducible floor by the overflow rule below. If it is over and a category line is still emitted, apply that rule.
+9. Either the inline list carries exactly one line per configured category of the pinned registry, or the footer carries the complete-breakdown pointer and the complete category breakdown reply is composed. No configured category is absent from both the summary and the thread.
 
-Never satisfy a failing item by deleting a required line. **Overflow rule:** when the summary still exceeds the limit after shortening the inline notes to their 40-character cap, keep the headline block and the footer, list only the worst-performing categories that fit, and append a `+{N} more categories` clause to the footer in its canonical position. Dropping a category *line* never drops that category's step 5 analysis — the threading gate follows the computed health, not the emitted lines. The headline block is never dropped, shortened, merged onto one line, or traded against the character limit.
+Never satisfy a failing item by deleting a required line. **Overflow rule:** when the summary still exceeds the limit after shortening the inline notes to their 40-character cap, keep the headline block and the footer, drop the per-category list **as a whole**, and append the complete-breakdown pointer clause to the footer in its canonical position. Overflow is all-or-nothing: the summary carries either every category line or none, so which categories a reader sees never depends on pass rate, health emoji, trend or any other severity ranking, and a dropped line is always carried by the complete category breakdown reply — overflow never silently drops a category. Dropping a category *line* never drops that category's step 5 analysis — the threading gate follows the computed health, not the emitted lines. The headline block is never dropped, shortened, merged onto one line, or traded against the character limit. The headline block plus the footer is the irreducible floor: if it still exceeds the limit with no category line left to drop, shorten the footer by dropping its optional clauses in this order — the `Registry drift:` clause first (compose the threaded drift reply if it is not already present, so the drift result is still delivered), then the skipped-category count — and deliver it over the limit rather than dropping a required line. Never drop the complete-breakdown pointer: without it the thread that holds the dropped categories is unreachable.
 
-**Scenario examples** (illustrative values only). Except where a footer is shown, these are headline fragments: the category lines and the footer are omitted for brevity, and a delivered report always ends with the footer.
+A registry of many categories, or long `prow_filter` URLs, can put the list over the limit on every run; the breakdown reply is then the normal route to per-category figures, and a summary of headline block plus footer is the expected shape rather than a degraded one. That is a placement cost, not a coverage cost: no figure and no category is lost.
+
+**Scenario examples** (illustrative values only, from a smaller registry than the live one). Except where a footer is shown, these are headline fragments: the category lines and the footer are omitted for brevity, and a delivered report always ends with the footer. A footer-bearing example may still elide category lines with a `...` line; an example showing no category line at all is showing an overflowed summary.
 
 *Trends available, informing jobs with data:*
 
@@ -175,11 +181,12 @@ The gating population's current window is complete and genuinely held no complet
 *Non-gating:* 71% (22/31, incomplete) -- trend unavailable
 
 :large_green_circle: *ROSA HCP E2E:* 92% (23/25) :left_right_arrow: (<prow_filter|jobs>)
+...
 
-_1 category skipped (no runs) · partial data (4 jobs unavailable) · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow> · <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|Dashboard>_
+_1 category skipped (no runs) · partial data (4 jobs unavailable) · full breakdown in thread (19 categories) · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow> · <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|Dashboard>_
 ```
 
-An incomplete current window reduces coverage, not the pass rate: the unretrieved jobs are excluded from the denominators and never counted as failures. Availability is decided per line: here the four unretrieved jobs are all non-gating and none belongs to the listed category, so the gating rollup and that category keep complete windows, while the non-gating rollup is qualified `, incomplete` and loses its trend. The header carries no counts, so the footer's partial-data clause is what qualifies the 85%.
+An incomplete current window reduces coverage, not the pass rate: the unretrieved jobs are excluded from the denominators and never counted as failures. Availability is decided per line: here the four unretrieved jobs are all non-gating and none belongs to the listed category, so the gating rollup and that category keep complete windows, while the non-gating rollup is qualified `, incomplete` and loses its trend. The header carries no counts, so the footer's partial-data clause is what qualifies the 85%. The remaining category lines are elided here as `...`. The skipped category is not among them, so the footer also points at the complete category breakdown reply, where every configured category appears one row each.
 
 *Current history unavailable for the whole population:*
 
@@ -191,11 +198,23 @@ An incomplete current window reduces coverage, not the pass rate: the unretrieve
 
 Nothing was retrieved, so nothing is known. `N/A (data unavailable)` says exactly that, where `N/A (0/0)` would falsely assert that every job ran nothing. Reserve `N/A (0/0)` for a current window that is complete for the whole population and genuinely held no completed build.
 
-*All categories green and the report is delivered:* the same three-line headline block is emitted, followed by the green category lines and the footer. Healthy is a reason to skip failure analysis, not a reason to skip the headline block.
+*Summary over the character limit (overflow):*
 
-**Threading gate:** Before proceeding, check: did this run **compute** any :red_circle: or :large_yellow_circle: category, whether or not its line survived the overflow rule? If yes, step 5 is **mandatory** — do not call `send_response()` until threaded replies are composed. If every computed category is :large_green_circle:, or no category had data at all, skip step 5 and proceed directly to step 6 (write handoff artifact).
+```
+*ROSA CI Daily Health -- 2026-07-25 -- 85%*
+*Gating:* 94% (47/50) -- :left_right_arrow:
+*Non-gating:* 71% (22/31) -- :chart_with_downwards_trend:
 
-**Single threading rule:** The first reply uses `---THREAD_DETAILS---`; every subsequent reply uses `---THREAD_BREAK---`, regardless of reply type (failure analysis, registry drift, remediation or phase breakdown). Never emit a second `---THREAD_DETAILS---` in one response. Apply this rule on delivered all-green reports too.
+_2 categories skipped (no runs) · full breakdown in thread (19 categories) · <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow> · <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|Dashboard>_
+```
+
+The notes were already at their 40-character cap and the list still did not fit, so the whole list gives way — not its tail, and not its healthiest or its worst entries. The headline block, the footer and every rate stand unchanged, and every configured category, the 2 with no runs included, appears one row each in the complete category breakdown reply.
+
+*All categories green and the report is delivered:* the same three-line headline block is emitted, followed by the green category lines and the footer — or, when those lines do not fit, by the footer alone carrying its complete-breakdown pointer. Healthy is a reason to skip failure analysis, not a reason to skip the headline block.
+
+**Threading gate:** Before proceeding, check: did this run **compute** any :red_circle: or :large_yellow_circle: category, whether or not its line survived the overflow rule? If yes, step 5 is **mandatory** — do not call `send_response()` until threaded replies are composed. If every computed category is :large_green_circle:, or no category had data at all, skip step 5 and proceed directly to step 6 (write handoff artifact). The complete category breakdown reply is not failure analysis: it never satisfies this gate, never substitutes for a step 5 reply, and is never a reason to enter step 5.
+
+**Single threading rule:** The first reply uses `---THREAD_DETAILS---`; every subsequent reply uses `---THREAD_BREAK---`, regardless of reply type (failure analysis, registry drift, remediation, complete category breakdown or phase breakdown). Never emit a second `---THREAD_DETAILS---` in one response. Apply this rule on delivered all-green reports too.
 
 ### 5. Failure analysis (threaded replies)
 
@@ -251,7 +270,7 @@ Failing since {date}. {Root cause analysis.}
 {Short summary and analysis}
 ```
 
-**Scope cap:** Analyze the 5 worst categories first (lowest pass rate). For each, analyze at most 5 failing jobs (worst pass rate first). This keeps the report actionable without requiring excessive tool calls. If more categories are failing, note the count in the last threaded reply (e.g., "2 additional categories below 80% — see Prow dashboard for details").
+**Scope cap:** Analyze the 5 worst categories first (lowest pass rate). For each, analyze at most 5 failing jobs (worst pass rate first). This keeps the report actionable without requiring excessive tool calls. If more categories are failing, note the count in the last failure-analysis reply (e.g., "2 additional categories below 80% — see Prow dashboard for details").
 
 **Skip informing jobs in failure analysis.** Jobs with `informing: true` in the registry are pre-GA project validation; do not select them for analysis and do not let their failures pull a category into the analyzed set. Exception: an informing-job failure whose root cause is a shared-infrastructure defect with evidence that the same defect also affects at least one release-gating job (e.g. the same gather step or credential mount failing in gating jobs in the same window) is analyzed normally, with the fix routed to the affected gating job.
 
@@ -407,20 +426,83 @@ On runs with health failures, after the selected remediation attempt, check exis
 
 ## Constraints
 
-- Keep the top-level summary under 1200 characters. The message should be a scannable scoreboard, not a report. All detailed analysis goes in threaded replies.
+- Keep the top-level summary under 1200 characters — except step 4's irreducible headline-block-plus-footer floor, which is delivered as it stands. The message should be a scannable scoreboard, not a report. All detailed analysis goes in threaded replies.
 - Every delivered summary contains the mandatory headline block: the header line plus `*Gating:*` and `*Non-gating:*` directly beneath it. Brevity, an all-green run, a zero denominator, missing comparison history and the character limit are all reasons to shorten *fields and notes*, never reasons to omit those lines. Run the pre-delivery structural checklist in step 4 before composing the response.
+- A delivered report never leaves a configured category out of both the summary and the thread. When the summary cannot carry one line per configured category, the complete category breakdown reply carries every one of them, and the footer points at it. Dropping category lines is all-or-nothing and never selected by health, rate or severity.
 - Never add sections, headers, or bullet lists below the category lines. The only thing after the last category line is the footer, which may contain the one concise actionable/materially incomplete drift clause allowed by step 4; detailed drift evidence goes in the existing thread.
 - If more than half the jobs return no data, warn about possible Prow/GCS issues at the top.
-- Before sending: if any category is below 80%, verify your response content contains `---THREAD_DETAILS---` followed by at least one threaded reply section. If these delimiters are missing, your threaded replies will not be posted — go back to step 5.
+- Before sending: if any category is below 80%, verify your response content contains `---THREAD_DETAILS---` followed by at least one **failure-analysis** reply section. The complete-category-breakdown, drift, remediation and phase replies do not satisfy this check. If these delimiters are missing, your threaded replies will not be posted — go back to step 5.
 - Always write the handoff artifact (step 6) before calling `send_response()`, even if all categories are green.
 - `send_response()` ends the turn immediately — no tool calls after it.
 - On the all-green path (all categories >= 80%), skip failure analysis and FAILURE remediation, not step 1b reconciliation or step 7's safe drift remediation. After the required artifact/checks, use `no_action_required()` when no action/change or newly material incomplete result merits reporting; do not post unchanged healthy/no-drift noise.
+
+## Additional complete category breakdown
+
+This section is additive. It changes no pass rate, trend, window-completeness or gating definition, no top-level format rule, no failure-analysis gate, no handoff artifact field, and no remediation behaviour. It only guarantees that a delivered report shows every configured category somewhere, and that the summary's size cap is paid for in placement rather than in coverage.
+
+### When it is required
+
+On a delivered report, compose this reply whenever the summary's category lines do not already carry **exactly one line per configured category** of the pinned registry. That is the case whenever the overflow rule dropped the list, whenever a category has no run data (step 4 keeps those out of the summary), and whenever a configured category is absent from the summary for any other reason. When every configured category already has its own summary line, the inline list *is* the complete view: emit no reply and no footer pointer.
+
+A run that qualifies for scheduled silence has no report and therefore no breakdown. Never compose this reply, or its footer pointer, to defeat the scheduled silence of `no_action_required()`.
+
+The reply lives in the thread, so completeness costs the channel nothing: the top-level summary keeps its character limit and its scoreboard shape.
+
+### Rows
+
+Build the rows from the same run and the same reporting window as the summary, out of the step 2 history and the step 3 figures already computed. Do not issue a second history query, re-derive a rate by another route, or print a figure that differs from the summary's.
+
+Emit one row per configured category in the pinned registry, in registry order, carrying:
+
+- the category display name from the registry and its step 3 health emoji — `:white_circle:` for any category without a computed rate, which covers both the `N/A (0/0)` and the `N/A (data unavailable)` forms;
+- the pass rate with its `({pass}/{total})` counts, in exactly the forms step 3 defines and nowhere else: `{rate}% ({pass}/{total})`, `{rate}% ({pass}/{total}, incomplete)`, `N/A (0/0)` or `N/A (data unavailable)`;
+- the trend emoji, or the literal `trend unavailable` when step 3's trend availability is not met;
+- the category's `(<prow_filter|jobs>)` link when the registry supplies a `prow_filter`, omitted when it does not;
+- an explicit state marker that keeps the kinds of missing data apart. Every marker is judged over the category's **non-informing** jobs only, the same population as its rate, so a marker can never contradict the rate beside it. The marker describes the row's *coverage*; the rate field, unchanged from step 3, reports its *figures*. They are not in one-to-one correspondence: different markers can accompany the same rate form, one marker can accompany different rate forms, and the marker never changes which form step 3 prints. At most one marker per row, first match wins in this order:
+  1. `informing only` — the category has no non-informing job at all, so there is no rate population to measure;
+  2. `unavailable` — no non-informing window is complete **and** no completed build was retrieved, so nothing about the category is known;
+  3. `partial` — at least one non-informing window is incomplete, and either completed builds were retrieved or coverage is mixed (some windows complete, some not). A qualified measured rate `{rate}% ({pass}/{total}, incomplete)` is a `partial` row, including when every window is incomplete: step 3 measures whatever subset came back, and the marker says the coverage behind it is partial. Mixed coverage that returned no completed build is a `partial` row too, and it prints the same `N/A (data unavailable)` rate form as an `unavailable` row — step 3 gives that form to every incomplete current window whose retrieved subset is empty, whether or not some window of the population was complete. Keep the rate exactly as step 3 computes it: the marker never downgrades a measured rate to an `N/A` form, and never upgrades an `N/A` form to a measured one;
+  4. `no runs` — every non-informing window is complete and none held a completed build;
+  5. no marker at all — every non-informing window is complete and a rate is measured.
+
+  A quiet job whose source was exhausted has a complete window (step 3), so a quiet category is `no runs`, never `unavailable`. Never show an incomplete window as `no runs`, and never omit the marker from a row whose rate carries the `, incomplete` qualifier;
+- the count-only informing tally `informing {passing}/{total}` when the category has informing jobs with data, omitted when it has none. Informing jobs stay out of the row's rate, its counts and its trend exactly as step 3 requires; the tally is a separate figure beside them and is never folded into the rate.
+
+Row format:
+
+```
+{emoji} *{Category}:* {rate}% ({pass}/{total}) {trend} [-- no runs | -- partial | -- unavailable | -- informing only] [· informing {p}/{t}] (<prow_filter|jobs>)
+```
+
+An `N/A (0/0)` or `N/A (data unavailable)` form, and the `, incomplete` qualifier, replace the whole `{rate}% ({pass}/{total})` span exactly as they do in the summary — never only the percentage.
+
+An `informing only` category has an empty rate population, so step 3 resolves its rate to `N/A (0/0)` and its trend to `trend unavailable`. The marker is what tells a reader that those values mean "nothing to measure here" rather than "a category that ran nothing": its informing tally beside them may well show builds.
+
+### Coverage and reconciliation check
+
+Before composing the reply, check it against the pinned registry and the figures already computed:
+
+1. every configured category `id` appears exactly once — no missing category, no duplicate row. Match on `id`, which the registry pairs with the display name the row prints;
+2. the row count equals the number of categories in the pinned registry, and the row set matches the categories written to the step 6 artifact;
+3. the rows' non-informing `{pass}` and `{total}` sum to the combined `*Gating:*` and `*Non-gating:*` counts, which is the overall rate's population;
+4. the rows' informing tallies sum to the `*Informing:*` rollup;
+5. a category that also has a summary line shows the same rate, counts, trend and emoji in both places.
+
+These checks reconcile the existing step 3 definitions; they introduce no new calculation. A category excluded from the rates — nothing retrieved, no completed build, or informing jobs only — contributes zero to check 3 and states why in its row marker; its informing jobs still contribute to check 4. A rollup printed in an `N/A` form carries no counts and so contributes nothing to check 3: reconcile against whichever rollup does carry counts, and skip check 3 entirely when neither does. If a check fails, do not drop, merge or invent a row to make it pass: deliver the rows as computed, prepend `:warning: coverage check failed: {what did not reconcile}` above the reply's opening sentence, and leave the summary and every figure unchanged.
+
+### Delivery
+
+Compose this reply after any failure-analysis, registry-drift and remediation replies and before the phase-breakdown reply, in the same single `set_response_element` call, under step 4's single threading rule: `---THREAD_DETAILS---` if it is the first reply of the response, otherwise `---THREAD_BREAK---`. Never create another top-level message or a second thread.
+
+Begin the reply with: `Complete category breakdown for the same reporting window; one row per configured category.` — below the `:warning: coverage check failed:` line when the coverage check prepended one.
+
+If the rows do not fit a single reply, continue them across further replies in the same thread, each separated by `---THREAD_BREAK---` and each labelled `Complete category breakdown ({n} of {replies})`, splitting only between whole rows. The opening sentence above goes on the first reply only; the continuations carry their label and their rows. The existing in-thread attachment mechanism (the phase follow-up's self-contained HTML file is the supported example) may carry the same rows in addition, never instead of the labelled replies, and never as a reason to leave a row out. If attachment delivery is unavailable, the labelled replies are the delivery and nothing is lost.
 
 ## Additional phase-breakdown follow-up
 
 This section is additive. Do not change the top-level report format, existing failure-analysis replies, handoff artifact, or remediation flow above.
 
-When a report merits delivery, after the existing report and any remediation/drift reply are composed, but before `send_response()`, append exactly one phase-breakdown reply and one HTML attachment to the same report thread. On a delivered all-green report, the phase reply may accompany an actionable/materially incomplete drift reply. Do not create a phase reply or attachment to defeat the scheduled silence of `no_action_required()`.
+When a report merits delivery, after the existing report and any remediation/drift or complete-category-breakdown reply are composed, but before `send_response()`, append exactly one phase-breakdown reply and one HTML attachment to the same report thread. On a delivered all-green report, the phase reply may accompany an actionable/materially incomplete drift reply. Do not create a phase reply or attachment to defeat the scheduled silence of `no_action_required()`.
 
 ### Reuse the report sample
 
@@ -454,7 +536,7 @@ Include every category represented by the existing report and a totals row. Use 
 
 Add the follow-up through the existing single-response delimiter mechanism:
 
-- If any reply already exists (failure analysis, registry drift or remediation), append `---THREAD_BREAK---` and then the phase reply.
+- If any reply already exists (failure analysis, registry drift, remediation or complete category breakdown), append `---THREAD_BREAK---` and then the phase reply.
 - Otherwise append `---THREAD_DETAILS---` and then the phase reply; this is the first reply, not an additional thread.
 - Begin the reply with: `Failure-phase breakdown for the same reporting window; see the attached summary table.`
 - Attach the HTML file to that same report thread.
