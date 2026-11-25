@@ -67,7 +67,60 @@ if [[ -n "${CLUSTER_ID}" ]]; then
   rosa delete oidc-provider -c "${CLUSTER_ID}" --mode auto --yes 2>/dev/null || true
 fi
 
-# Step 3: Clean up VPC CloudFormation stack
+# Step 3: Delete the zero egress VPC endpoints before the VPC teardown: the
+# interface endpoints block subnet and VPC deletion (mirrors the CI cleanup
+# step rosa-e2e-hcp-zero-egress-vpc-cleanup)
+ZERO_EGRESS_ENABLED="${ZERO_EGRESS_ENABLED:-false}"
+if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
+  echo ""
+  echo "--- Deleting zero egress VPC endpoints ---"
+  if [[ -n "${ZERO_EGRESS_ENDPOINT_IDS:-}" ]]; then
+    DELETE_RESULT=$(aws ec2 delete-vpc-endpoints --vpc-endpoint-ids ${ZERO_EGRESS_ENDPOINT_IDS} \
+      --region "${REGION}" --output json 2>/dev/null || echo '{"Unsuccessful": []}')
+    UNSUCCESSFUL=$(jq '.Unsuccessful | length' <<<"${DELETE_RESULT}" 2>/dev/null || echo 0)
+    if [[ "${UNSUCCESSFUL}" != "0" ]]; then
+      echo "WARNING: some endpoints were not deleted:"
+      jq -r '.Unsuccessful[] | "  \(.ResourceId): \(.Error.Message)"' <<<"${DELETE_RESULT}"
+    else
+      echo "Deleted:${ZERO_EGRESS_ENDPOINT_IDS}"
+    fi
+  fi
+  if [[ -n "${ZERO_EGRESS_ENDPOINT_SG_ID:-}" ]]; then
+    # Endpoint deletion is asynchronous; the endpoints reference the security
+    # group until they are gone, so poll for their disappearance before
+    # deleting it. A failed lookup is unknown state, not "gone": the security
+    # group is deleted only after a successful lookup confirms the endpoints
+    # are gone, so the group is never left silently behind.
+    endpoints_gone=true
+    if [[ -n "${ZERO_EGRESS_ENDPOINT_IDS:-}" ]]; then
+      endpoints_gone=false
+      REMAINING=""
+      for _ in $(seq 1 30); do
+        if REMAINING=$(aws ec2 describe-vpc-endpoints --region "${REGION}" \
+          --vpc-endpoint-ids ${ZERO_EGRESS_ENDPOINT_IDS} \
+          --query 'VpcEndpoints[].VpcEndpointId' --output text 2>/dev/null); then
+          if [[ -z "${REMAINING}" ]]; then
+            endpoints_gone=true
+            break
+          fi
+        else
+          REMAINING="unknown (describe-vpc-endpoints failed)"
+        fi
+        sleep 10
+      done
+    fi
+    if [[ "${endpoints_gone}" == true ]]; then
+      aws ec2 delete-security-group --group-id "${ZERO_EGRESS_ENDPOINT_SG_ID}" \
+        --region "${REGION}" 2>/dev/null ||
+        echo "WARNING: failed to delete endpoint security group ${ZERO_EGRESS_ENDPOINT_SG_ID}"
+    else
+      echo "WARNING: endpoint state unresolved after 5 minutes: ${REMAINING:-still present}"
+      echo "WARNING: leaving security group ${ZERO_EGRESS_ENDPOINT_SG_ID} in place"
+    fi
+  fi
+fi
+
+# Step 4: Clean up VPC CloudFormation stack
 if [[ -n "${VPC_STACK_NAME}" ]]; then
   echo ""
   echo "--- Deleting VPC CloudFormation stack ${VPC_STACK_NAME} ---"
@@ -149,7 +202,7 @@ elif [[ -n "${VPC_ID}" ]]; then
   aws ec2 delete-vpc --vpc-id ${VPC_ID} --region ${REGION} 2>/dev/null || true
 fi
 
-# Step 4: Delete the OIDC config, but only when this run created it: a config
+# Step 5: Delete the OIDC config, but only when this run created it: a config
 # the provision script adopted (any managed config in the org) may be shared
 # with other clusters and is not ours to delete.
 OIDC_CONFIG_CREATED="${OIDC_CONFIG_CREATED:-false}"
@@ -164,7 +217,7 @@ if [[ -n "${OIDC_CONFIG_ID}" ]]; then
   fi
 fi
 
-# Step 5: Schedule KMS key deletion if the provision script created it (the key must
+# Step 6: Schedule KMS key deletion if the provision script created it (the key must
 # no longer be in use by the cluster, so this runs after cluster deletion)
 KMS_KEY_ARN="${KMS_KEY_ARN:-}"
 KMS_KEY_CREATED="${KMS_KEY_CREATED:-false}"
@@ -177,7 +230,7 @@ if [[ "${KMS_KEY_CREATED}" == "true" && -n "${KMS_KEY_ARN}" ]]; then
     --region "${REGION}" 2>/dev/null || true
 fi
 
-# Step 6: Clean up the shared VPC DNS infrastructure (PHZ, role, policy) created by
+# Step 7: Clean up the shared VPC DNS infrastructure (PHZ, role, policy) created by
 # the provision script. The PHZ must be emptied first: the cluster's records are
 # removed during cluster deletion, so this runs after it (mirrors the CI orphan
 # gate rosa-e2e-validate-shared-vpc-teardown).

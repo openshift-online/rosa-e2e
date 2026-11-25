@@ -51,6 +51,15 @@ KMS_KEY_ARN="${KMS_KEY_ARN:-}"
 # account); pass SHARED_VPC_BASE_DOMAIN to reuse an existing rosa dnsdomain.
 SHARED_VPC_ENABLED="${SHARED_VPC_ENABLED:-false}"
 SHARED_VPC_BASE_DOMAIN="${SHARED_VPC_BASE_DOMAIN:-}"
+# Zero egress is a day-1, immutable cluster property: image content is served
+# from a regional ECR mirror reachable through VPC endpoints, and the private
+# subnets' NAT routes are removed so worker nodes have no internet egress. Set
+# ZERO_EGRESS_ENABLED=true to create the ECR/S3 VPC endpoints, cut the NAT
+# routes and create the cluster with --properties zero_egress:true. Requires an
+# ECR-enabled provision shard, so CLUSTER_SECTOR defaults to rosa-e2e (the
+# sector used by the CI zero-egress job). Required by the Feature:ZeroEgress
+# specs; the env file exports FEATURE_ZERO_EGRESS=true so they self-select.
+ZERO_EGRESS_ENABLED="${ZERO_EGRESS_ENABLED:-false}"
 
 # AWS payer/billing account per OCM environment
 # integration/staging: 277304166082 (osd-staging-1) or 811685182089 (osd-staging-2)
@@ -67,6 +76,7 @@ echo "Compute: ${COMPUTE_NODES}x ${COMPUTE_MACHINE_TYPE}"
 echo "External auth: ${EXTERNAL_AUTH_ENABLED}"
 echo "KMS encryption: ${KMS_ENABLED}"
 echo "Shared VPC: ${SHARED_VPC_ENABLED}"
+echo "Zero egress: ${ZERO_EGRESS_ENABLED}"
 echo ""
 
 # Verify prerequisites
@@ -184,6 +194,11 @@ echo "VPC: ${VPC_ID}"
 echo "Stack: ${STACK_NAME}"
 
 # Step 4: Resolve sector if specified
+# zero_egress:true requires an ECR-enabled provision shard; the rosa-e2e sector
+# shard (used by the CI zero-egress job) is ECR-enabled, so default to it.
+if [[ "${ZERO_EGRESS_ENABLED}" == "true" && -z "${CLUSTER_SECTOR}" ]]; then
+  CLUSTER_SECTOR="rosa-e2e"
+fi
 SECTOR_ARGS=""
 if [[ -n "${CLUSTER_SECTOR}" ]]; then
   echo ""
@@ -191,6 +206,13 @@ if [[ -n "${CLUSTER_SECTOR}" ]]; then
   PS_ID=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters \
     --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status in ('ready')" \
     | jq -r '.items[].provision_shard_reference.id' | head -1)
+  if [[ -z "${PS_ID}" ]]; then
+    # osdfm does not support status in ('ready', 'maintenance'); the CI
+    # rosa-cluster-provision step accepts maintenance shards the same way.
+    PS_ID=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters \
+      --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status in ('maintenance')" \
+      | jq -r '.items[].provision_shard_reference.id' | head -1)
+  fi
   if [[ -z "${PS_ID}" ]]; then
     echo "ERROR: No provision shard found for sector ${CLUSTER_SECTOR} in ${REGION}"
     exit 1
@@ -580,6 +602,152 @@ if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
   fi
 fi
 
+# Step 4e: Prepare the VPC for zero egress (day-1, immutable cluster property)
+# Mirrors the CI step rosa-e2e-hcp-zero-egress-vpc-prepare: the private subnets
+# must reach the ECR mirror (ecr.api/ecr.dkr interface endpoints) and S3 (s3
+# gateway endpoint), and their route tables' NAT routes are removed so nodes
+# have no internet egress (public subnets keep their IGW routes: the API and
+# ingress load balancers stay reachable). The endpoints must exist before
+# cluster creation because worker nodes pull the payload through the ECR mirror
+# from the first boot. The rosa-quickstart-default-vpc network template already
+# creates all of these endpoints, so creation here is a fallback for other
+# network setups. The CFN stack still owns the NAT routes; deleting them
+# out-of-band is a no-op at stack teardown.
+ZERO_EGRESS_ARGS=""
+ZERO_EGRESS_ENDPOINT_IDS=""
+ZERO_EGRESS_ENDPOINT_SG_ID=""
+
+# Returns the first available endpoint of the given service and type. Only
+# one ID: several tab-joined IDs passed as a single quoted argument would
+# fail the describe/modify calls below. The type filter matters for s3,
+# which has both Interface and Gateway endpoints and only the Gateway kind
+# accepts route-table associations.
+zero_egress_endpoint_id() {
+  aws ec2 describe-vpc-endpoints --region "${REGION}" \
+    --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.${1}" \
+    "Name=vpc-endpoint-state,Values=available" "Name=vpc-endpoint-type,Values=${2}" \
+    --query 'VpcEndpoints[0].VpcEndpointId' --output text
+}
+
+if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
+  echo ""
+  echo "--- Zero egress enabled: ensuring VPC endpoints and cutting NAT routes ---"
+
+  ROUTE_TABLE_IDS=$(aws ec2 describe-route-tables --region "${REGION}" \
+    --filters "Name=vpc-id,Values=${VPC_ID}" \
+    --query 'RouteTables[].RouteTableId' --output text | tr '\t' ' ')
+
+  for service in ecr.api ecr.dkr; do
+    ENDPOINT_ID=$(zero_egress_endpoint_id "${service}" Interface)
+    if [[ -n "${ENDPOINT_ID}" && "${ENDPOINT_ID}" != "None" ]]; then
+      echo "${service} endpoint already exists: ${ENDPOINT_ID}"
+      # Private DNS is required for ecr.dkr (docker pulls resolve the mirror
+      # host through it); enable it on pre-existing endpoints that lack it.
+      PRIVATE_DNS=$(aws ec2 describe-vpc-endpoints --region "${REGION}" \
+        --vpc-endpoint-ids "${ENDPOINT_ID}" \
+        --query 'VpcEndpoints[0].PrivateDnsEnabled' --output text)
+      if [[ "${PRIVATE_DNS}" != "True" ]]; then
+        aws ec2 modify-vpc-endpoint --region "${REGION}" \
+          --vpc-endpoint-id "${ENDPOINT_ID}" --private-dns-enabled
+        echo "Enabled private DNS on ${service} endpoint ${ENDPOINT_ID}"
+      fi
+      continue
+    fi
+    if [[ -z "${ZERO_EGRESS_ENDPOINT_SG_ID}" ]]; then
+      # Reuse a leftover security group from a previous run of this script
+      # for the same cluster name instead of failing on DuplicateGroup.
+      ZERO_EGRESS_ENDPOINT_SG_ID=$(aws ec2 describe-security-groups --region "${REGION}" \
+        --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${CLUSTER_NAME}-zero-egress-endpoints" \
+        --query 'SecurityGroups[].GroupId' --output text)
+      if [[ -z "${ZERO_EGRESS_ENDPOINT_SG_ID}" || "${ZERO_EGRESS_ENDPOINT_SG_ID}" == "None" ]]; then
+        VPC_CIDR=$(aws ec2 describe-vpcs --vpc-ids "${VPC_ID}" --region "${REGION}" \
+          --query 'Vpcs[0].CidrBlock' --output text)
+        ZERO_EGRESS_ENDPOINT_SG_ID=$(aws ec2 create-security-group \
+          --region "${REGION}" \
+          --group-name "${CLUSTER_NAME}-zero-egress-endpoints" \
+          --description "Allow HTTPS to the ECR/S3 VPC endpoints for ${CLUSTER_NAME}" \
+          --vpc-id "${VPC_ID}" \
+          --query 'GroupId' --output text)
+        aws ec2 authorize-security-group-ingress \
+          --region "${REGION}" \
+          --group-id "${ZERO_EGRESS_ENDPOINT_SG_ID}" \
+          --protocol tcp --port 443 --cidr "${VPC_CIDR}"
+      else
+        echo "Reusing existing endpoint security group ${ZERO_EGRESS_ENDPOINT_SG_ID}"
+      fi
+    fi
+    for subnet in ${PRIVATE_SUBNET_IDS//,/ }; do
+      ENDPOINT_ID=$(aws ec2 create-vpc-endpoint \
+        --region "${REGION}" \
+        --vpc-id "${VPC_ID}" \
+        --vpc-endpoint-type Interface \
+        --service-name "com.amazonaws.${REGION}.${service}" \
+        --subnet-ids "${subnet}" \
+        --security-group-ids "${ZERO_EGRESS_ENDPOINT_SG_ID}" \
+        --query 'VpcEndpoint.VpcEndpointId' --output text)
+      ZERO_EGRESS_ENDPOINT_IDS+=" ${ENDPOINT_ID}"
+      echo "Created ${service} endpoint ${ENDPOINT_ID} in ${subnet}"
+    done
+  done
+
+  S3_ENDPOINT_ID=$(zero_egress_endpoint_id s3 Gateway)
+  if [[ -n "${S3_ENDPOINT_ID}" && "${S3_ENDPOINT_ID}" != "None" ]]; then
+    echo "s3 gateway endpoint already exists: ${S3_ENDPOINT_ID}"
+    # Reconcile route table associations: a pre-existing endpoint may not
+    # cover every route table in the VPC.
+    S3_ROUTE_TABLES=$(aws ec2 describe-vpc-endpoints --region "${REGION}" \
+      --vpc-endpoint-ids "${S3_ENDPOINT_ID}" \
+      --query 'VpcEndpoints[0].RouteTableIds' --output text | tr '\t' ' ')
+    MISSING_ROUTE_TABLES=""
+    for rt in ${ROUTE_TABLE_IDS}; do
+      [[ " ${S3_ROUTE_TABLES} " == *" ${rt} "* ]] || MISSING_ROUTE_TABLES+=" ${rt}"
+    done
+    if [[ -n "${MISSING_ROUTE_TABLES}" ]]; then
+      aws ec2 modify-vpc-endpoint --region "${REGION}" \
+        --vpc-endpoint-id "${S3_ENDPOINT_ID}" --add-route-table-ids ${MISSING_ROUTE_TABLES}
+      echo "Associated s3 endpoint ${S3_ENDPOINT_ID} with route tables:${MISSING_ROUTE_TABLES}"
+    fi
+  else
+    S3_ENDPOINT_ID=$(aws ec2 create-vpc-endpoint \
+      --region "${REGION}" \
+      --vpc-id "${VPC_ID}" \
+      --vpc-endpoint-type Gateway \
+      --service-name "com.amazonaws.${REGION}.s3" \
+      --route-table-ids ${ROUTE_TABLE_IDS} \
+      --query 'VpcEndpoint.VpcEndpointId' --output text)
+    ZERO_EGRESS_ENDPOINT_IDS+=" ${S3_ENDPOINT_ID}"
+    echo "Created s3 gateway endpoint ${S3_ENDPOINT_ID}"
+  fi
+
+  for rt in ${ROUTE_TABLE_IDS}; do
+    NAT_ROUTES=$(aws ec2 describe-route-tables --region "${REGION}" \
+      --route-table-ids "${rt}" \
+      --query 'RouteTables[0].Routes[?NatGatewayId != null].DestinationCidrBlock' \
+      --output text)
+    for cidr in ${NAT_ROUTES}; do
+      aws ec2 delete-route --region "${REGION}" \
+        --route-table-id "${rt}" --destination-cidr-block "${cidr}" || true
+      echo "Removed NAT route ${cidr} from ${rt}"
+    done
+  done
+
+  # Worker nodes pull from the ECR mirror using the HCP worker account role;
+  # rosa only attaches AmazonEC2ContainerRegistryReadOnly to account roles it
+  # creates itself, so attach it when reusing pre-existing roles.
+  WORKER_ROLE_NAME=$(rosa list account-roles -o json 2>/dev/null |
+    jq -r '[.[] | select(.RoleName | contains("HCP-ROSA") and contains("Worker-Role"))][0].RoleName // empty')
+  if [[ -n "${WORKER_ROLE_NAME}" ]] &&
+     ! aws iam list-attached-role-policies --role-name "${WORKER_ROLE_NAME}" \
+       --query 'AttachedPolicies[].PolicyName' --output text 2>/dev/null |
+       grep -q AmazonEC2ContainerRegistryReadOnly; then
+    aws iam attach-role-policy --role-name "${WORKER_ROLE_NAME}" \
+      --policy-arn "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+    echo "Attached AmazonEC2ContainerRegistryReadOnly to ${WORKER_ROLE_NAME}"
+  fi
+
+  ZERO_EGRESS_ARGS="--properties zero_egress:true"
+fi
+
 # Step 5: Create cluster
 echo ""
 echo "--- Creating ROSA HCP cluster ---"
@@ -602,6 +770,7 @@ rosa create cluster \
   ${EXTERNAL_AUTH_ARGS} \
   ${KMS_ARGS} \
   ${SHARED_VPC_ARGS} \
+  ${ZERO_EGRESS_ARGS} \
   --yes
 
 CLUSTER_ID=$(rosa describe cluster -c "${CLUSTER_NAME}" -o json | jq -r '.id')
@@ -652,6 +821,12 @@ export SHARED_VPC_VPC_ENDPOINT_POLICY_ARN=${SHARED_VPC_VPC_ENDPOINT_POLICY_ARN}
 export SHARED_VPC_INSTALLER_ROLE_ARN=${SHARED_VPC_INSTALLER_ROLE_ARN}
 export SHARED_VPC_OPERATOR_ROLES_CREATED=${SHARED_VPC_OPERATOR_ROLES_CREATED}
 export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE:-${HOME}/.aws/credentials}
+export ZERO_EGRESS_ENABLED=${ZERO_EGRESS_ENABLED}
+# The value is a space-prefixed id list; it must be quoted or sourcing the env
+# file breaks (the leading space makes export see a bare word).
+export ZERO_EGRESS_ENDPOINT_IDS="${ZERO_EGRESS_ENDPOINT_IDS}"
+export ZERO_EGRESS_ENDPOINT_SG_ID=${ZERO_EGRESS_ENDPOINT_SG_ID}
+export FEATURE_ZERO_EGRESS=${ZERO_EGRESS_ENABLED}
 EOF
 
 echo ""
@@ -675,6 +850,12 @@ if [[ "${SHARED_VPC_ENABLED}" == "true" ]]; then
   echo "The env file pre-sets the SHARED_VPC_* variables the Feature:SharedVPC specs need."
   echo "Run only the shared VPC specs:"
   echo "  OCM_TOKEN=\$(ocm token) LABEL_FILTER=\"Feature:SharedVPC\" make test"
+fi
+if [[ "${ZERO_EGRESS_ENABLED}" == "true" ]]; then
+  echo ""
+  echo "The env file pre-sets FEATURE_ZERO_EGRESS=true for the Feature:ZeroEgress specs."
+  echo "Run only the zero egress specs:"
+  echo "  OCM_TOKEN=\$(ocm token) LABEL_FILTER=\"Feature:ZeroEgress\" make test"
 fi
 echo ""
 echo "Clean up:"

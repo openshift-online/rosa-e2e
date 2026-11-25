@@ -149,6 +149,40 @@ end-to-end only in CI — locally you still get the PHZ record, base-domain and
 role-trust assertions. Cleanup via `./scripts/deprovision-e2e-cluster.sh` also
 deletes the hosted zone, shared role and policy after the cluster is gone.
 
+## Provision a Cluster with Zero Egress
+
+Zero egress is a **day-1, immutable** cluster property — image content is served
+from a regional ECR mirror reached through VPC endpoints, and the private
+subnets' NAT routes are removed so worker nodes have no internet egress. To
+exercise the zero egress specs (`Feature:ZeroEgress`) you need a cluster created
+with `--properties zero_egress:true` on an ECR-enabled provision shard.
+
+```bash
+# Step 1: AWS credentials (same as above)
+eval $(echo "y" | osdctl account cli -i <ACCOUNT_ID> -p osd-staging-2 -r us-west-2 -oenv 2>/dev/null | tr '\n' ' ' | sed 's/.*AWS_ACCESS/AWS_ACCESS/')
+
+# Step 2: Provision WITH zero egress (creates the ecr.api/ecr.dkr/s3 VPC
+# endpoints, cuts the private route tables' NAT routes, and pins the cluster to
+# the rosa-e2e sector shard, which is ECR-enabled — use us-west-2, where the
+# shard has the ECR mirror configured)
+ZERO_EGRESS_ENABLED=true REGION=us-west-2 ./scripts/provision-e2e-cluster.sh
+
+# Step 3: Wait for the cluster to be ready (~15 min)
+rosa logs install -c rosa-e2e-$(date +%m%d) --watch
+
+# Step 4: Run the zero egress tests (the cluster env file pre-sets
+# FEATURE_ZERO_EGRESS=true)
+source /tmp/rosa-e2e-cluster.env
+OCM_TOKEN=$(ocm token) LABEL_FILTER="Feature:ZeroEgress" make test
+```
+
+The specs pull a digest-pinned payload image through the ECR mirror (customer
+plane) and assert the HostedCluster image content sources, ECR worker-role
+annotation and ignition credential provider (platform plane, needs MC access as
+described below). Cleanup via `./scripts/deprovision-e2e-cluster.sh` deletes the
+VPC endpoints and their security group before the VPC teardown — the endpoints
+otherwise block subnet deletion.
+
 ## Quick Start: Test Against Any Existing Cluster
 
 The simplest path. The framework auto-detects whether the cluster is HCP or Classic.
