@@ -221,6 +221,16 @@ if [[ -n "${CLUSTER_SECTOR}" ]]; then
   SECTOR_ARGS="--properties provision_shard_id:${PS_ID}"
 fi
 
+# Step 4a: OpenShift version. When unset, rosa falls back to OCM's default
+# version, which is not necessarily the newest stable — CI's
+# rosa-cluster-provision takes the newest version in the channel group, so
+# set OPENSHIFT_VERSION (e.g. 5.0.1) to reproduce that selection locally.
+VERSION_ARGS=""
+if [[ -n "${OPENSHIFT_VERSION:-}" ]]; then
+  echo "OpenShift version: ${OPENSHIFT_VERSION}"
+  VERSION_ARGS="--version ${OPENSHIFT_VERSION} --channel-group stable"
+fi
+
 # Step 4b: Enable external authentication if requested (day-1, immutable)
 EXTERNAL_AUTH_ARGS=""
 if [[ "${EXTERNAL_AUTH_ENABLED}" == "true" ]]; then
@@ -761,6 +771,7 @@ rosa create cluster \
   --sts \
   --mode auto \
   --region "${REGION}" \
+  ${VERSION_ARGS} \
   ${COMPUTE_NODES_ARGS} \
   --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
   --billing-account "${BILLING_ACCOUNT}" \

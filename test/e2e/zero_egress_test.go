@@ -405,7 +405,10 @@ var _ = Describe("Zero Egress: ECR Mirror Configuration",
 var ecrMirrorHostPattern = regexp.MustCompile(`^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com$`)
 
 // hasReleaseToECRMirror reports whether any release payload source in an
-// imageContentSources list maps to a regional ECR mirror host.
+// imageContentSources list maps to a regional ECR mirror host. The source is
+// matched by the release namespace prefix rather than exact repository names:
+// the payload art repository is versioned (ocp-v4.0-art-dev on 4.x,
+// ocp-v5.0-art-dev on 5.x).
 func hasReleaseToECRMirror(sources []any) bool {
 	for _, s := range sources {
 		source, ok := s.(map[string]any)
@@ -414,7 +417,7 @@ func hasReleaseToECRMirror(sources []any) bool {
 		}
 		srcName, _ := source["source"].(string)
 		mirrors, _ := source["mirrors"].([]any)
-		if srcName != "quay.io/openshift-release-dev/ocp-release" && srcName != "quay.io/openshift-release-dev/ocp-v4.0-art-dev" {
+		if !strings.HasPrefix(srcName, "quay.io/openshift-release-dev/") {
 			continue
 		}
 		for _, m := range mirrors {
