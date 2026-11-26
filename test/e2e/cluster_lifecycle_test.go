@@ -48,10 +48,16 @@ var _ = Describe("ROSA HCP Cluster Lifecycle: Full", labels.Critical, labels.Pos
 		kubeClient, err := framework.NewKubeClient(kubeConfig)
 		Expect(err).NotTo(HaveOccurred())
 
+		dynamicClient, err := framework.NewDynamicClient(kubeConfig)
+		Expect(err).NotTo(HaveOccurred())
+
 		Expect(verifiers.RunVerifiers(ctx, kubeClient,
 			verifiers.VerifyAllNodesReady(),
 			verifiers.VerifyNodeCount(tc.Config().ComputeNodes),
 		)).To(Succeed())
+
+		By("Verifying no critical alerts are firing")
+		Expect(verifiers.VerifyNoCriticalAlerts(ctx, kubeClient, dynamicClient, cfg.ExcludeAlerts...)).To(Succeed())
 
 		By("Deleting the cluster")
 		Expect(framework.DeleteCluster(tc.Connection(), clusterID)).To(Succeed())
@@ -125,10 +131,16 @@ var _ = Describe("ROSA Classic Cluster Lifecycle: Full", labels.Critical, labels
 		kubeClient, err := framework.NewKubeClient(kubeConfig)
 		Expect(err).NotTo(HaveOccurred())
 
+		dynamicClient, err := framework.NewDynamicClient(kubeConfig)
+		Expect(err).NotTo(HaveOccurred())
+
 		Expect(verifiers.RunVerifiers(ctx, kubeClient,
 			verifiers.VerifyAllNodesReady(),
 			verifiers.VerifyNodeCount(tc.Config().ComputeNodes),
 		)).To(Succeed())
+
+		By("Verifying no critical alerts are firing")
+		Expect(verifiers.VerifyNoCriticalAlerts(ctx, kubeClient, dynamicClient, cfg.ExcludeAlerts...)).To(Succeed())
 
 		By("Deleting the cluster")
 		Expect(framework.DeleteCluster(tc.Connection(), clusterID)).To(Succeed())

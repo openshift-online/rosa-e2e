@@ -312,10 +312,6 @@ Expand periodic jobs to test multiple regions:
 - EU (eu-west-1, eu-central-1)
 - APAC (ap-southeast-1, ap-northeast-1)
 
-### Critical Alert Verification
-
-Add `VerifyNoCriticalAlerts` verifier to lifecycle tests (both HCP and Classic) to catch pre-GA alert bugs after cluster creation.
-
 ### OCP-Blocking Promotion
 
 Goal: Promote rosa-e2e to OCP-blocking status by demonstrating:
