@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"regexp"
@@ -475,10 +476,22 @@ func TestDailyHealthReportUnknownDataDistinction(t *testing.T) {
 		"`" + dataUnavailable + "`",
 		", incomplete)",
 		"Never print `0/0` for an incomplete window",
+		// The coverage check reconciles the same two forms, and once said
+		// "nothing retrieved ... contributes zero" -- which is the claim
+		// step 3 reserves for a confirmed-empty window.
+		"contributes a real `0/0`. It is measured, and zero is the measurement",
+		"contribute neither a count nor a zero",
+		"Treating unknown as zero would assert the category ran nothing",
+		"check 3 cannot be completed for that run: report it as inconclusive",
+		"coverage check inconclusive:",
+		"every **known** informing tally contributes to it whatever rate form sits beside it",
 	} {
 		if !strings.Contains(doc, needle) {
 			t.Errorf("instruction file must distinguish confirmed-empty from unknown totals (missing %q)", needle)
 		}
+	}
+	if strings.Contains(doc, "nothing retrieved, no completed build, or informing jobs only — contributes zero") {
+		t.Error("the coverage check must not fold unknown totals in with a confirmed-empty window as a zero contributor")
 	}
 	// An incomplete window must never be rendered with 0/0, in prose or sample.
 	if strings.Contains(doc, "0/0, incomplete") {
@@ -932,77 +945,189 @@ func TestDailyHealthReportSampleCategoriesReconcile(t *testing.T) {
 		if isElided(block) {
 			continue // the block hides category lines, so its rows cannot sum
 		}
-		samples := categorySamples(t, block)
-		rollPass, rollTotal, haveRollup := rollupCounts(t, block, false)
-		var infPass, infTotal int
-		var haveInforming bool
-		for _, line := range block {
-			if m := informingRe.FindStringSubmatch(line.text); m != nil {
-				infPass = atoi(t, line, m[1])
-				infTotal = atoi(t, line, m[2])
-				haveInforming = true
-			}
+		problems, compared := reconcileBlock(t, block)
+		for _, p := range problems {
+			t.Error(p)
 		}
-		var catPass, catTotal, tallyPass, tallyTotal int
-		reconcilable, unknown := 0, 0
-		for _, c := range samples {
-			if c.unknown {
-				// N/A (data unavailable) means the totals are not known.
-				// Counting it as zero would assert the category ran nothing,
-				// which is exactly the claim step 3 reserves for N/A (0/0).
-				unknown++
-				continue
-			}
-			// A tally belongs to the informing rollup whatever rate form the
-			// row prints beside it, including an N/A one.
-			tallyPass += c.iPass
-			tallyTotal += c.iTotal
-			if !c.counted && !c.zeroDenom {
-				continue // a placeholder row carries no figures to sum
-			}
-			reconcilable++
-			if c.marked {
-				// An informing-only row's rate is its informing population.
-				tallyPass += c.pass
-				tallyTotal += c.total
-			} else {
-				// A zero-denominator row contributes a real 0/0 here, which
-				// is what the coverage check calls a zero contributor.
-				catPass += c.pass
-				catTotal += c.total
-			}
-		}
-		if unknown > 0 {
-			continue // totals unknown somewhere in the block; nothing to reconcile against
-		}
-		if reconcilable == 0 || !haveRollup {
-			continue // a template block has nothing to reconcile
-		}
-		if reconcilable != len(samples) {
-			// Half-numeric blocks would reconcile against a partial sum and
-			// quietly pass; that is the silent skip this test exists to avoid.
-			t.Errorf("line %d: block mixes %d category lines carrying figures with %d that carry none; reconciliation cannot be checked",
-				samples[0].line.number, reconcilable, len(samples)-reconcilable)
-			continue
-		}
-		checked++
-		if catPass != rollPass || catTotal != rollTotal {
-			t.Errorf("line %d: category lines sum to %d/%d but the rollups carry %d/%d",
-				samples[0].line.number, catPass, catTotal, rollPass, rollTotal)
-		}
-		// The rollup is mandatory whenever any informing job has data, so a
-		// block carrying informing figures without it is itself the defect.
-		if tallyTotal > 0 && !haveInforming {
-			t.Errorf("line %d: block shows informing figures (%d/%d) but no *Informing:* rollup",
-				samples[0].line.number, tallyPass, tallyTotal)
-		}
-		if haveInforming && (tallyPass != infPass || tallyTotal != infTotal) {
-			t.Errorf("line %d: informing figures sum to %d/%d but the *Informing:* rollup shows %d/%d",
-				samples[0].line.number, tallyPass, tallyTotal, infPass, infTotal)
+		if compared {
+			checked++
 		}
 	}
 	if checked == 0 {
 		t.Error("expected a worked example whose complete category list reconciles with its rollups")
+	}
+}
+
+// blockFigures is one fenced sample block's own arithmetic, gathered once so
+// the release-signal and informing reconciliations can be judged separately.
+// Keeping them apart is the point: an unknown release-signal total says
+// nothing about an informing tally printed on the same row.
+type blockFigures struct {
+	samples               []categorySample
+	reconcilable          int // rows contributing known release-signal figures
+	unknown               int // rows whose release-signal totals are unknown
+	catPass, catTotal     int
+	tallyPass, tallyTotal int
+	rollPass, rollTotal   int
+	haveRollup            bool
+	infPass, infTotal     int
+	haveInforming         bool
+}
+
+func figuresOf(t *testing.T, block []sampleLine) blockFigures {
+	t.Helper()
+	f := blockFigures{samples: categorySamples(t, block)}
+	f.rollPass, f.rollTotal, f.haveRollup = rollupCounts(t, block, false)
+	for _, line := range block {
+		if m := informingRe.FindStringSubmatch(line.text); m != nil {
+			f.infPass = atoi(t, line, m[1])
+			f.infTotal = atoi(t, line, m[2])
+			f.haveInforming = true
+		}
+	}
+	for _, c := range f.samples {
+		// A known informing tally is known whatever rate form sits beside it.
+		// Collecting it before the unknown branch is what keeps an
+		// unretrieved release-signal window from hiding an informing error.
+		f.tallyPass += c.iPass
+		f.tallyTotal += c.iTotal
+		switch {
+		case c.unknown:
+			// N/A (data unavailable) means the totals are not known. Counting
+			// it as zero would assert the category ran nothing, which is
+			// exactly the claim step 3 reserves for N/A (0/0).
+			f.unknown++
+		case c.marked:
+			// An informing-only row's rate is its informing population.
+			f.reconcilable++
+			f.tallyPass += c.pass
+			f.tallyTotal += c.total
+		case c.counted || c.zeroDenom:
+			// A zero-denominator row contributes a real 0/0 here, which is
+			// what the coverage check calls a zero contributor.
+			f.reconcilable++
+			f.catPass += c.pass
+			f.catTotal += c.total
+		}
+	}
+	return f
+}
+
+// reconcileBlock checks one block, returning what did not reconcile and
+// whether the release-signal sums were actually compared -- the latter is what
+// the caller's coverage floor counts. Findings are returned rather than
+// reported so the behaviour can be asserted directly. The informing rollup is
+// checked independently, so it still runs on a block whose release-signal
+// comparison is inconclusive.
+func reconcileBlock(t *testing.T, block []sampleLine) (problems []string, compared bool) {
+	t.Helper()
+	f := figuresOf(t, block)
+	if len(f.samples) == 0 || !f.haveRollup {
+		return nil, false // a headline fragment carries no category rows to sum
+	}
+	at := f.samples[0].line.number
+
+	// Informing reconciliation uses known tallies only and therefore stands
+	// whatever the release-signal rows could not tell us.
+	if f.tallyTotal > 0 && !f.haveInforming {
+		problems = append(problems, fmt.Sprintf(
+			"line %d: block shows informing figures (%d/%d) but no *Informing:* rollup",
+			at, f.tallyPass, f.tallyTotal))
+	}
+	if f.haveInforming && (f.tallyPass != f.infPass || f.tallyTotal != f.infTotal) {
+		problems = append(problems, fmt.Sprintf(
+			"line %d: informing figures sum to %d/%d but the *Informing:* rollup shows %d/%d",
+			at, f.tallyPass, f.tallyTotal, f.infPass, f.infTotal))
+	}
+
+	// Only the release-signal comparison needs every row's totals known.
+	switch {
+	case f.unknown > 0:
+		return problems, false // inconclusive: unknown is not zero, so the sum would be short
+	case f.reconcilable == 0:
+		return problems, false // a template block has nothing to reconcile
+	case f.reconcilable != len(f.samples):
+		// Half-numeric blocks would reconcile against a partial sum and
+		// quietly pass; that is the silent skip this test exists to avoid.
+		return append(problems, fmt.Sprintf(
+			"line %d: block mixes %d category lines carrying figures with %d that carry none; reconciliation cannot be checked",
+			at, f.reconcilable, len(f.samples)-f.reconcilable)), false
+	}
+	if f.catPass != f.rollPass || f.catTotal != f.rollTotal {
+		problems = append(problems, fmt.Sprintf(
+			"line %d: category lines sum to %d/%d but the rollups carry %d/%d",
+			at, f.catPass, f.catTotal, f.rollPass, f.rollTotal))
+	}
+	return problems, true
+}
+
+// syntheticBlock turns literal sample lines into the shape loadSampleBlocks
+// produces, so a reconciliation case can be exercised without putting a
+// deliberately wrong figure into the shipped instruction file.
+func syntheticBlock(lines ...string) []sampleLine {
+	block := make([]sampleLine, 0, len(lines))
+	for i, text := range lines {
+		block = append(block, sampleLine{number: i + 1, text: text})
+	}
+	return block
+}
+
+// TestReconcileBlockSeparatesUnknownFromZero pins the two behaviours the doc's
+// coverage check distinguishes and that a doc-driven test cannot reach on its
+// own: an unknown release-signal total must not be summed as zero, and it must
+// not take the informing reconciliation down with it. The deliberately wrong
+// rollups here are why these cases live in a synthetic block.
+func TestReconcileBlockSeparatesUnknownFromZero(t *testing.T) {
+	const (
+		header  = "*ROSA CI Daily Health -- 2026-07-25 -- 90%*"
+		gating  = "*Gating:* 90% (9/10) -- :left_right_arrow:"
+		nonGate = "*Non-gating:* 90% (9/10) -- :left_right_arrow:"
+		green   = ":large_green_circle: *A:* 90% (18/20) :left_right_arrow: (<prow_filter|jobs>)"
+	)
+	unavailableRow := ":white_circle: *B:* N/A (data unavailable) trend unavailable · informing-only 1/2 (<prow_filter|jobs>)"
+	zeroRow := ":white_circle: *C:* N/A (0/0) trend unavailable · informing-only 1/2 (<prow_filter|jobs>)"
+
+	for _, tc := range []struct {
+		name      string
+		block     []sampleLine
+		wantErr   string // substring the failure must contain, "" for none
+		wantCheck bool   // whether the release-signal sums were compared
+	}{{
+		name:      "unknown totals still reconcile a wrong informing rollup",
+		block:     syntheticBlock(header, gating, nonGate, "*Informing:* 99/100 passing (excluded from pass rates)", green, unavailableRow),
+		wantErr:   "informing figures sum to 1/2 but the *Informing:* rollup shows 99/100",
+		wantCheck: false,
+	}, {
+		name:      "unknown totals leave a correct informing rollup alone",
+		block:     syntheticBlock(header, gating, nonGate, "*Informing:* 1/2 passing (excluded from pass rates)", green, unavailableRow),
+		wantErr:   "",
+		wantCheck: false,
+	}, {
+		name:      "confirmed empty contributes a real zero and reconciles",
+		block:     syntheticBlock(header, gating, nonGate, "*Informing:* 1/2 passing (excluded from pass rates)", green, zeroRow),
+		wantErr:   "",
+		wantCheck: true,
+	}, {
+		name:      "confirmed empty is not a licence to miscount the release signal",
+		block:     syntheticBlock(header, "*Gating:* 90% (9/10) -- :left_right_arrow:", "*Non-gating:* 89% (8/9) -- :left_right_arrow:", "*Informing:* 1/2 passing (excluded from pass rates)", green, zeroRow),
+		wantErr:   "category lines sum to 18/20 but the rollups carry 17/19",
+		wantCheck: true,
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			problems, compared := reconcileBlock(t, tc.block)
+			if compared != tc.wantCheck {
+				t.Errorf("release-signal comparison ran = %v, want %v", compared, tc.wantCheck)
+			}
+			joined := strings.Join(problems, "\n")
+			switch {
+			case tc.wantErr == "" && len(problems) > 0:
+				t.Errorf("expected the block to reconcile, got:\n%s", joined)
+			case tc.wantErr != "" && !strings.Contains(joined, tc.wantErr):
+				t.Errorf("expected a finding containing %q, got:\n%s", tc.wantErr, joined)
+			case tc.wantErr != "" && len(problems) != 1:
+				t.Errorf("expected exactly one finding, got %d:\n%s", len(problems), joined)
+			}
+		})
 	}
 }
 
