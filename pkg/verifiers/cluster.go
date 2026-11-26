@@ -1,6 +1,7 @@
 package verifiers
 
 import (
+	"context"
 	"fmt"
 
 	sdk "github.com/openshift-online/ocm-sdk-go"
@@ -10,6 +11,20 @@ import (
 // VerifyClusterReady asserts that the cluster state is "ready" in OCM.
 func VerifyClusterReady(conn *sdk.Connection, clusterID string) error {
 	resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().Send()
+	if err != nil {
+		return fmt.Errorf("getting cluster %s: %w", clusterID, err)
+	}
+
+	state := resp.Body().State()
+	if state != cmv1.ClusterStateReady {
+		return fmt.Errorf("expected cluster %s state to be %q, got %q", clusterID, cmv1.ClusterStateReady, state)
+	}
+	return nil
+}
+
+// VerifyClusterReadyWithContext asserts that the cluster state is "ready" in OCM, with context support for cancellation.
+func VerifyClusterReadyWithContext(ctx context.Context, conn *sdk.Connection, clusterID string) error {
+	resp, err := conn.ClustersMgmt().V1().Clusters().Cluster(clusterID).Get().SendContext(ctx)
 	if err != nil {
 		return fmt.Errorf("getting cluster %s: %w", clusterID, err)
 	}
