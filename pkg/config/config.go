@@ -63,6 +63,9 @@ type Config struct {
 	// ClusterOperator exclusion list (for known staging issues)
 	ExcludeClusterOperators []string `yaml:"exclude_cluster_operators"`
 
+	// Critical alert exclusion list (for known staging issues)
+	ExcludeAlerts []string `yaml:"exclude_alerts"`
+
 	// RHOBS Synthetic Monitoring API access
 	RHOBSProbeAPIURL      string `yaml:"rhobs_probe_api_url"`
 	RHOBSMetricsAPIURL    string `yaml:"rhobs_metrics_api_url"`
@@ -197,6 +200,9 @@ func Load() (*Config, error) {
 	}
 	if v := os.Getenv("EXCLUDE_CLUSTER_OPERATORS"); v != "" {
 		cfg.ExcludeClusterOperators = strings.Split(v, ",")
+	}
+	if v := os.Getenv("EXCLUDE_ALERTS"); v != "" {
+		cfg.ExcludeAlerts = strings.Split(v, ",")
 	}
 	if v := os.Getenv("RHOBS_PROBE_API_URL"); v != "" {
 		cfg.RHOBSProbeAPIURL = v
