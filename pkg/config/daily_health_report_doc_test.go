@@ -482,7 +482,14 @@ func TestDailyHealthReportUnknownDataDistinction(t *testing.T) {
 		"contributes a real `0/0`. It is measured, and zero is the measurement",
 		"contribute neither a count nor a zero",
 		"Treating unknown as zero would assert the category ran nothing",
+		// The inconclusive rule is scoped to the population check 3 actually
+		// sums. Stated over "any row" it contradicted the informing-only
+		// disposition, which says such a row never blocks check 3.
+		"When a **release-signal** row's totals are unknown",
 		"check 3 cannot be completed for that run: report it as inconclusive",
+		"An `informing-only` row never triggers this, however its own figures turned out",
+		"**informing-only** contributes nothing to check 3, available or not",
+		"first match wins in this order, so an `informing-only` row is judged as one whether or not its own figures came back",
 		"coverage check inconclusive:",
 		"every **known** informing tally contributes to it whatever rate form sits beside it",
 		"An `informing-only` row whose own figures are unavailable contributes neither a count nor a zero here",
@@ -494,6 +501,17 @@ func TestDailyHealthReportUnknownDataDistinction(t *testing.T) {
 	}
 	if strings.Contains(doc, "nothing retrieved, no completed build, or informing jobs only — contributes zero") {
 		t.Error("the coverage check must not fold unknown totals in with a confirmed-empty window as a zero contributor")
+	}
+	// An inconclusive rule stated over every row contradicts the
+	// informing-only disposition: such a row has no release-signal population
+	// to be unknown about, so it cannot block the categories that do.
+	for _, forbidden := range []string{
+		"When any row's totals are unknown",
+		"whenever any row has unknown totals",
+	} {
+		if strings.Contains(doc, forbidden) {
+			t.Errorf("the inconclusive rule must name the release-signal population, not every row (found %q)", forbidden)
+		}
 	}
 	// An incomplete window must never be rendered with 0/0, in prose or sample.
 	if strings.Contains(doc, "0/0, incomplete") {
