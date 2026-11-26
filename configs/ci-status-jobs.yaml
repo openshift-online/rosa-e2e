@@ -215,6 +215,8 @@ categories:
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-autoscaling-e2e-staging
       - name: HCP Shared VPC
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-shared-vpc-e2e-staging
+      - name: HCP Zero Egress
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-zero-egress-e2e-staging
 
   - id: capa-e2e-stg
     scope: component
