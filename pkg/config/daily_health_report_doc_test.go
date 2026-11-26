@@ -50,8 +50,180 @@ const (
 	noRunsMarker        = "`no runs`"
 	partialMarker       = "`partial`"
 	unavailableMarker   = "`unavailable`"
-	informingOnlyMarker = "`informing only`"
+	informingOnlyMarker = "`informing-only`"
+
+	// detailsWithheld is the fixed suffix a yellow or red summary line carries
+	// in place of failure detail, which belongs in the step 5 thread.
+	detailsWithheld = "-- details withheld"
+	// informingOnlySuffix marks a summary line whose figures are informational
+	// because the category has no non-informing job.
+	informingOnlySuffix = "-- informing-only"
+	// informingOnlyTally is the count-only informing figure a mixed category
+	// carries beside its non-informing rate.
+	informingOnlyTally = "· informing-only "
 )
+
+// categoryRank orders the summary's category groups. The emoji sequence is the
+// grouping -- the instruction file forbids group headings -- so the rank of
+// each health indicator is what a group-order assertion has to work from.
+var categoryRank = map[string]int{
+	":large_green_circle:":  0,
+	":large_yellow_circle:": 1,
+	":red_circle:":          2,
+	":white_circle:":        3,
+}
+
+var (
+	// The jobs link is a real prow_filter URL in a delivered report and the
+	// literal placeholder in the format template, so the pattern must accept
+	// both. Anchoring on the placeholder alone would let any sample written
+	// the way the bot actually renders it escape every check below.
+	categoryLineRe = regexp.MustCompile(`^(:[a-z_]+:) \*[^*]+:\* (.*) \(<[^|]*\|jobs>\)$`)
+	// rateSpanRe covers every rate form step 3 defines, plus the template
+	// placeholder, so a residual check can strip the rate and see what is left.
+	rateSpanRe = regexp.MustCompile(
+		`^(?:\{rate\}% \(\{pass\}/\{total\}\)|\d+% \(\d+/\d+(?:, incomplete)?\)|N/A \(0/0\)|N/A \(data unavailable\))`)
+	ratePrefixRe = regexp.MustCompile(`^(\d+)% \((\d+)/(\d+)(, incomplete)?\)`)
+	tallyRe      = regexp.MustCompile(`· informing-only (?:(\d+)/(\d+)|\{ipass\}/\{itotal\})`)
+	informingRe  = regexp.MustCompile(`^\*Informing:\* (\d+)/(\d+) passing`)
+	trendTokenRe = regexp.MustCompile(`^(?::[a-z_]+:|trend unavailable|\{trend\})`)
+	// charCapRe catches any reintroduced length cap on the summary, however
+	// it is worded. The removed rule traded category lines against 1200
+	// characters; an exact-literal guard would miss a reworded revival.
+	charCapRe = regexp.MustCompile(`(?i)(\d[\d,]{2,} character|character (?:cap|limit)|summary limit)`)
+)
+
+// categorySample is one parsed category line of a fenced sample block.
+type categorySample struct {
+	line     sampleLine
+	emoji    string
+	body     string // everything between the category name and the jobs link
+	printed  int    // the percentage the line actually prints
+	pass     int
+	total    int
+	counted  bool // body opens with numeric counts, qualified or not
+	rated    bool // ... and its current window is complete, so the rate is comparable
+	iPass    int
+	iTotal   int
+	tally    bool
+	residual string // body text left over once every defined token is removed
+}
+
+// categorySamples returns the category lines of one fenced block, in the order
+// the block lists them.
+func categorySamples(t *testing.T, block []sampleLine) []categorySample {
+	t.Helper()
+	var out []categorySample
+	for _, line := range block {
+		m := categoryLineRe.FindStringSubmatch(line.text)
+		if m == nil {
+			continue
+		}
+		c := categorySample{line: line, emoji: m[1], body: m[2]}
+		if r := ratePrefixRe.FindStringSubmatch(c.body); r != nil {
+			c.printed = atoi(t, line, r[1])
+			c.pass = atoi(t, line, r[2])
+			c.total = atoi(t, line, r[3])
+			c.counted = true
+			// An incomplete window still contributes its retrieved counts
+			// (step 3), but its rate is not a comparable measurement.
+			c.rated = r[4] == ""
+		}
+		if tt := tallyRe.FindStringSubmatch(c.body); tt != nil {
+			c.tally = true
+			if tt[1] != "" {
+				c.iPass = atoi(t, line, tt[1])
+				c.iTotal = atoi(t, line, tt[2])
+			}
+		}
+		c.residual = residualBody(c.body)
+		out = append(out, c)
+	}
+	return out
+}
+
+func atoi(t *testing.T, line sampleLine, s string) int {
+	t.Helper()
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		t.Fatalf("line %d: unparsable number %q", line.number, s)
+	}
+	return n
+}
+
+// residualBody strips every token a category line is allowed to carry -- the
+// rate span, the trend, the withheld-detail suffix, the informing-only suffix
+// and the informing tally -- and returns whatever is left. Anything left over
+// is text the instruction file never defines, which on a yellow or red line is
+// exactly the leaked failure analysis the thread exists to hold. Checking the
+// whole body rather than only the text after the suffix is what catches a note
+// placed before it.
+func residualBody(body string) string {
+	rest := rateSpanRe.ReplaceAllString(body, "")
+	rest = strings.TrimSpace(rest)
+	rest = trendTokenRe.ReplaceAllString(rest, "")
+	rest = tallyRe.ReplaceAllString(rest, "")
+	rest = strings.Replace(rest, detailsWithheld, "", 1)
+	rest = strings.Replace(rest, informingOnlySuffix, "", 1)
+	return strings.TrimSpace(rest)
+}
+
+// rollupCounts sums the Gating and Non-gating counts of a block. bounded stops
+// at the first non-rollup line, which is how the headline arithmetic check
+// scopes itself to the rollups directly under one header.
+func rollupCounts(t *testing.T, lines []sampleLine, bounded bool) (pass, total int, ok bool) {
+	t.Helper()
+	for _, line := range lines {
+		if !isRollup(line.text) {
+			if bounded {
+				break
+			}
+			continue
+		}
+		m := countsRe.FindStringSubmatch(line.text)
+		if m == nil {
+			continue
+		}
+		pass += atoi(t, line, m[1])
+		total += atoi(t, line, m[2])
+		ok = true
+	}
+	return pass, total, ok
+}
+
+// indicatorFor maps a pass rate to the health-indicator rank step 3 defines:
+// green >= 80%, yellow >= 40%, red below that. An informing-only category is
+// :white_circle: regardless, so callers exempt that rank.
+func indicatorFor(rate int) int {
+	switch {
+	case rate >= 80:
+		return categoryRank[":large_green_circle:"]
+	case rate >= 40:
+		return categoryRank[":large_yellow_circle:"]
+	default:
+		return categoryRank[":red_circle:"]
+	}
+}
+
+func indicatorName(rank int) string {
+	for emoji, r := range categoryRank {
+		if r == rank {
+			return emoji
+		}
+	}
+	return "unknown"
+}
+
+// isElided reports whether a block omits category lines with a bare "..."
+// continuation, which makes it unusable for whole-list reconciliation.
+func isElided(block []sampleLine) bool {
+	for _, line := range block {
+		if line.text == "..." {
+			return true
+		}
+	}
+	return false
+}
 
 var (
 	countsRe           = regexp.MustCompile(`\((\d+)/(\d+)[^)]*\)`)
@@ -437,28 +609,365 @@ func TestDailyHealthReportBrevityFloor(t *testing.T) {
 	}
 }
 
-// TestDailyHealthReportOverflowIsAllOrNothing asserts the overflow rule drops
-// the category list as a whole rather than keeping the subset that fits.
-// Keeping a subset made the delivered coverage a function of each category's
-// health, and silently left the rest out of the report entirely.
-func TestDailyHealthReportOverflowIsAllOrNothing(t *testing.T) {
+// TestDailyHealthReportSummaryKeepsEveryCategoryLine asserts the summary
+// carries the whole grouped category list. The superseded contract traded the
+// list against a 1200-character cap and relocated every line into the thread,
+// which made the top-level scoreboard disappear on exactly the registries that
+// needed it most.
+func TestDailyHealthReportSummaryKeepsEveryCategoryLine(t *testing.T) {
 	doc := loadDailyHealthReportDoc(t)
 	for _, needle := range []string{
-		"drop the per-category list **as a whole**",
-		"the summary carries either every category line or none",
-		"overflow never silently drops a category",
+		"The complete category list stays in the summary.",
+		"There is no overflow rule",
+		"not truncated to the lines that fit",
+		"not relocated into the thread",
 	} {
 		if !strings.Contains(doc, needle) {
-			t.Errorf("overflow must drop the whole list, never a severity-selected subset (missing %q)", needle)
+			t.Errorf("the summary must keep every category line (missing %q)", needle)
 		}
 	}
 	for _, forbidden := range []string{
+		"drop the per-category list **as a whole**",
+		"the summary carries either every category line or none",
 		"list only the worst-performing categories that fit",
 		"append a `+{N} more categories` clause",
 	} {
 		if strings.Contains(doc, forbidden) {
-			t.Errorf("the superseded severity-selected overflow behaviour must not survive (found %q)", forbidden)
+			t.Errorf("the superseded overflow behaviour must not survive (found %q)", forbidden)
 		}
+	}
+	// A reworded length cap revives the same defect, so match the shape of
+	// one rather than the exact sentence that used to state it.
+	for _, m := range charCapRe.FindAllString(doc, -1) {
+		t.Errorf("a summary length cap must not be reintroduced (found %q)", m)
+	}
+}
+
+// TestDailyHealthReportStatesSummaryRules asserts the summary rules the bot
+// acts on are actually written down. The samples pin what a correct report
+// looks like, but the bot follows the prose: a rule that exists only as an
+// example is a rule the instruction file does not state.
+func TestDailyHealthReportStatesSummaryRules(t *testing.T) {
+	doc := loadDailyHealthReportDoc(t)
+	required := []struct{ needle, why string }{
+		{"**Group order: green, then yellow, then red, then informing-only.**", "the group order"},
+		{"within each group by pass rate descending", "the sort inside a group"},
+		{"emit no group heading", "that the emoji sequence alone marks the groups"},
+		{"**One category per line.**", "one line per category"},
+		{"This is a fixed literal, not a summary", "that the withheld suffix is not a place for a note"},
+		{"never put an error message, a failing job or test name, a date, a count or any other failure analysis on a summary line",
+			"what may not appear on a summary line"},
+		{"exclude them from the overall rate, from the gating and non-gating rates, and from per-category pass rates and health indicators",
+			"that informing jobs are excluded from every aggregate"},
+		{"append the count-only tally `" + informingOnlyTally + "{ipass}/{itotal}`", "the mixed-category tally"},
+		{"never folded into it", "that the tally stays out of the rate"},
+		{"**Rate population**", "the population every availability rule is judged over"},
+		{"Aggregate two separate weighted pass rates across all **non-informing** jobs with data",
+			"that the two rollups are computed over non-informing jobs only"},
+		{"An informing job never enters either rate", "that no gating override can pull an informing job into a rollup"},
+		{"`{overall_rate}` is the weighted pass rate across all **non-informing** jobs with data",
+			"that the overall rate excludes informing jobs"},
+	}
+	for _, r := range required {
+		if !strings.Contains(doc, r.needle) {
+			t.Errorf("the summary rules must state %s (missing %q)", r.why, r.needle)
+		}
+	}
+	// The pre-delivery checklist is what the bot runs immediately before
+	// composing, so the same rules must survive there too. Bound the slice to
+	// the checklist itself: running it to the end of the document would let
+	// the scenario examples satisfy these needles after the checklist item
+	// stating them had been deleted.
+	start := strings.Index(doc, "Pre-delivery structural checklist")
+	if start < 0 {
+		t.Fatal("instruction file must keep the pre-delivery structural checklist")
+	}
+	end := strings.Index(doc[start:], "Never satisfy a failing item")
+	if end < 0 {
+		t.Fatal("the pre-delivery checklist must end with the rule against deleting a required line")
+	}
+	checklist := doc[start : start+end]
+	for _, needle := range []string{
+		"grouped green, then yellow, then red, then informing-only",
+		"Every yellow and red line ends its trend field with the exact suffix",
+		detailsWithheld,
+		informingOnlySuffix,
+		informingOnlyTally,
+	} {
+		if !strings.Contains(checklist, needle) {
+			t.Errorf("the pre-delivery checklist must enforce %q", needle)
+		}
+	}
+}
+
+// TestDailyHealthReportCategoryGroupOrder asserts every sample lists its
+// category lines green, then yellow, then red, then informing-only, with pass
+// rate descending inside a group. The emoji sequence is the only thing marking
+// the groups -- the file forbids group headings -- so a sample in the wrong
+// order teaches the grouping away.
+func TestDailyHealthReportCategoryGroupOrder(t *testing.T) {
+	grouped, compared := 0, 0
+	for _, block := range loadSampleBlocks(t) {
+		samples := categorySamples(t, block)
+		if len(samples) < 2 {
+			continue
+		}
+		grouped++
+		for _, c := range samples {
+			// A line whose percentage disagrees with its own counts teaches a
+			// figure the bot would never compute, and the health emoji beside
+			// it is then unverifiable too.
+			if c.counted && c.total > 0 {
+				if want := int(math.Round(float64(c.pass) / float64(c.total) * 100)); want != c.printed {
+					t.Errorf("line %d: prints %d%% but its counts %d/%d are %d%%",
+						c.line.number, c.printed, c.pass, c.total, want)
+				}
+			}
+			if rank, ok := categoryRank[c.emoji]; ok && c.rated {
+				if got := indicatorFor(c.printed); got != rank && rank != categoryRank[":white_circle:"] {
+					t.Errorf("line %d: %d%% is a %s category by the step 3 thresholds, not %s",
+						c.line.number, c.printed, indicatorName(got), c.emoji)
+				}
+			}
+		}
+		for i := 1; i < len(samples); i++ {
+			prev, cur := samples[i-1], samples[i]
+			prevRank, ok := categoryRank[prev.emoji]
+			if !ok {
+				t.Errorf("line %d: %q is not a defined health indicator", prev.line.number, prev.emoji)
+				continue
+			}
+			curRank, ok := categoryRank[cur.emoji]
+			if !ok {
+				t.Errorf("line %d: %q is not a defined health indicator", cur.line.number, cur.emoji)
+				continue
+			}
+			if curRank < prevRank {
+				t.Errorf("line %d: %s follows %s; groups run green, yellow, red, informing-only",
+					cur.line.number, cur.emoji, prev.emoji)
+				continue
+			}
+			if curRank == prevRank && prev.rated && cur.rated {
+				compared++
+				if cur.pass*prev.total > prev.pass*cur.total {
+					t.Errorf("line %d: %d/%d sorts above %d/%d inside one group; sort by pass rate descending",
+						cur.line.number, cur.pass, cur.total, prev.pass, prev.total)
+				}
+			}
+		}
+	}
+	if grouped == 0 {
+		t.Error("expected at least one sample listing several category lines in group order")
+	}
+	if compared == 0 {
+		t.Error("no sample places two measured categories in one group, so the rate-descending sort is never exercised")
+	}
+}
+
+// TestDailyHealthReportWithheldDetail asserts yellow and red summary lines
+// carry the fixed withheld-detail suffix and nothing else. The superseded
+// contract put a free-text failure note here, which leaked the analysis the
+// thread exists to hold.
+func TestDailyHealthReportWithheldDetail(t *testing.T) {
+	doc := loadDailyHealthReportDoc(t)
+	if !strings.Contains(doc, "append the exact suffix `"+detailsWithheld+"`") {
+		t.Errorf("the file must fix the yellow/red suffix as %q", detailsWithheld)
+	}
+	for _, forbidden := range []string{
+		"add a **short** inline note after the trend field",
+		"Keep notes under 40 characters",
+		"-- AMD64 & E2E at 40%",
+		"-- stale since Jun 17",
+	} {
+		if strings.Contains(doc, forbidden) {
+			t.Errorf("the superseded inline failure note must not survive (found %q)", forbidden)
+		}
+	}
+
+	var yellow, red int
+	for _, block := range loadSampleBlocks(t) {
+		for _, c := range categorySamples(t, block) {
+			withheld := strings.Contains(c.body, detailsWithheld)
+			// Residual text is anything the file never defines for a category
+			// line, wherever on the line it sits -- before the suffix as well
+			// as after it.
+			if c.residual != "" {
+				t.Errorf("line %d: %q is undefined text on a summary line; failure detail belongs in the step 5 thread",
+					c.line.number, c.residual)
+			}
+			switch c.emoji {
+			case ":large_yellow_circle:":
+				if c.rated {
+					yellow++
+				}
+			case ":red_circle:":
+				if c.rated {
+					red++
+				}
+			default:
+				if withheld {
+					t.Errorf("line %d: only yellow and red lines withhold detail, got %s", c.line.number, c.emoji)
+				}
+				continue
+			}
+			if !withheld {
+				t.Errorf("line %d: a %s line must carry %q, got %q", c.line.number, c.emoji, detailsWithheld, c.body)
+			}
+		}
+	}
+	if yellow == 0 || red == 0 {
+		t.Errorf("expected worked yellow and red category lines with real figures, found %d yellow and %d red", yellow, red)
+	}
+}
+
+// TestDailyHealthReportInformingOnlyRows asserts the hyphenated marker is the
+// one spelling, that an informing-only line is the white-circle final group,
+// and that a mixed category keeps its non-informing rate with the informing
+// figures beside it rather than inside it.
+func TestDailyHealthReportInformingOnlyRows(t *testing.T) {
+	doc := loadDailyHealthReportDoc(t)
+	if m := regexp.MustCompile(`(?i)\binforming only\b`).FindString(doc); m != "" {
+		t.Errorf("the marker is spelled `informing-only`; the unhyphenated form must not survive (found %q)", m)
+	}
+	for _, needle := range []string{
+		"Informing figures (informational only, never aggregated)",
+		"its rate, counts, trend and health indicator stay exactly as computed above, over its non-informing jobs only",
+		"print them as **informational** figures",
+		"excluded from the overall, gating and non-gating rollups",
+		"append the exact suffix `" + informingOnlySuffix + "`",
+	} {
+		if !strings.Contains(doc, needle) {
+			t.Errorf("informing handling must be stated (missing %q)", needle)
+		}
+	}
+
+	var informingOnly, mixed int
+	for _, block := range loadSampleBlocks(t) {
+		for _, c := range categorySamples(t, block) {
+			marked := strings.Contains(c.body, informingOnlySuffix)
+			if marked != (c.emoji == ":white_circle:") {
+				t.Errorf("line %d: %q and %s must go together", c.line.number, informingOnlySuffix, ":white_circle:")
+			}
+			if marked {
+				if c.rated {
+					informingOnly++
+				}
+				if c.tally {
+					t.Errorf("line %d: an informing-only row reports that population as its own rate; it carries no separate tally",
+						c.line.number)
+				}
+			}
+			if c.tally {
+				if c.rated && c.iTotal > 0 {
+					mixed++
+				}
+				if c.emoji == ":white_circle:" && marked {
+					t.Errorf("line %d: the tally belongs to a mixed category, not an informing-only one", c.line.number)
+				}
+			}
+			if strings.Contains(c.body, "informing") && !marked && !c.tally {
+				t.Errorf("line %d: unrecognised informing figure %q", c.line.number, c.body)
+			}
+		}
+	}
+	if informingOnly == 0 || mixed == 0 {
+		t.Errorf("expected worked informing-only and mixed category lines with real figures, found %d and %d",
+			informingOnly, mixed)
+	}
+}
+
+// TestDailyHealthReportInformingOnlyIsNotFailingHealth asserts every gate that
+// used to read "any category below 80%" is expressed in health-indicator terms
+// instead. Giving an informing-only category a visible informational rate puts
+// it inside a numeric threshold, where a 50% project-validation category would
+// block the all-green path and -- worse -- trip the pre-send check demanding a
+// failure-analysis reply that the threading gate forbids anyone to write.
+func TestDailyHealthReportInformingOnlyIsNotFailingHealth(t *testing.T) {
+	doc := loadDailyHealthReportDoc(t)
+	required := []struct{ needle, why string }{
+		{"**If no category is :large_yellow_circle: or :red_circle:**", "the all-green branch of step 4"},
+		{"- Before sending: if any category is :large_yellow_circle: or :red_circle:", "the pre-send failure-analysis check"},
+		{"On the all-green path (no :large_yellow_circle: or :red_circle: category)", "the all-green constraint"},
+		{"Analyze the 5 worst :large_yellow_circle:/:red_circle: categories first", "the step 5 scope cap"},
+		{"an informing-only category never qualifies", "the step 7 failure scope"},
+		{"Informing figures never change which categories are selected for failure analysis",
+			"that informational figures never widen the analysed set"},
+		{"its informational rate is not release-signal health", "why an informing-only category cannot fail the all-green test"},
+		{"health: \"informing-only\"", "the artifact convention that keeps the informational rate out of step 7's ranking"},
+	}
+	for _, r := range required {
+		if !strings.Contains(doc, r.needle) {
+			t.Errorf("an informing-only category must not read as failing health in %s (missing %q)", r.why, r.needle)
+		}
+	}
+}
+
+// TestDailyHealthReportSampleCategoriesReconcile asserts a complete worked
+// summary adds up: its non-informing category counts equal the two rollups,
+// and its informing figures equal the Informing rollup. This is what keeps a
+// sample from teaching that informing builds leak into the aggregate rates.
+func TestDailyHealthReportSampleCategoriesReconcile(t *testing.T) {
+	checked := 0
+	for _, block := range loadSampleBlocks(t) {
+		if isElided(block) {
+			continue // the block hides category lines, so its rows cannot sum
+		}
+		samples := categorySamples(t, block)
+		rollPass, rollTotal, haveRollup := rollupCounts(t, block, false)
+		var infPass, infTotal int
+		var haveInforming bool
+		for _, line := range block {
+			if m := informingRe.FindStringSubmatch(line.text); m != nil {
+				infPass = atoi(t, line, m[1])
+				infTotal = atoi(t, line, m[2])
+				haveInforming = true
+			}
+		}
+		var catPass, catTotal, tallyPass, tallyTotal int
+		counted := 0
+		for _, c := range samples {
+			if !c.counted {
+				continue
+			}
+			counted++
+			if c.emoji == ":white_circle:" {
+				tallyPass += c.pass
+				tallyTotal += c.total
+			} else {
+				catPass += c.pass
+				catTotal += c.total
+			}
+			tallyPass += c.iPass
+			tallyTotal += c.iTotal
+		}
+		if counted == 0 || !haveRollup {
+			continue // a template or all-N/A block has nothing to reconcile
+		}
+		if counted != len(samples) {
+			// Half-numeric blocks would reconcile against a partial sum and
+			// quietly pass; that is the silent skip this test exists to avoid.
+			t.Errorf("line %d: block mixes %d counted category lines with %d that carry none; reconciliation cannot be checked",
+				samples[0].line.number, counted, len(samples)-counted)
+			continue
+		}
+		checked++
+		if catPass != rollPass || catTotal != rollTotal {
+			t.Errorf("line %d: category lines sum to %d/%d but the rollups carry %d/%d",
+				samples[0].line.number, catPass, catTotal, rollPass, rollTotal)
+		}
+		// The rollup is mandatory whenever any informing job has data, so a
+		// block carrying informing figures without it is itself the defect.
+		if tallyTotal > 0 && !haveInforming {
+			t.Errorf("line %d: block shows informing figures (%d/%d) but no *Informing:* rollup",
+				samples[0].line.number, tallyPass, tallyTotal)
+		}
+		if haveInforming && (tallyPass != infPass || tallyTotal != infTotal) {
+			t.Errorf("line %d: informing figures sum to %d/%d but the *Informing:* rollup shows %d/%d",
+				samples[0].line.number, tallyPass, tallyTotal, infPass, infTotal)
+		}
+	}
+	if checked == 0 {
+		t.Error("expected a worked example whose complete category list reconciles with its rollups")
 	}
 }
 
@@ -523,7 +1032,7 @@ func TestDailyHealthReportBreakdownRowFields(t *testing.T) {
 		{"first match wins in this order", "a precedence that keeps the markers mutually exclusive"},
 		{"the same population as its rate", "markers judged over the non-informing jobs, so a marker cannot contradict the rate beside it"},
 		{"Never show an incomplete window as " + noRunsMarker, "that an incomplete window is never reported as no runs"},
-		{"informing {passing}/{total}", "the count-only informing tally"},
+		{"`informing-only {passing}/{total}`", "the count-only informing tally"},
 		{"never folded into the rate", "that informing jobs stay out of the rates"},
 		{"`prow_filter`", "the jobs link when the registry supplies one"},
 	}
@@ -675,18 +1184,19 @@ func TestDailyHealthReportBreakdownPointerExample(t *testing.T) {
 	}
 }
 
-// TestDailyHealthReportOverflowPreservesAnalysis asserts the overflow rule,
-// which may drop category lines from the summary, does not also drop those
-// categories' mandatory failure analysis: the threading gate must follow the
-// computed health rather than the emitted lines.
-func TestDailyHealthReportOverflowPreservesAnalysis(t *testing.T) {
+// TestDailyHealthReportWithheldDetailKeepsAnalysis asserts that withholding
+// detail from a summary line withholds only the text: the threading gate still
+// follows the computed health, so a yellow or red category whose line now says
+// nothing beyond "details withheld" still gets its mandatory step 5 reply.
+func TestDailyHealthReportWithheldDetailKeepsAnalysis(t *testing.T) {
 	doc := loadDailyHealthReportDoc(t)
 	for _, needle := range []string{
-		"Dropping a category *line* never drops that category's step 5 analysis",
 		"did this run **compute** any :red_circle: or :large_yellow_circle: category",
+		"The investigation belongs in the step 5 threaded replies.",
+		"at least one **failure-analysis** reply section",
 	} {
 		if !strings.Contains(doc, needle) {
-			t.Errorf("overflow must not suppress mandatory failure analysis (missing %q)", needle)
+			t.Errorf("withholding summary detail must not suppress mandatory failure analysis (missing %q)", needle)
 		}
 	}
 }
