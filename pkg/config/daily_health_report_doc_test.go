@@ -485,6 +485,8 @@ func TestDailyHealthReportUnknownDataDistinction(t *testing.T) {
 		"check 3 cannot be completed for that run: report it as inconclusive",
 		"coverage check inconclusive:",
 		"every **known** informing tally contributes to it whatever rate form sits beside it",
+		"An `informing-only` row whose own figures are unavailable contributes neither a count nor a zero here",
+		"it never makes check 3 inconclusive for the categories that do",
 	} {
 		if !strings.Contains(doc, needle) {
 			t.Errorf("instruction file must distinguish confirmed-empty from unknown totals (missing %q)", needle)
@@ -964,8 +966,8 @@ func TestDailyHealthReportSampleCategoriesReconcile(t *testing.T) {
 // nothing about an informing tally printed on the same row.
 type blockFigures struct {
 	samples               []categorySample
-	reconcilable          int // rows contributing known release-signal figures
-	unknown               int // rows whose release-signal totals are unknown
+	accounted             int // rows whose disposition is known, so the sums are not short
+	unknown               int // rows whose *release-signal* totals are unknown
 	catPass, catTotal     int
 	tallyPass, tallyTotal int
 	rollPass, rollTotal   int
@@ -986,26 +988,44 @@ func figuresOf(t *testing.T, block []sampleLine) blockFigures {
 		}
 	}
 	for _, c := range f.samples {
+		// Unavailable means no figures were retrieved, so an unavailable row
+		// can never carry counts. The dispositions below rely on this: it is
+		// what makes "unavailable contributes neither a count nor a zero"
+		// true by construction rather than by the order of the cases.
+		if c.unknown && (c.pass != 0 || c.total != 0) {
+			t.Fatalf("line %d: an unavailable row cannot carry counts, got %d/%d",
+				c.line.number, c.pass, c.total)
+		}
 		// A known informing tally is known whatever rate form sits beside it.
 		// Collecting it before the unknown branch is what keeps an
 		// unretrieved release-signal window from hiding an informing error.
 		f.tallyPass += c.iPass
 		f.tallyTotal += c.iTotal
 		switch {
+		case c.marked && c.unknown:
+			// An informing-only category has no release-signal population at
+			// all, so its being unavailable says nothing about the
+			// release-signal totals and must not make them unknown. Its own
+			// population is what is unavailable here, so it contributes
+			// neither a count nor a zero to the informing tally either --
+			// unavailable is not confirmed empty. The row is still fully
+			// accounted for: nothing about it is missing from the sums.
+			f.accounted++
 		case c.unknown:
 			// N/A (data unavailable) means the totals are not known. Counting
 			// it as zero would assert the category ran nothing, which is
 			// exactly the claim step 3 reserves for N/A (0/0).
 			f.unknown++
 		case c.marked:
-			// An informing-only row's rate is its informing population.
-			f.reconcilable++
+			// An informing-only row's rate is its informing population, so a
+			// confirmed-empty one contributes a real 0/0 to that tally.
+			f.accounted++
 			f.tallyPass += c.pass
 			f.tallyTotal += c.total
 		case c.counted || c.zeroDenom:
 			// A zero-denominator row contributes a real 0/0 here, which is
 			// what the coverage check calls a zero contributor.
-			f.reconcilable++
+			f.accounted++
 			f.catPass += c.pass
 			f.catTotal += c.total
 		}
@@ -1022,7 +1042,7 @@ func figuresOf(t *testing.T, block []sampleLine) blockFigures {
 func reconcileBlock(t *testing.T, block []sampleLine) (problems []string, compared bool) {
 	t.Helper()
 	f := figuresOf(t, block)
-	if len(f.samples) == 0 || !f.haveRollup {
+	if len(f.samples) == 0 {
 		return nil, false // a headline fragment carries no category rows to sum
 	}
 	at := f.samples[0].line.number
@@ -1040,18 +1060,21 @@ func reconcileBlock(t *testing.T, block []sampleLine) (problems []string, compar
 			at, f.tallyPass, f.tallyTotal, f.infPass, f.infTotal))
 	}
 
-	// Only the release-signal comparison needs every row's totals known.
+	// Only the release-signal comparison is gated below. Everything above
+	// runs on known tallies, including when both rollups are unavailable.
 	switch {
+	case !f.haveRollup:
+		return problems, false // no rollup carries counts to compare against
 	case f.unknown > 0:
 		return problems, false // inconclusive: unknown is not zero, so the sum would be short
-	case f.reconcilable == 0:
+	case f.accounted == 0:
 		return problems, false // a template block has nothing to reconcile
-	case f.reconcilable != len(f.samples):
+	case f.accounted != len(f.samples):
 		// Half-numeric blocks would reconcile against a partial sum and
 		// quietly pass; that is the silent skip this test exists to avoid.
 		return append(problems, fmt.Sprintf(
-			"line %d: block mixes %d category lines carrying figures with %d that carry none; reconciliation cannot be checked",
-			at, f.reconcilable, len(f.samples)-f.reconcilable)), false
+			"line %d: block mixes %d accounted category lines with %d that carry none; reconciliation cannot be checked",
+			at, f.accounted, len(f.samples)-f.accounted)), false
 	}
 	if f.catPass != f.rollPass || f.catTotal != f.rollTotal {
 		problems = append(problems, fmt.Sprintf(
@@ -1086,6 +1109,13 @@ func TestReconcileBlockSeparatesUnknownFromZero(t *testing.T) {
 	)
 	unavailableRow := ":white_circle: *B:* N/A (data unavailable) trend unavailable · informing-only 1/2 (<prow_filter|jobs>)"
 	zeroRow := ":white_circle: *C:* N/A (0/0) trend unavailable · informing-only 1/2 (<prow_filter|jobs>)"
+	// Informing-only rows: their rate *is* their informing population, so an
+	// unavailable one knows nothing while a confirmed-empty one knows zero.
+	unavailableInformingOnly := ":white_circle: *D:* N/A (data unavailable) trend unavailable -- informing-only (<prow_filter|jobs>)"
+	emptyInformingOnly := ":white_circle: *E:* N/A (0/0) trend unavailable -- informing-only (<prow_filter|jobs>)"
+	mixedRow := ":large_green_circle: *A:* 90% (18/20) :left_right_arrow: · informing-only 1/2 (<prow_filter|jobs>)"
+	naGating := "*Gating:* N/A (data unavailable) -- trend unavailable"
+	naNonGating := "*Non-gating:* N/A (data unavailable) -- trend unavailable"
 
 	for _, tc := range []struct {
 		name      string
@@ -1112,6 +1142,49 @@ func TestReconcileBlockSeparatesUnknownFromZero(t *testing.T) {
 		block:     syntheticBlock(header, "*Gating:* 90% (9/10) -- :left_right_arrow:", "*Non-gating:* 89% (8/9) -- :left_right_arrow:", "*Informing:* 1/2 passing (excluded from pass rates)", green, zeroRow),
 		wantErr:   "category lines sum to 18/20 but the rollups carry 17/19",
 		wantCheck: true,
+	}, {
+		// An informing-only category has no release-signal population, so its
+		// being unavailable must not make the other categories inconclusive.
+		name:      "unavailable informing-only row leaves the release signal reconcilable",
+		block:     syntheticBlock(header, gating, nonGate, green, unavailableInformingOnly),
+		wantErr:   "",
+		wantCheck: true,
+	}, {
+		name:      "unavailable informing-only row still lets a miscounted release signal fail",
+		block:     syntheticBlock(header, "*Gating:* 90% (9/10) -- :left_right_arrow:", "*Non-gating:* 89% (8/9) -- :left_right_arrow:", green, unavailableInformingOnly),
+		wantErr:   "category lines sum to 18/20 but the rollups carry 17/19",
+		wantCheck: true,
+	}, {
+		// Its population is unavailable, not empty: it adds nothing to the
+		// tally, so the mixed row's 1/2 must be the whole rollup.
+		name:      "unavailable informing-only row contributes neither count nor zero",
+		block:     syntheticBlock(header, gating, nonGate, "*Informing:* 1/2 passing (excluded from pass rates)", mixedRow, unavailableInformingOnly),
+		wantErr:   "",
+		wantCheck: true,
+	}, {
+		// A confirmed-empty informing-only row knows its population is zero,
+		// so it contributes a real 0/0 -- and cannot invent passes.
+		name:      "confirmed-empty informing-only row contributes a real zero",
+		block:     syntheticBlock(header, gating, nonGate, "*Informing:* 1/2 passing (excluded from pass rates)", mixedRow, emptyInformingOnly),
+		wantErr:   "",
+		wantCheck: true,
+	}, {
+		name:      "confirmed-empty informing-only row cannot cover a wrong informing rollup",
+		block:     syntheticBlock(header, gating, nonGate, "*Informing:* 99/100 passing (excluded from pass rates)", mixedRow, emptyInformingOnly),
+		wantErr:   "informing figures sum to 1/2 but the *Informing:* rollup shows 99/100",
+		wantCheck: true,
+	}, {
+		// Both rollups unavailable: no release-signal comparison is possible,
+		// but the informing tallies are still known and must reconcile.
+		name:      "unavailable rollups still reconcile a wrong informing rollup",
+		block:     syntheticBlock(header, naGating, naNonGating, "*Informing:* 99/100 passing (excluded from pass rates)", unavailableRow),
+		wantErr:   "informing figures sum to 1/2 but the *Informing:* rollup shows 99/100",
+		wantCheck: false,
+	}, {
+		name:      "unavailable rollups leave a correct informing rollup alone",
+		block:     syntheticBlock(header, naGating, naNonGating, "*Informing:* 1/2 passing (excluded from pass rates)", unavailableRow),
+		wantErr:   "",
+		wantCheck: false,
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
 			problems, compared := reconcileBlock(t, tc.block)
