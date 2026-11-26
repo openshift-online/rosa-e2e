@@ -222,7 +222,7 @@ Nothing was retrieved, so nothing is known. `N/A (data unavailable)` says exactl
 *ROSA CI Daily Health -- 2026-07-25 -- 85%*
 *Gating:* 94% (47/50) -- :left_right_arrow:
 *Non-gating:* 71% (22/31) -- :chart_with_downwards_trend:
-*Informing:* 5/10 passing (excluded from pass rates)
+*Informing:* 6/12 passing (excluded from pass rates)
 
 :large_green_circle: *ROSA HCP E2E:* 100% (20/20) :left_right_arrow: (<prow_filter|jobs>)
 :large_green_circle: *ROSA Classic E2E:* 95% (21/22) :left_right_arrow: · informing-only 2/4 (<prow_filter|jobs>)
@@ -230,13 +230,18 @@ Nothing was retrieved, so nothing is known. `N/A (data unavailable)` says exactl
 :large_yellow_circle: *HyperShift CI:* 79% (11/14) :chart_with_downwards_trend: -- details withheld (<prow_filter|jobs>)
 :red_circle: *ROSA CLI:* 30% (3/10) :chart_with_downwards_trend: -- details withheld (<prow_filter|jobs>)
 :white_circle: *Seaplane Regional:* 50% (3/6) :left_right_arrow: -- informing-only (<prow_filter|jobs>)
+:white_circle: *OSDFM Health:* N/A (0/0) trend unavailable · informing-only 1/2 (<prow_filter|jobs>)
 
 _<https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy> · <https://prow.ci.openshift.org/?type=periodic&job=*rosa*|Prow> · <https://rosa-eng-dashboard.apps.engineering.openshift.org/executive#ci-health|Dashboard>_
 ```
 
 Every configured category of this (small) registry has a line, so the footer carries neither a skipped-category count nor the complete-breakdown pointer: the inline list already is the complete view. The groups run green, yellow, red, informing-only with no heading between them, and pass rate descends inside the green group (100%, 95%, 93%). The yellow and red lines carry the fixed `-- details withheld` suffix: which jobs failed and why is in their step 5 threaded replies, not here.
 
-Informing jobs stay out of every rate. *ROSA Classic E2E* is mixed: its 95% (21/22) is its non-informing jobs alone, and its four informing jobs appear only as the `· informing-only 2/4` tally. *Seaplane Regional* is informing-only, so its 50% (3/6) is informational — it is the final group, and neither its passes nor its builds are in the 94%, the 71% or the 85%. The two sets of informing jobs are what the `*Informing:*` rollup totals as 5/10. The release-signal lines reconcile against the rollups instead: 20+21+14+11+3 = 69 passes over 20+22+15+14+10 = 81 builds, which is (47+22)/(50+31) = 85%.
+Informing jobs stay out of every rate. *ROSA Classic E2E* is mixed: its 95% (21/22) is its non-informing jobs alone, and its four informing jobs appear only as the `· informing-only 2/4` tally. *Seaplane Regional* is informing-only, so its 50% (3/6) is informational — it is the final group, and neither its passes nor its builds are in the 94%, the 71% or the 85%.
+
+*OSDFM Health* is the third form the final group holds: a **mixed** category whose non-informing jobs have a complete window that held no completed build, and whose informing jobs do have data. It is not informing-only, so it takes no suffix; its release-signal rate is `N/A (0/0)` and its informing figures stay in the tally beside it. A zero denominator is a measured zero, so the row contributes `0/0` to the release-signal sums rather than being left out of them — unlike `N/A (data unavailable)`, where the totals are unknown and nothing may be assumed.
+
+The three sets of informing jobs are what the `*Informing:*` rollup totals as 6/12: 2/4 from the mixed green line, 3/6 from the informing-only line, and 1/2 from the rate-less mixed line. The release-signal lines reconcile against the rollups instead: 20+21+14+11+3+0 = 69 passes over 20+22+15+14+10+0 = 81 builds, which is (47+22)/(50+31) = 85%.
 
 *All categories green and the report is delivered:* the same three-line headline block is emitted, followed by every green category line and the footer. Healthy is a reason to skip failure analysis, not a reason to skip the headline block or any category line.
 

@@ -95,18 +95,24 @@ var (
 
 // categorySample is one parsed category line of a fenced sample block.
 type categorySample struct {
-	line     sampleLine
-	emoji    string
-	body     string // everything between the category name and the jobs link
-	printed  int    // the percentage the line actually prints
-	pass     int
-	total    int
-	counted  bool // body opens with numeric counts, qualified or not
-	rated    bool // ... and its current window is complete, so the rate is comparable
-	iPass    int
-	iTotal   int
-	tally    bool
-	residual string // body text left over once every defined token is removed
+	line    sampleLine
+	emoji   string
+	body    string // everything between the category name and the jobs link
+	printed int    // the percentage the line actually prints
+	pass    int
+	total   int
+	counted bool // body opens with numeric counts, qualified or not
+	rated   bool // ... and its current window is complete, so the rate is comparable
+	// zeroDenom and unknown keep step 3's two N/A forms apart. A confirmed
+	// empty window contributes a real zero to the sums; unknown totals
+	// contribute nothing at all and must never be read as zero.
+	zeroDenom bool
+	unknown   bool
+	marked    bool // carries the informing-only suffix
+	iPass     int
+	iTotal    int
+	tally     bool
+	residual  string // body text left over once every defined token is removed
 }
 
 // categorySamples returns the category lines of one fenced block, in the order
@@ -129,6 +135,9 @@ func categorySamples(t *testing.T, block []sampleLine) []categorySample {
 			// (step 3), but its rate is not a comparable measurement.
 			c.rated = r[4] == ""
 		}
+		c.zeroDenom = strings.HasPrefix(c.body, zeroDenominator)
+		c.unknown = strings.HasPrefix(c.body, dataUnavailable)
+		c.marked = strings.Contains(c.body, informingOnlySuffix)
 		if tt := tallyRe.FindStringSubmatch(c.body); tt != nil {
 			c.tally = true
 			if tt[1] != "" {
@@ -844,26 +853,37 @@ func TestDailyHealthReportInformingOnlyRows(t *testing.T) {
 	var informingOnly, mixed int
 	for _, block := range loadSampleBlocks(t) {
 		for _, c := range categorySamples(t, block) {
-			marked := strings.Contains(c.body, informingOnlySuffix)
-			if marked != (c.emoji == ":white_circle:") {
-				t.Errorf("line %d: %q and %s must go together", c.line.number, informingOnlySuffix, ":white_circle:")
+			marked := c.marked
+			// The suffix implies the white circle, but not the reverse: the
+			// final group also holds a mixed category whose non-informing
+			// jobs returned no data, which takes an N/A release-signal rate
+			// and its informing tally with no suffix at all.
+			switch {
+			case marked && c.emoji != ":white_circle:":
+				t.Errorf("line %d: %q implies %s, got %s",
+					c.line.number, informingOnlySuffix, ":white_circle:", c.emoji)
+			case !marked && c.emoji == ":white_circle:":
+				if c.counted {
+					t.Errorf("line %d: a measured category takes a green, yellow or red indicator, not %s without %q",
+						c.line.number, ":white_circle:", informingOnlySuffix)
+				} else if !c.tally {
+					t.Errorf("line %d: %s without %q is only the rate-less mixed row, which carries an informing tally",
+						c.line.number, ":white_circle:", informingOnlySuffix)
+				}
 			}
 			if marked {
 				if c.rated {
 					informingOnly++
 				}
+				// marked implies white above, so this covers the
+				// informing-only row wherever its emoji lands.
 				if c.tally {
 					t.Errorf("line %d: an informing-only row reports that population as its own rate; it carries no separate tally",
 						c.line.number)
 				}
 			}
-			if c.tally {
-				if c.rated && c.iTotal > 0 {
-					mixed++
-				}
-				if c.emoji == ":white_circle:" && marked {
-					t.Errorf("line %d: the tally belongs to a mixed category, not an informing-only one", c.line.number)
-				}
+			if c.tally && c.rated && c.iTotal > 0 {
+				mixed++
 			}
 			if strings.Contains(c.body, "informing") && !marked && !c.tally {
 				t.Errorf("line %d: unrecognised informing figure %q", c.line.number, c.body)
@@ -924,30 +944,45 @@ func TestDailyHealthReportSampleCategoriesReconcile(t *testing.T) {
 			}
 		}
 		var catPass, catTotal, tallyPass, tallyTotal int
-		counted := 0
+		reconcilable, unknown := 0, 0
 		for _, c := range samples {
-			if !c.counted {
+			if c.unknown {
+				// N/A (data unavailable) means the totals are not known.
+				// Counting it as zero would assert the category ran nothing,
+				// which is exactly the claim step 3 reserves for N/A (0/0).
+				unknown++
 				continue
 			}
-			counted++
-			if c.emoji == ":white_circle:" {
+			// A tally belongs to the informing rollup whatever rate form the
+			// row prints beside it, including an N/A one.
+			tallyPass += c.iPass
+			tallyTotal += c.iTotal
+			if !c.counted && !c.zeroDenom {
+				continue // a placeholder row carries no figures to sum
+			}
+			reconcilable++
+			if c.marked {
+				// An informing-only row's rate is its informing population.
 				tallyPass += c.pass
 				tallyTotal += c.total
 			} else {
+				// A zero-denominator row contributes a real 0/0 here, which
+				// is what the coverage check calls a zero contributor.
 				catPass += c.pass
 				catTotal += c.total
 			}
-			tallyPass += c.iPass
-			tallyTotal += c.iTotal
 		}
-		if counted == 0 || !haveRollup {
-			continue // a template or all-N/A block has nothing to reconcile
+		if unknown > 0 {
+			continue // totals unknown somewhere in the block; nothing to reconcile against
 		}
-		if counted != len(samples) {
+		if reconcilable == 0 || !haveRollup {
+			continue // a template block has nothing to reconcile
+		}
+		if reconcilable != len(samples) {
 			// Half-numeric blocks would reconcile against a partial sum and
 			// quietly pass; that is the silent skip this test exists to avoid.
-			t.Errorf("line %d: block mixes %d counted category lines with %d that carry none; reconciliation cannot be checked",
-				samples[0].line.number, counted, len(samples)-counted)
+			t.Errorf("line %d: block mixes %d category lines carrying figures with %d that carry none; reconciliation cannot be checked",
+				samples[0].line.number, reconcilable, len(samples)-reconcilable)
 			continue
 		}
 		checked++
