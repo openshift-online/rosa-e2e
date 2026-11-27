@@ -380,6 +380,9 @@ categories:
       - name: HCP Backup CP In Progress
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-cpupzfin-integration-main
         informing: true
+      - name: HCP Backup MC One
+        prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-backup-mc-one-integration-main
+        informing: true
       - name: HCP AD Regional
         prow_job: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-ad-integration-regional-main
         informing: true
@@ -572,6 +575,8 @@ categories:
         prow_job: periodic-ci-openshift-release-main-nightly-5.0-e2e-rosa-hcp-ovn
       - name: HCP 5.1
         prow_job: periodic-ci-openshift-release-main-nightly-5.1-e2e-rosa-hcp-ovn
+      - name: HCP 5.2
+        prow_job: periodic-ci-openshift-release-main-nightly-5.2-e2e-rosa-hcp-ovn
 
   - id: classic-conformance
     scope: upstream
